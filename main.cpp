@@ -494,7 +494,7 @@ int load_profile(std::string Username, std::string Password)
     //go through and see if you are logged in already     
     for ( int i = 0; i < MAX_CLIENTS; i++ )
     {
-		printf("Looping all players and i is %i and Nick is %s Ident is %i Connected is %i", i ,User[i].Nick.c_str(), User[i].Ident, User[i].Sock->Connected);
+		//printf("Looping all players and i is %i and Nick is %s Ident is %i Connected is %i", i ,User[i].Nick.c_str(), User[i].Ident, User[i].Sock->Connected);
 		
         //tell the client if you are logged in already
         if (lower(User[i].Nick).compare(lower(Username)) == 0){
@@ -1171,7 +1171,8 @@ Item[ITEM_SNOW_BALL]=       SKO_Item(12,    12,    5,    0,    0,    0,     0,  
     
     if (pthread_create(&dbThread, NULL, DbLoop, 0)){
         printf("Could not create thread for db->..\n");
-        system("PAUSE");
+        return 1;
+	//system("PAUSE");
     }      
     
     for (unsigned long int i = 0; i < NUM_MAPS; i++)
@@ -5041,6 +5042,9 @@ if (HOLIDAY)
 						//MAP
 						int warp_m = atoi(rip.substr(0, rip.find_first_of(" ")).c_str());
 	
+						if (warp_m >= NUM_MAPS)
+							break;
+ 
 						printf("Warp %s to (%i,%i) on map [%i]\n", warp_user.c_str(), warp_x, warp_y, warp_m);
 
 						//find user

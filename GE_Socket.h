@@ -52,6 +52,7 @@ private:
 	double              micro_seconds;//counter
 	unsigned  int   stream_ticker;
 
+	~GE_Socket();
 	GE_Socket();
 	
     bool		OpenByIP(char* IP, unsigned int Port);

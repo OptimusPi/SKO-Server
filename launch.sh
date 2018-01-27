@@ -16,7 +16,7 @@ echo "...done!"
 
 #run the server
 echo -n "Starting server..."
-nohup ./sko-dev > server.log &
+nohup ./skoserver > server.log &
 
 #All done!
 echo "...Stick-Knights-Online server is running!"

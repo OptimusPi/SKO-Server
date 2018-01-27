@@ -76,14 +76,14 @@ void SKO_Player::init()
 
 void SKO_Player::Clear()
 {
-	printf("Clear();\n");
+	//printf("Clear();\n");
 	if (Sock)
 	{
-		printf("deleting Sock...");
+		//printf("deleting Sock...");
 		delete Sock;
 	}
 	init();
-	printf("Init() called.\n");
+	//printf("Init() called.\n");
 	
 }
 SKO_Player::~SKO_Player()

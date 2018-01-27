@@ -2,12 +2,12 @@
 
 GE_Socket::~GE_Socket()
 {		
-	printf("~GE_Socket()\n");
+	printf("~GE_Socket() {Socket is %i}\n", Socket);
 	if (Socket) { 
-		printf (">     close (Socket);\n");
+		//printf (">     close(%i);\n", (int)Socket);
 		close (Socket);	
 	} else {
-		printf(">     Nothing to clean up.\n");
+		//printf(">     Nothing to clean up.\n");
 	}
 }
  
@@ -24,7 +24,7 @@ GE_Socket::GE_Socket()
     timeout.tv_sec = 0; 
     timeout.tv_usec = 0;    
     sendTime = 0; 
-    Socket = NULL;
+    Socket = 0;
 } 
  
 void GE_Socket::Stream() 
@@ -240,7 +240,7 @@ void GE_Socket::Close()
     Data = "";
     Connected = false; 
     if (Socket > 0)
-close(Socket);
+	close(Socket);
     //crashes the server xD 
     //WSACleanup(); //Clean up Winsock 
 } 
