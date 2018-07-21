@@ -94,7 +94,7 @@ CREATE TABLE IF NOT EXISTS `clan` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
   `owner_id` int(11) NOT NULL,
   `name` varchar(19) NOT NULL,
-  `bio` varchar(255) NOT NULL,
+  `bio` varchar(255) NOT NULL DEFAULT 'A Stick Knights clan.',
   PRIMARY KEY (`id`)
 ) ENGINE=InnoDB  DEFAULT CHARSET=latin1 AUTO_INCREMENT=1 ;
 
