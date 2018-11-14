@@ -3,9 +3,9 @@
 
 #include <SDL/SDL.h>
 
-static unsigned int Clock()
+static unsigned long int Clock()
 {
-	return (unsigned int)SDL_GetTicks();
+	return (unsigned long int)SDL_GetTicks();
 }
 
 static void Sleep(unsigned int ms)

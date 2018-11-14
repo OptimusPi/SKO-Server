@@ -31,9 +31,9 @@ public:
 		bool Que;
 		bool Ident;
 		bool Save;
-		unsigned int QueTime;
+		unsigned long int QueTime;
 		unsigned int ping;
-		unsigned int pingTicker;
+		unsigned long int pingTicker;
 		bool pingWaiting;
 			
 		
@@ -54,8 +54,8 @@ public:
         bool attacking;
         bool ground;
         bool facing_right;
-        unsigned int attack_ticker;
-        unsigned int regen_ticker;
+        unsigned long int attack_ticker;
+        unsigned long int regen_ticker;
         int que_action; 
         
         void setX();
@@ -108,8 +108,8 @@ public:
 	int clanStatus;
 	int clanPlayer;
 	//party
-	    int party;
-        int partyStatus;
+	int party;
+	int partyStatus;
 
 
    //fun server stuff

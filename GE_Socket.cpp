@@ -19,7 +19,6 @@ GE_Socket::GE_Socket()
     IP = ""; 
     byte_counter = 0;//counts data in bytes 
     bandwidth = 0;//bytes per second 
-    micro_seconds = 0;//counter 
     stream_ticker = 0;   
     timeout.tv_sec = 0; 
     timeout.tv_usec = 0;    
@@ -106,10 +105,12 @@ int GE_Socket::GetStatus2()
     { 
         Status |= GE_Socket_OK; 
     } 
-    if( FD_ISSET(Socket,&wset) ){  
+    if( FD_ISSET(Socket,&wset) )
+	{  
         Status |= GE_Socket_Write; 
     } 
-    else if( FD_ISSET(Socket,&rset) ){ 
+    else if( FD_ISSET(Socket,&rset) ){
+		
          Status |= GE_Socket_Read; 
     } 
      
@@ -129,12 +130,12 @@ int GE_Socket::GetStatus()
     fd_set wset; 
     fd_set eset; 
  
-    FD_ZERO(&rset);  
-    FD_ZERO(&wset);  
-    FD_ZERO(&eset);  
-    FD_SET((unsigned int)Socket,&rset);  
-    FD_SET((unsigned int)Socket,&wset);  
-    FD_SET((unsigned int)Socket,&eset); 
+    FD_ZERO(&rset);
+    FD_ZERO(&wset);
+    FD_ZERO(&eset);
+    FD_SET((unsigned int)Socket,&rset);
+    FD_SET((unsigned int)Socket,&wset);
+    FD_SET((unsigned int)Socket,&eset);
  
     //printf("Time a: %i\n", Clock()); 
     int i = select(FD_SETSIZE,&rset,&wset,&eset,(struct timeval*)&timeout); 
@@ -247,21 +248,21 @@ void GE_Socket::Close()
  
 int GE_Socket::Send(std::string in_Data) 
 { 
-        if( send(Socket, in_Data.c_str(), in_Data.length(), 0) == 0 ) 
-        { 
-            perror("SEND() FAILED!!!\n"); 
-            printf("send_Data [%s] send_Data.length [%i]\n", in_Data.c_str(), (int)in_Data.length()); 
-            printf("Packet code was %i\n", in_Data[1]); 
-             
-            printf("getStatus returns this: [%i]\n", GetStatus()); 
-            Close(); 
-             
-            return (int)GE_Socket_Error; 
-        }     
-     
-         
-         
-        return (int)GE_Socket_OK; 
+	if( send(Socket, in_Data.c_str(), in_Data.length(), 0) == 0 ) 
+	{ 
+		perror("SEND() FAILED!!!\n"); 
+		printf("send_Data [%s] send_Data.length [%i]\n", in_Data.c_str(), (int)in_Data.length()); 
+		printf("Packet code was %i\n", in_Data[1]); 
+		 
+		printf("getStatus returns this: [%i]\n", GetStatus()); 
+		Close(); 
+		 
+		return (int)GE_Socket_Error; 
+	}     
+ 
+	 
+	 
+	return (int)GE_Socket_OK; 
 } 
  
  

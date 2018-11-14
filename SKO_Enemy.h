@@ -48,22 +48,22 @@ class SKO_Enemy
       bool attacking;
       bool ground;
       int  current_frame;
-      int animation_ticker;
-      int attack_ticker;
+      unsigned long int animation_ticker;
+      unsigned long int attack_ticker;
 	  
 	  //loot
 	  int lootAmount;
 	  std::vector<Loot> lootItem;
       
 	  //keep track of players who hit me
-	  int dibsPlayer;
-	  int dibsTicker;
+	  unsigned int dibsPlayer;
+	  unsigned long int dibsTicker;
 	  int dibsDamage[MAX_CLIENTS];
 	  
 	  
       //AI
       bool dead;
-      unsigned  int respawn_ticker;
+      unsigned int respawn_ticker;
       unsigned int AI_ticker;
       unsigned int AI_period;
       int      AI_pos;      

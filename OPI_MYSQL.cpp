@@ -117,15 +117,15 @@ int OPI_MYSQL::reconnect()
 	         
 
         Connected = false;
-        log("reconnect()\n");
+        //log("reconnect()\n");
          
-	log("conn = mysql_init(NULL);\n");
+	//log("conn = mysql_init(NULL);\n");
              conn = mysql_init(NULL);    
 	printf("mysql_real_connect((MYSQL *)conn, %s, %s, %s, %s, 0, NULL, (unsigned long)0);", server, user, password, database);
         do {//make the connection
 	 
 
-	  if (!mysql_real_connect((MYSQL *)conn, server, user, password, database, 0, NULL, (unsigned long)0)) {
+			if (!mysql_real_connect((MYSQL *)conn, server, user, password, database, 0, NULL, (unsigned long)0)) {
        	      log("-1\n");
        	      //if it is NULL there is some error
        	      log("Error was:\n" + (std::string)(getError()) + "*");
@@ -154,7 +154,6 @@ int OPI_MYSQL::query(std::string statement)
 
 int OPI_MYSQL::query(std::string statement, bool once)
 {
-
     sem_wait(&mutex);
 	
     log("OPI_MYSQL::query()\n\t");
@@ -169,50 +168,57 @@ int OPI_MYSQL::query(std::string statement, bool once)
     //make the query
     do
     {
-
-	log("OPI_MySQL::query(): do\n");
+		log("OPI_MySQL::query(): do\n");
     	
-            if (fail || !Connected){
-       		log("\nYou want a query but I'm not connected.\nI'll try to reconnect.\n");
- 	      while (reconnect()) {
-		   log("Trying to reconnect in Mr. Failed Query if-statement...It didn't work..but I'll wait a second and try again.");
-		   
-		   Sleep(1000);
-	       }
-	       log("\nReconnected finally, now I'll try your damn query.\n");
-	    } 
-	    
+		if (fail || !Connected)
+		{
+			printf("OPI_MYSQL`````````````fail : %i, Connected: %i", (int)fail, (int)Connected);
+			int reconnectAttempts = 0;
+			
+			log("\nYou want a query but I'm not connected.\nI'll try to reconnect.\n");
+			while (reconnect()) 
+			{
+				log("Trying to reconnect in Mr. Failed Query if-statement...It didn't work..but I'll wait a second and try again.");
+				Sleep(1000);
+				if (++reconnectAttempts > 5)
+					return 1;
+			}
+			log("\nReconnected finally, now I'll try your damn query.\n");
+		} 
 	
 	    //count is 0;
 	    rowCount = 0;
 	        	
 	    fail = false;
 	    
-	    //fixed memleak by cearing necessary result
+	    //fixed memleak by clearing necessary result
 	    //if (result)
 	    //{
 	    //   printf("mysql_free_result(%d)\n", (long)result);
 	    //   mysql_free_result(result);
-            //}
+		//}
  
-            printf("mysql_real_query(%d, [%s], %i);\n", (long)conn, statement.c_str(), statement.size()); 
+        printf("mysql_real_query(%d, [%s], %i);\n", (long)conn, statement.c_str(), statement.size()); 
 	    returnVal = mysql_real_query(conn, statement.c_str(), statement.size());
-	    
-
+	    printf("return value is: %i \r\n", returnVal);
 	    if (returnVal == 0)
 	    {
-		printf("query success!\n");
-		//store returnthe result
+			printf("query success!\n");
+			//store the result
 	        result = mysql_store_result(conn);
 
-		if (result)
-	        {
-	           rowCount = mysql_num_rows(result);
-	           numOfFields = mysql_num_fields(result);
-	        } else {
-			fail = true;
-		}
-		fail = false;
+			if (result)
+			{
+			   rowCount = mysql_num_rows(result);
+			   numOfFields = mysql_num_fields(result);
+			} 
+			else 
+			{
+				//TODO - umm... this fixed a bug but is result 
+				//printf("OPI_MYSQL QUERY FAIL! %i \r\n", result);
+				//Sleep(6000);
+				//fail = true;
+			}
 	    } 
 	    else 
 	    {
@@ -223,9 +229,9 @@ int OPI_MYSQL::query(std::string statement, bool once)
 
 			
 	      	printf("This is dangerous! I must re-try your query!\n");
-		Sleep(1000);
+			Sleep(1000);
 	    }
-	error = std::string(mysql_error(conn));
+		error = std::string(mysql_error(conn));
        
     }while (fail && !once);
     
