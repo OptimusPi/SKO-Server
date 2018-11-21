@@ -56,7 +56,7 @@ class SKO_Enemy
 	  std::vector<Loot> lootItem;
       
 	  //keep track of players who hit me
-	  unsigned int dibsPlayer;
+	  int dibsPlayer;
 	  unsigned long int dibsTicker;
 	  int dibsDamage[MAX_CLIENTS];
 	  

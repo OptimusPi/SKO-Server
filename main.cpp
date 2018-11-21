@@ -109,7 +109,6 @@ int attack_speed = 40*6;
 
 //Database connection
 OPI_MYSQL *db;// = new OPI_MYSQL();;
-bool dbConnected = false;
 
 //this waits for auto-save
 unsigned int persistTicker;
@@ -152,22 +151,9 @@ std::string lower(std::string myString)
   return myString;
 }
 
-void assertDB()
-{
-    
-return; 
-     while (dbConnected == false)
-     {
-        printf("assertDB() waiting for db to reconnect\n");
-        Sleep(1000);    
-     } 
-  
-}
-
    
 int ipban(int Mod_i, std::string IP, std::string Reason)
 {
-    assertDB();   
     //are you a moderator
     if (User[Mod_i].Moderator)
     {
@@ -225,8 +211,7 @@ int kick(int Mod_i, std::string Username)
 }
 
 int mute (int Mod_i, std::string Username, int flag)
-{
-    assertDB();  
+{ 
     std::string sql = "SELECT * FROM player WHERE username LIKE '";
     sql += db->clean(Username);
     sql += "'";
@@ -310,9 +295,6 @@ int mute (int Mod_i, std::string Username, int flag)
 
 int ban(int Mod_i, std::string Username, std::string Reason, int flag)
 {
-
-    
-    assertDB();  
     std::string sql = "SELECT * FROM player WHERE username LIKE '";
     sql += db->clean(Username);
     sql += "'";
@@ -400,7 +382,6 @@ int create_profile(std::string Username, std::string Password, std::string IP)
 {    
        
        printf("create_profile()\n");
-       assertDB();  
        std::string sql = "SELECT * FROM player WHERE username LIKE '";
        sql += db->clean(Username);
        sql += "'";
@@ -432,12 +413,19 @@ int create_profile(std::string Username, std::string Password, std::string IP)
           printf("not ip banned. good.\n");
        }
     
-    
-       sql = "INSERT INTO player (username, password, level, x, y, hp, str, def, xp_max, hp_max, current_map) VALUES('";
+	   //create unique salt for user password
+	   sql = "SELECT REPLACE(UUID(), '-', '');";
+	   db->query(sql);
+	   db->nextRow();
+	   std::string player_salt = db->getString(0);
+	   
+       sql = "INSERT INTO player (username, password, level, x, y, hp, str, def, xp_max, hp_max, current_map, salt) VALUES('";
        sql += db->clean(Username);
-       sql += "', sha1('";
-       sql += db->clean(Password);
-       sql += "'), '1', '400', '300', '10', '2', '1', '10', '10', '2')";
+       sql += "', '";
+       sql += db->clean(Hash(Password, player_salt));
+       sql += "', '1', '400', '300', '10', '2', '1', '10', '10', '2', '";
+	   sql += db->clean(player_salt);
+	   sql += "')";
        printf(sql.c_str());
        db->query(sql);
        printf("inserted. Well, tried anyway.\n");
@@ -489,7 +477,7 @@ int create_profile(std::string Username, std::string Password, std::string IP)
 int load_profile(std::string Username, std::string Password)
 {    
     bool mute = false;
-    std::string player_id = "";
+    std::string player_id = "", player_salt = "";
     
     //go through and see if you are logged in already     
     for ( int i = 0; i < MAX_CLIENTS; i++ )
@@ -502,9 +490,6 @@ int load_profile(std::string Username, std::string Password)
            return 2;         
 		}
     }
-
-    //don't login unless connected
-    assertDB();
     
     std::string sql = "SELECT * FROM player WHERE username like '";
     sql += db->clean(Username);
@@ -516,6 +501,8 @@ int load_profile(std::string Username, std::string Password)
        db->nextRow();
        //get the id for loading purposes
        player_id = db->getString(0);
+	   //get the salt for login purposes
+	   player_salt = db->getString(26);
     }
     else //could not open file!
     {
@@ -547,9 +534,9 @@ int load_profile(std::string Username, std::string Password)
 	
     sql = "SELECT * FROM player WHERE username like '";
     sql += db->clean(Username);
-    sql += "' AND password like sha1('";
-    sql += db->clean(Password);
-    sql += "')";
+    sql += "' AND password like '";
+    sql += db->clean(Hash(Password, player_salt));
+    sql += "'";
     db->query(sql);
        
     if (!db->count())//&& Password != "389663e912c6f954c00aeb2343aee4e2")
@@ -579,8 +566,7 @@ int save_profile(int CurrSock)
 		printf("dafuq? I'm not saving someone without a username.\n");
 		return 1;
 	}
-
-        assertDB();  
+ 
         std::string player_id = User[CurrSock].ID;
         {
             //save inventory
@@ -727,7 +713,6 @@ void saveAllProfiles()
         if (User[i].Ident || User[i].Save)
         {
 			printf("Saving profile: [%s]\n", User[i].Nick.c_str());
-            assertDB();
             save_profile(i);
             printf("\e[35;0m[Saved %s]\e[m\n", User[i].Nick.c_str());
             numSaved++;
@@ -793,9 +778,6 @@ void saveAllProfiles()
 
 int load_data(int CurrSock)
 {
-	//asset database connection
-	assertDB();
-	
 	int returnVals = 0;
 	
 	std::string sql = "SELECT * FROM player WHERE username LIKE '";
@@ -842,6 +824,9 @@ int load_data(int CurrSock)
 	   User[CurrSock].minutesPlayed = db->getInt(21);
 	   //what map is the current user on
 		User[CurrSock].current_map = db->getInt(22);
+		
+		
+	printf("%s is on map: %i\r\n", User[CurrSock].Nick.c_str(), User[CurrSock].current_map);
 		User[CurrSock].inventory_order = base64_decode(db->getString(23));  
 		
 		printf("the length of the inventory is : %i \n", (int)User[CurrSock].inventory_order.length());
@@ -1046,10 +1031,6 @@ int main()
        printf("Could not connect.\r\n");
        db->getError();
 	   return 1;
-    } else 
-	{
-       printf("Connected to SQL database.\n");
-       dbConnected = true;
     }
 
     //items                            width,  height, type, def,  str,  hp,  reach, equipID
@@ -1214,66 +1195,32 @@ Item[ITEM_SNOW_BALL]=       SKO_Item(12,    12,    5,    0,    0,    0,     0,  
 
 void *DbLoop(void *arg)
 {
-     //auto saving variables
-     int persistRate = 1000 * 60 * 5;
+	//auto saving variables
+	int persistRate = 1000 * 60 * 5;
      
     return arg;
  
-     while (true)
-     {     
-         
-         //check for errors to the database connection
-         int errorNum = db->ping();
-         if (errorNum)
-         {
-            printf("ping said: [%i]\nerror says: [%s]\n", errorNum, db->getError().c_str());
-            dbConnected = false;
-            
-            //an error occurred
-            printf("***\n***\nLost connection to the SQL database.\nReconnecting...\n"); 
-            if (!db->reconnect())
-            {
-                printf("...successfully re-connected to the SQL database.\n"); 
-                dbConnected = true;              
-            }
-            else
-            {
-                printf("Reconnect to database failed. Will try again!\n");
-            }           
-         }
-         
-         //auto save
-         if (dbConnected && Clock() - persistTicker >= persistRate)
-         {
-	    printf("Auto Save\n");
-
-            saveAllProfiles();
-            
-
-	    printf("Persist Ticker");
-            //reset ticker
-            persistTicker = Clock();
-         }
-         
-         
-         //Sleep(1000);
-	 Sleep(1000);
-
-         //std::cout << "Clock(): " << Clock() << std::endl;
-         
-     }
+	while (true)
+	{     
+		//auto save
+		if (Clock() - persistTicker >= persistRate)
+		{
+			printf("Auto Save...\r\n");
+			saveAllProfiles();
+			//reset ticker
+			persistTicker = Clock();
+		}
+		Sleep(1000);
+    }
 }
 
 void *QueLoop(void *arg)
 {
      while (!SERVER_QUIT)
-     {     
-
-
+     {
         // Cycle through all connections
-	for( int CurrSock = 0; CurrSock < MAX_CLIENTS; CurrSock++ )
-	{
-     
+		for( int CurrSock = 0; CurrSock < MAX_CLIENTS; CurrSock++ )
+		{
             //check Que
             if (User[CurrSock].Que)
             {
@@ -1345,7 +1292,6 @@ void *QueLoop(void *arg)
                    }
                    else  // Recv returned error!
                    { 
-                         
                          User[CurrSock].Que = false;
                          User[CurrSock].Status = false;
                          User[CurrSock].Ident = false;
@@ -1364,16 +1310,16 @@ void *QueLoop(void *arg)
                    } 
                                           
             } //end que
-         } //end for loop
+        } //end for loop
          
-         //checking que loop 10 times per second is plenty fast
-         Sleep(300);
+        //checking que loop 2 times per second is plenty fast
+        Sleep(500);
     } //end while loop
 }//end QueLoop
 
 void *ConnectLoop(void *arg)
 {
-     while (true)
+     while (!SERVER_QUIT)
      {     
 		//check for disconnects by too high of ping.
 		for (int i = 0 ; i < MAX_CLIENTS; i++)
@@ -1521,7 +1467,7 @@ void *MainLoop(void *arg)
 	int data_len = 0;
 	int pack_len = 0;
 	int code = -1;
-	while (true)
+	while (!SERVER_QUIT)
 	{       
 
 		// If this socket is taken
@@ -1639,8 +1585,6 @@ void *MainLoop(void *arg)
 				if (result == 0 || result == 5) //login with no problems or with 1 problem: user is mute
 				{//login success
 				
-					  
-					
 					printf("(login success) User %i %s socket status: %i\n", CurrSock, Username.c_str(), User[CurrSock].Sock->GetStatus());
 					
 					if (result == 0)
@@ -2027,7 +1971,7 @@ void *MainLoop(void *arg)
 						for (int i = 0; i < MAX_CLIENTS; i++)
 						{
 							//tell everyone new has joined
-							if (User[i].Ident)
+							if (User[i].Ident || i == CurrSock)
 							{
 								std::string Message1 = "0";	
 
@@ -2238,21 +2182,17 @@ void *MainLoop(void *arg)
 			}//end "register"        
 			else if (code == ATTACK)
 			{ 
-                             
-			      
-				 float numx, numy;
-                                 ((char*)&numx)[0] = User[CurrSock].Sock->Data[2];
-                                 ((char*)&numx)[1] = User[CurrSock].Sock->Data[3];
-                                 ((char*)&numx)[2] = User[CurrSock].Sock->Data[4];
-                                 ((char*)&numx)[3] = User[CurrSock].Sock->Data[5];
-                                 ((char*)&numy)[0] = User[CurrSock].Sock->Data[6];
-                                 ((char*)&numy)[1] = User[CurrSock].Sock->Data[7];
-                                 ((char*)&numy)[2] = User[CurrSock].Sock->Data[8];
-                                 ((char*)&numy)[3] = User[CurrSock].Sock->Data[9];
-			      Attack(CurrSock, numx, numy);
-
-			        
-                        }                  //end enemy loop
+				float numx, numy;
+				((char*)&numx)[0] = User[CurrSock].Sock->Data[2];
+				((char*)&numx)[1] = User[CurrSock].Sock->Data[3];
+				((char*)&numx)[2] = User[CurrSock].Sock->Data[4];
+				((char*)&numx)[3] = User[CurrSock].Sock->Data[5];
+				((char*)&numy)[0] = User[CurrSock].Sock->Data[6];
+				((char*)&numy)[1] = User[CurrSock].Sock->Data[7];
+				((char*)&numy)[2] = User[CurrSock].Sock->Data[8];
+				((char*)&numy)[3] = User[CurrSock].Sock->Data[9];
+			    Attack(CurrSock, numx, numy);
+			}                  //end enemy loop
 			else if (code == MOVE_RIGHT)
 			{    
                              
@@ -5305,7 +5245,7 @@ void *TargetLoop(void *arg)
 	long int timea;
 	long int current_map = (intptr_t)arg;
 
-	while (true)
+	while (!SERVER_QUIT)
 	{
 		timea = Clock();
 		//npc
@@ -5331,7 +5271,7 @@ void *EnemyLoop(void *arg)
    long int current_map = (intptr_t)arg;
      
    
-     while (true)
+     while (!SERVER_QUIT)
      {
          timea = Clock();
          
@@ -5344,7 +5284,7 @@ void *EnemyLoop(void *arg)
 
 	     	//check for dibs on the kill, reset after 5 seconds
 		if (Clock() - map[current_map].Enemy[i]->dibsTicker >= 5000)
-             	{ 
+        { 
 			map[current_map].Enemy[i]->dibsPlayer = -1;
 			map[current_map].Enemy[i]->dibsTicker = 0;
 		}
@@ -5811,7 +5751,7 @@ void *Physics(void *arg)
 {
 
     //initialize the timestep
-KE_Timestep *timestep = new KE_Timestep(60);
+	KE_Timestep *timestep = new KE_Timestep(60);
 
 
     long int current_map = (intptr_t)arg;
@@ -5825,75 +5765,63 @@ KE_Timestep *timestep = new KE_Timestep(60);
     unsigned int amt = 0;
     char b1, b2, b3, b4;
     
-unsigned int updates = 0;
-unsigned int lastTime = Clock();
+	unsigned int updates = 0;
+	unsigned int lastTime = Clock();
 
-    while (true)
+    while (!SERVER_QUIT)
     {
-
-
-	/*if (updates >= 256)
-	{
-		printf("Updates per second: %.4f\n", ((double)updates/((Clock()-lastTime)/1000.0)));
-		updates = 0;
-		lastTime = Clock();	        
-	}*/
-
         //update the timestep
         timestep->Update();
              
         while (timestep->Check())
-        {
-                      
-         //enemies
-         for (int i = 0; i < map[current_map].num_enemies; i++)
-         {
+        {      
+			//enemies
+			for (int i = 0; i < map[current_map].num_enemies; i++)
+			{
 
-             //enemy physics
-             if (map[current_map].Enemy[i]->y_speed < 10)
-                map[current_map].Enemy[i]->y_speed += GRAVITY;
+				//enemy physics
+				if (map[current_map].Enemy[i]->y_speed < 10)
+					map[current_map].Enemy[i]->y_speed += GRAVITY;
     
-             //verical collision detection
+				//verical collision detection
                 block_y = blocked(current_map, map[current_map].Enemy[i]->x + map[current_map].Enemy[i]->x1, map[current_map].Enemy[i]->y+map[current_map].Enemy[i]->y_speed + map[current_map].Enemy[i]->y1 + 0.25, map[current_map].Enemy[i]->x + map[current_map].Enemy[i]->x2, map[current_map].Enemy[i]->y+map[current_map].Enemy[i]->y_speed + map[current_map].Enemy[i]->y2, true);
     
-                 map[current_map].Enemy[i]->ground = true;
+				map[current_map].Enemy[i]->ground = true;
     
     
-                 //vertical movement
-                 if (!block_y)
-                 {//not blocked, fall
+                //vertical movement
+                if (!block_y)
+                {//not blocked, fall
     
-                    //animation
-                    map[current_map].Enemy[i]->ground = false;
+                   //animation
+                   map[current_map].Enemy[i]->ground = false;
     
-                    map[current_map].Enemy[i]->y += map[current_map].Enemy[i]->y_speed;
+                   map[current_map].Enemy[i]->y += map[current_map].Enemy[i]->y_speed;
     
-                 }
-                 else
-                 {  //blocked, stop
+                }
+                else
+                {  //blocked, stop
                     if (map[current_map].Enemy[i]->y_speed > 0)
                     {
                         map[current_map].Enemy[i]->y_speed = 1;
     
-                        //while or if TODO
-			 for (int loopVar = 0; loopVar < HIT_LOOP && (!blocked(current_map, map[current_map].Enemy[i]->x + map[current_map].Enemy[i]->x1, map[current_map].Enemy[i]->y+map[current_map].Enemy[i]->y_speed + map[current_map].Enemy[i]->y1 + 0.25, map[current_map].Enemy[i]->x + map[current_map].Enemy[i]->x2, map[current_map].Enemy[i]->y+map[current_map].Enemy[i]->y_speed + map[current_map].Enemy[i]->y1 + 0.25 + map[current_map].Enemy[i]->y2, true)) ; loopVar++)
+						//while or if TODO
+						for (int loopVar = 0; loopVar < HIT_LOOP && (!blocked(current_map, map[current_map].Enemy[i]->x + map[current_map].Enemy[i]->x1, map[current_map].Enemy[i]->y+map[current_map].Enemy[i]->y_speed + map[current_map].Enemy[i]->y1 + 0.25, map[current_map].Enemy[i]->x + map[current_map].Enemy[i]->x2, map[current_map].Enemy[i]->y+map[current_map].Enemy[i]->y_speed + map[current_map].Enemy[i]->y1 + 0.25 + map[current_map].Enemy[i]->y2, true)) ; loopVar++)
                               map[current_map].Enemy[i]->y += map[current_map].Enemy[i]->y_speed;
     
                         map[current_map].Enemy[i]->y = (int) (map[current_map].Enemy[i]->y + 0.5);
-                       
-                       
+
                     }
                     if (map[current_map].Enemy[i]->y_speed < 0)
                     {
                         map[current_map].Enemy[i]->y_speed = -1;
     
-			//while or if TODO
+						//while or if TODO
                         for (int loopVar = 0; loopVar < HIT_LOOP &&  (!blocked(current_map, map[current_map].Enemy[i]->x + map[current_map].Enemy[i]->x1, map[current_map].Enemy[i]->y+map[current_map].Enemy[i]->y_speed + map[current_map].Enemy[i]->y1 + 0.25, map[current_map].Enemy[i]->x + map[current_map].Enemy[i]->x2, map[current_map].Enemy[i]->y+map[current_map].Enemy[i]->y_speed + map[current_map].Enemy[i]->y1 + 0.25 + map[current_map].Enemy[i]->y2, true)) ; loopVar++)
                            map[current_map].Enemy[i]->y += map[current_map].Enemy[i]->y_speed;
                     }
     
-                    map[current_map].Enemy[i]->y_speed = 0;
-                    
+                    map[current_map].Enemy[i]->y_speed = 0; 
                  }
     
                  //horizontal collision detection
@@ -5907,58 +5835,55 @@ unsigned int lastTime = Clock();
     
                  if ((map[current_map].Enemy[i]->x_speed == 0 && map[current_map].Enemy[i]->y_speed == 0) || !map[current_map].Enemy[i]->attacking)
                     map[current_map].Enemy[i]->current_frame = 0;
-         }//end enemies/npc
+			}//end enemies/npc
 
 
-//npcs
-         for (int i = 0; i < map[current_map].num_npcs; i++)
-         {
-
-             //enemy physics
-             if (map[current_map].NPC[i]->y_speed < 10)
-                map[current_map].NPC[i]->y_speed += GRAVITY;
+			//npcs
+			for (int i = 0; i < map[current_map].num_npcs; i++)
+			{
+				//enemy physics
+				if (map[current_map].NPC[i]->y_speed < 10)
+					map[current_map].NPC[i]->y_speed += GRAVITY;
     
-             //verical collision detection
+				//verical collision detection
                 block_y = blocked(current_map, map[current_map].NPC[i]->x + map[current_map].NPC[i]->x1, map[current_map].NPC[i]->y+map[current_map].NPC[i]->y_speed + map[current_map].NPC[i]->y1 + 0.25, map[current_map].NPC[i]->x + map[current_map].NPC[i]->x2, map[current_map].NPC[i]->y+map[current_map].NPC[i]->y_speed + map[current_map].NPC[i]->y2, true);
     
-                 map[current_map].NPC[i]->ground = true;
+                map[current_map].NPC[i]->ground = true;
     
     
-                 //vertical movement
-                 if (!block_y)
-                 {//not blocked, fall
+                //vertical movement
+                if (!block_y)
+                {//not blocked, fall
     
-                    //animation
-                    map[current_map].NPC[i]->ground = false;
+                   //animation
+                   map[current_map].NPC[i]->ground = false;
     
-                    map[current_map].NPC[i]->y += map[current_map].NPC[i]->y_speed;
+                   map[current_map].NPC[i]->y += map[current_map].NPC[i]->y_speed;
     
-                 }
-                 else
-                 {  //blocked, stop
+                }
+                else
+                {   
+					//blocked, stop
                     if (map[current_map].NPC[i]->y_speed > 0)
                     {
-                        map[current_map].NPC[i]->y_speed = 1;
+                       map[current_map].NPC[i]->y_speed = 1;
     
                         //while or if TODO
-			 for (int loopVar = 0; loopVar < HIT_LOOP && (!blocked(current_map, map[current_map].NPC[i]->x + map[current_map].NPC[i]->x1, map[current_map].NPC[i]->y+map[current_map].NPC[i]->y_speed + map[current_map].NPC[i]->y1 + 0.25, map[current_map].NPC[i]->x + map[current_map].NPC[i]->x2, map[current_map].NPC[i]->y+map[current_map].NPC[i]->y_speed + map[current_map].NPC[i]->y1 + 0.25 + map[current_map].NPC[i]->y2, true)) ; loopVar++)
-                              map[current_map].NPC[i]->y += map[current_map].NPC[i]->y_speed;
+						for (int loopVar = 0; loopVar < HIT_LOOP && (!blocked(current_map, map[current_map].NPC[i]->x + map[current_map].NPC[i]->x1, map[current_map].NPC[i]->y+map[current_map].NPC[i]->y_speed + map[current_map].NPC[i]->y1 + 0.25, map[current_map].NPC[i]->x + map[current_map].NPC[i]->x2, map[current_map].NPC[i]->y+map[current_map].NPC[i]->y_speed + map[current_map].NPC[i]->y1 + 0.25 + map[current_map].NPC[i]->y2, true)) ; loopVar++)
+                            map[current_map].NPC[i]->y += map[current_map].NPC[i]->y_speed;
     
                         map[current_map].NPC[i]->y = (int) (map[current_map].NPC[i]->y + 0.5);
-                       
-                       
                     }
                     if (map[current_map].NPC[i]->y_speed < 0)
                     {
                         map[current_map].NPC[i]->y_speed = -1;
     
-			//while or if TODO
+						//while or if TODO
                         for (int loopVar = 0; loopVar < HIT_LOOP &&  (!blocked(current_map, map[current_map].NPC[i]->x + map[current_map].NPC[i]->x1, map[current_map].NPC[i]->y+map[current_map].NPC[i]->y_speed + map[current_map].NPC[i]->y1 + 0.25, map[current_map].NPC[i]->x + map[current_map].NPC[i]->x2, map[current_map].NPC[i]->y+map[current_map].NPC[i]->y_speed + map[current_map].NPC[i]->y1 + 0.25 + map[current_map].NPC[i]->y2, true)) ; loopVar++)
                            map[current_map].NPC[i]->y += map[current_map].NPC[i]->y_speed;
                     }
     
                     map[current_map].NPC[i]->y_speed = 0;
-                    
                  }
     
                  //horizontal collision detection
@@ -5966,319 +5891,308 @@ unsigned int lastTime = Clock();
     
                  //horizontal movement
                  if (!block_x)
-                 {//not blocked, walk
+                 {
+					//not blocked, walk
                     map[current_map].NPC[i]->x += map[current_map].NPC[i]->x_speed;
                  }
-    
-         }//end npc
+			}//end npc
 
-
-
-
-         //players
-         for (int i = 0; i < MAX_CLIENTS; i++)
-             if (User[i].current_map == current_map && User[i].Ident)
-             {
-                 //check for portal collisions
-		     for (int portal = 0; portal < map[current_map].num_portals;  portal++)
-		     {
-          			
-				//player box
-				float box1_x1 = User[i].x + 23;
-				float box1_y1 = User[i].y + 13;
-				float box1_x2 = User[i].x + 40;
-				float box1_y2 = User[i].y + 64;
-
-								
-				//portal box
-				float box2_x1 = map[current_map].Portal[portal].x;
-          			float box2_y1 = map[current_map].Portal[portal].y;
-          			float box2_x2 = map[current_map].Portal[portal].x + map[current_map].Portal[portal].w;
-          			float box2_y2 = map[current_map].Portal[portal].y +map[current_map].Portal[portal].h;
-
-
-          			if (box1_x2 > box2_x1 && box1_x1 < box2_x2 && box1_y2 > box2_y1 && box1_y1 < box2_y2)
-             			{
-
-					if (User[i].level >= map[current_map].Portal[portal].level_required){
-						Warp(i, map[current_map].Portal[portal]);
-				        	quitParty(i);		
-					}
-				}//end portal collison
-
-		     }//end for portal
-
-
-		 //stop attacking
-                 if (Clock() - User[i].attack_ticker > attack_speed)
-                 {
-                     User[i].attacking = false;
-
-		     //if you made an action during an attack, it is saved utnil now. Execute
-	             if (User[i].que_action != 0)
-		     { 
-		        printf("Glitched user is %s :O\n", User[i].Nick.c_str());	
-			std::string Packet = "0";
-			float numx = User[i].x;
-			float numy = User[i].y;
-			switch(User[i].que_action) 
+			//players
+			for (int i = 0; i < MAX_CLIENTS; i++)
+			if (User[i].current_map == current_map && User[i].Ident)
 			{
-				case MOVE_LEFT:
-					Packet += MOVE_LEFT;
-				        Left(i, numx, numy);
-					printf("\e[0;32mCorrection! que action being sent NOW: MOVE_LEFT\e[m\n");	 
-				break;
-				
-				case MOVE_RIGHT:
-					Packet += MOVE_RIGHT;
-					Right(i, numx, numy);
-                                        printf("\e[0;32mCorrection! que action being sent NOW: MOVE_RIGHT\e[m\n");
-				break;
-				
-				case MOVE_JUMP:
-					Packet += MOVE_JUMP;
-                                        Jump(i, numx, numy);
-					printf("\e[0;32mCorrection! que action being sent NOW: JUMP\e[m\n");
-				break;
-				
-				case ATTACK:
-					Packet += ATTACK;
-                                        printf("\e[0;32mCorrection! que action being sent NOW: ATTACK\e[m\n");
-				
-					//do attack actions
-					Attack(i, numx, numy);
-				break;
+					//check for portal collisions
+					for (int portal = 0; portal < map[current_map].num_portals;  portal++)
+					{
+          			
+						//player box
+						float box1_x1 = User[i].x + 23;
+						float box1_y1 = User[i].y + 13;
+						float box1_x2 = User[i].x + 40;
+						float box1_y2 = User[i].y + 64;
 		
-				case MOVE_STOP:
-                                        Packet += MOVE_STOP;
-                                        printf("\e[0;32mCorrection! que action being sent NOW: MOVE_STOP\e[m\n");
+										
+						//portal box
+						float box2_x1 = map[current_map].Portal[portal].x;
+						float box2_y1 = map[current_map].Portal[portal].y;
+						float box2_x2 = map[current_map].Portal[portal].x + map[current_map].Portal[portal].w;
+						float box2_y2 = map[current_map].Portal[portal].y +map[current_map].Portal[portal].h;
 
-                                        //do attack actions
-                                        Stop(i, numx, numy);
-                                break;
-	
-				default:
-					printf("\e[0;32mCorrection! que action glitch: %i\e[m\n", User[i].que_action);
+
+						if (box1_x2 > box2_x1 && box1_x1 < box2_x2 && box1_y2 > box2_y1 && box1_y1 < box2_y2)
+             			{
+							if (User[i].level >= map[current_map].Portal[portal].level_required)
+							{
+								Warp(i, map[current_map].Portal[portal]);
+								//TODO: how do players stay in a party on different maps? 
+								//Maybe disconnect after a minute.
+								quitParty(i);		
+							}
+						}//end portal collison
+					}//end for portal
+
+
+					//stop attacking
+					if (Clock() - User[i].attack_ticker > attack_speed)
+					{
+						User[i].attacking = false;
+
+						//if you made an action during an attack, it is saved utnil now. Execute
+						if (User[i].que_action != 0)
+						{ 
+							printf("Glitched user is %s :O\n", User[i].Nick.c_str());	
+							std::string Packet = "0";
+							float numx = User[i].x;
+							float numy = User[i].y;
+							switch(User[i].que_action) 
+							{
+								case MOVE_LEFT:
+									Packet += MOVE_LEFT;
+										Left(i, numx, numy);
+									printf("\e[0;32mCorrection! que action being sent NOW: MOVE_LEFT\e[m\n");	 
+								break;
+								
+								case MOVE_RIGHT:
+									Packet += MOVE_RIGHT;
+									Right(i, numx, numy);
+														printf("\e[0;32mCorrection! que action being sent NOW: MOVE_RIGHT\e[m\n");
+								break;
+								
+								case MOVE_JUMP:
+									Packet += MOVE_JUMP;
+														Jump(i, numx, numy);
+									printf("\e[0;32mCorrection! que action being sent NOW: JUMP\e[m\n");
+								break;
+								
+								case ATTACK:
+									Packet += ATTACK;
+									printf("\e[0;32mCorrection! que action being sent NOW: ATTACK\e[m\n");
+								
+									//do attack actions
+									Attack(i, numx, numy);
+								break;
+						
+								case MOVE_STOP:
+										Packet += MOVE_STOP;
+										printf("\e[0;32mCorrection! que action being sent NOW: MOVE_STOP\e[m\n");
+
+										//do attack actions
+										Stop(i, numx, numy);
+								break;
 					
-				break;
-			}//end switch
+								default:
+									printf("\e[0;32mCorrection! que action glitch: %i\e[m\n", User[i].que_action);
+									
+								break;
+							}//end switch
 
-			//add coords
-		        char *p;
-                        char b1, b2, b3, b4;
+							//add coords
+							char *p;
+							char b1, b2, b3, b4;
                         
-			//ID
-                        Packet += i;
+							//ID
+							Packet += i;
                         
-			//break up X into 4 bytes
-                        p=(char*)&numx;
-                        b1=p[0]; b2=p[1]; b3=p[2]; b4=p[3];
-                        Packet += b1;
-                        Packet += b2;
-                        Packet += b3;
-                        Packet += b4;
+							//break up X into 4 bytes
+							p=(char*)&numx;
+							b1=p[0]; b2=p[1]; b3=p[2]; b4=p[3];
+							Packet += b1;
+							Packet += b2;
+							Packet += b3;
+							Packet += b4;
 
-                        //break up Y into 4 bytes
-                        p=(char*)&numy;
-                        b1=p[0]; b2=p[1]; b3=p[2]; b4=p[3];
-			Packet += b1;
-                        Packet += b2;
-                        Packet += b3;
-                        Packet += b4;
+							//break up Y into 4 bytes
+							p=(char*)&numy;
+							b1=p[0]; b2=p[1]; b3=p[2]; b4=p[3];
+							Packet += b1;
+							Packet += b2;
+							Packet += b3;
+							Packet += b4;
 
-			//tell everyone
-			Packet[0] = Packet.length();
-			for (int qu = 0; qu < MAX_CLIENTS; qu++) if (User[qu].Ident)
-				User[qu].SendPacket(Packet);
+							//tell everyone
+							Packet[0] = Packet.length();
+							for (int qu = 0; qu < MAX_CLIENTS; qu++) if (User[qu].Ident)
+								User[qu].SendPacket(Packet);
 
 
-			//reset the cue
-		        User[i].que_action = 0;
+							//reset the cue
+							User[i].que_action = 0;
 
-		    } // end que actions
-                 }//end attack ticker
+						} // end que actions
+					}//end attack ticker
                  
-                 //HP regen
-		 int regen = User[i].regen;
-		 int weap = User[i].equip[0];
-		 int hat = User[i].equip[1];
+					//HP regen
+					int regen = User[i].regen;
+					int weap = User[i].equip[0];
+					int hat = User[i].equip[1];
 		 
-		 if (weap > 0)
-			regen += Item[weap].hp;
+					if (weap > 0)
+						regen += Item[weap].hp;
 
-		 if (hat > 0)
-			regen += Item[hat].hp;
+					if (hat > 0)
+						regen += Item[hat].hp;
 
-                 if (regen > 0)
-                 {
-                    
-                        
-                    if (Clock() - User[i].regen_ticker >= 1200)
-                    { 
-                      //regen hp
-                      if (User[i].hp < User[i].max_hp)
-                      {         
-                         User[i].hp += regen;
-                         
-                         if (User[i].hp > User[i].max_hp)
-                         {
-                            //cap the hp to their max
-                            User[i].hp = User[i].max_hp;
-                         }
+					if (regen > 0)
+					{   
+						if (Clock() - User[i].regen_ticker >= 1200)
+						{ 
+							//regen hp
+							if (User[i].hp < User[i].max_hp)
+							{         
+								User[i].hp += regen;
 
-			  //party hp notification
-                                     std::string hpPacket = "0";
-                                     hpPacket += BUDDY_HP;
-                                     hpPacket += i;
-                                     hpPacket += (int)((User[i].hp / (float)User[i].max_hp) * 80);
-                                     hpPacket[0] = hpPacket.length();
+								if (User[i].hp > User[i].max_hp)
+								{
+								//cap the hp to their max
+								User[i].hp = User[i].max_hp;
+								}
 
-                                     for (int pl = 0; pl < MAX_CLIENTS; pl ++)
-                                     {
-                                        if (pl != i && User[pl].Ident && User[pl].partyStatus == PARTY && User[pl].party == User[i].party)
-                                                User[pl].SendPacket(hpPacket);
-                                     }
-                      }
-                      
-                      std::string Packet = "0";
-          			  Packet += STAT_HP;
-                      Packet += User[i].hp;
-          			  Packet[0] = Packet.length();
-                      User[i].SendPacket(Packet);
-                      
-                      User[i].regen_ticker = Clock();
-                    }
-                    
-                 }
+								//party hp notification
+								std::string hpPacket = "0";
+								hpPacket += BUDDY_HP;
+								hpPacket += i;
+								hpPacket += (int)((User[i].hp / (float)User[i].max_hp) * 80);
+								hpPacket[0] = hpPacket.length();
+
+								for (int pl = 0; pl < MAX_CLIENTS; pl ++)
+								{
+									if (pl != i && User[pl].Ident && User[pl].partyStatus == PARTY && User[pl].party == User[i].party)
+										User[pl].SendPacket(hpPacket);
+								}
+							}
+						  
+							std::string Packet = "0";
+							Packet += STAT_HP;
+							Packet += User[i].hp;
+							Packet[0] = Packet.length();
+							User[i].SendPacket(Packet);
+							User[i].regen_ticker = Clock();
+						}
+					}
                  
                  
-                 if (User[i].y_speed < 10){
-                     	//printf("ys a: %.2f\n", User[i].y_speed);
-			User[i].y_speed += GRAVITY;
-                     	//printf("ys b: %.2f\n\n", User[i].y_speed);
-                 }
+					if (User[i].y_speed < 10)
+					{
+						User[i].y_speed += GRAVITY;
+					}
                         
-                 //verical collision detection
-                 block_y = blocked(current_map, User[i].x + 25, User[i].y+User[i].y_speed + 13 + 0.25, User[i].x + 38, User[i].y+User[i].y_speed + 64, false);
+					//verical collision detection
+					block_y = blocked(current_map, User[i].x + 25, User[i].y+User[i].y_speed + 13 + 0.25, User[i].x + 38, User[i].y+User[i].y_speed + 64, false);
     
                  
-                 //vertical movement
-                 if (!block_y)
-                 {//not blocked, fall
+					//vertical movement
+					if (!block_y)
+					{//not blocked, fall
                  
-                    //animation
-                    User[i].ground = false;
-                      
-                    User[i].y += User[i].y_speed;
+						//animation
+						User[i].ground = false;
+						  
+						User[i].y += User[i].y_speed;
+						
+						//bottomless pit
+						if (User[i].y > map[User[i].current_map].death_pit)
+						{
+							printf("user died in death pit on map %i because %i > %i\n", (int)current_map, (int)User[i].y, (int)map[current_map].death_pit);
+							Respawn(User[i].current_map, i);
+						}
+					}
+					else
+					{   
+						User[i].ground = true;
                     
-                    //bottomless pit
-                    if (User[i].y > map[User[i].current_map].death_pit)
-                    {
-			printf("user died in death pit on map %i because %i > %i\n", (int)current_map, (int)User[i].y, (int)map[current_map].death_pit);
-			Respawn(User[i].current_map, i);
-                    }
-                 }
-                 else
-                 {   
-                    if (!User[i].ground)
-		    {
-                       User[i].ground = true;
-                       //printf("smack\n");
-                    }
-                    
-	            //blocked, stop
-                    if (User[i].y_speed > 0)
-                    {
-                        User[i].y_speed = 1;
+						//blocked, stop
+						if (User[i].y_speed > 0)
+						{
+							User[i].y_speed = 1;
     
-			//while or if TODO
-                        for (int loopVar = 0; loopVar < HIT_LOOP && (!blocked(current_map, User[i].x + 25, User[i].y+User[i].y_speed + 13 + 0.25, User[i].x + 38, User[i].y+User[i].y_speed + 64 + 0.25, false)) ; loopVar++)
-
-                           User[i].y += User[i].y_speed;  
+							//while or if TODO
+							for (int loopVar = 0; loopVar < HIT_LOOP && (!blocked(current_map, User[i].x + 25, User[i].y+User[i].y_speed + 13 + 0.25, User[i].x + 38, User[i].y+User[i].y_speed + 64 + 0.25, false)) ; loopVar++)
+								User[i].y += User[i].y_speed;  
                            
-                        User[i].y = (int) (User[i].y + 0.5);
-                    }
-                    if (User[i].y_speed < 0)
-		    {
-                        User[i].y_speed = -1;
+							User[i].y = (int) (User[i].y + 0.5);
+						}
+						if (User[i].y_speed < 0)
+						{
+							User[i].y_speed = -1;
     
-			//while or if TODO
-                        for (int loopVar = 0; loopVar < HIT_LOOP && (!blocked(current_map, User[i].x + 25, User[i].y+User[i].y_speed + 13 + 0.25, User[i].x + 38, User[i].y+User[i].y_speed + 64 + 0.25, false)) ; loopVar++)
-                           User[i].y += User[i].y_speed;
-                    }
+							//while or if TODO
+							for (int loopVar = 0; loopVar < HIT_LOOP && (!blocked(current_map, User[i].x + 25, User[i].y+User[i].y_speed + 13 + 0.25, User[i].x + 38, User[i].y+User[i].y_speed + 64 + 0.25, false)) ; loopVar++)
+							User[i].y += User[i].y_speed;
+						}
+   
+						User[i].y_speed = 0;
+					}
     
-    
-                    User[i].y_speed = 0;
-                 }
-    
-                 //horizontal collision detection
-                 block_x = blocked(current_map, User[i].x + User[i].x_speed + 23, User[i].y + 13, User[i].x + User[i].x_speed + 40, User[i].y + 64, false);
-    
-                 //horizontal movement
-                 if (!block_x)
-                 {//not blocked, walk
-                    User[i].x += User[i].x_speed;     
-                 } 
-                 
-             }
+					//horizontal collision detection
+					block_x = blocked(current_map, User[i].x + User[i].x_speed + 23, User[i].y + 13, User[i].x + User[i].x_speed + 40, User[i].y + 64, false);
+		
+					//horizontal movement
+					if (!block_x)
+					{//not blocked, walk
+						User[i].x += User[i].x_speed;     
+					} 
+				}
              
-             for (int i = 0; i < 256; i++)
-             if (map[current_map].ItemObj[i].status)
-             {
-                 
-
-		 //ninja loot
-                 if (Clock() - map[current_map].ItemObj[i].ownerTicker > 10000) 
-		 {
-			//reset the item's owner
-			map[current_map].ItemObj[i].owner = -1;
-			map[current_map].ItemObj[i].ownerTicker = 0;
-                 }
+			//item objects
+			for (int i = 0; i < 256; i++)
+			if (map[current_map].ItemObj[i].status)
+			{
+					//ninja loot
+					if (Clock() - map[current_map].ItemObj[i].ownerTicker > 10000) 
+					{
+						//reset the item's owner
+						map[current_map].ItemObj[i].owner = -1;
+						map[current_map].ItemObj[i].ownerTicker = 0;
+					}
 		
 
-		 ID = map[current_map].ItemObj[i].itemID;
+					ID = map[current_map].ItemObj[i].itemID;
                  
     
-                 // printf("(%.2f,%.2f)\n", map[current_map].ItemObj[i].x, map[current_map].ItemObj[i].y);
-                 //horizontal collision detection
-                 block_x = blocked(current_map, map[current_map].ItemObj[i].x + map[current_map].ItemObj[i].x_speed, map[current_map].ItemObj[i].y , map[current_map].ItemObj[i].x + map[current_map].ItemObj[i].x_speed + Item[map[current_map].ItemObj[i].itemID].w, map[current_map].ItemObj[i].y + Item[map[current_map].ItemObj[i].itemID].w, false);
+					// printf("(%.2f,%.2f)\n", map[current_map].ItemObj[i].x, map[current_map].ItemObj[i].y);
+					//horizontal collision detection
+					block_x = blocked(current_map, map[current_map].ItemObj[i].x + map[current_map].ItemObj[i].x_speed, map[current_map].ItemObj[i].y , map[current_map].ItemObj[i].x + map[current_map].ItemObj[i].x_speed + Item[map[current_map].ItemObj[i].itemID].w, map[current_map].ItemObj[i].y + Item[map[current_map].ItemObj[i].itemID].w, false);
     
-                 if (map[current_map].ItemObj[i].y_speed < 10)
-                     map[current_map].ItemObj[i].y_speed += GRAVITY;
+					if (map[current_map].ItemObj[i].y_speed < 10)
+						map[current_map].ItemObj[i].y_speed += GRAVITY;
                         
-                 //verical collision detection
-                 block_y = blocked(current_map, map[current_map].ItemObj[i].x + map[current_map].ItemObj[i].x_speed, map[current_map].ItemObj[i].y+map[current_map].ItemObj[i].y_speed + 0.2, map[current_map].ItemObj[i].x + Item[map[current_map].ItemObj[i].itemID].w, map[current_map].ItemObj[i].y+map[current_map].ItemObj[i].y_speed + Item[map[current_map].ItemObj[i].itemID].h,false);
+					//vertical collision detection
+					block_y = blocked(current_map, map[current_map].ItemObj[i].x + map[current_map].ItemObj[i].x_speed, map[current_map].ItemObj[i].y+map[current_map].ItemObj[i].y_speed + 0.2, map[current_map].ItemObj[i].x + Item[map[current_map].ItemObj[i].itemID].w, map[current_map].ItemObj[i].y+map[current_map].ItemObj[i].y_speed + Item[map[current_map].ItemObj[i].itemID].h,false);
     
                  
-				 //vertical movement
-				 if (!block_y)                 
-					map[current_map].ItemObj[i].y += map[current_map].ItemObj[i].y_speed;
-				 else{
-					map[current_map].ItemObj[i].y_speed = 0;
-					map[current_map].ItemObj[i].x_speed *= 0.5;
-				 }
+					//vertical movement
+					if (!block_y)  
+					{						
+						map[current_map].ItemObj[i].y += map[current_map].ItemObj[i].y_speed;
+					}
+					else
+					{
+						map[current_map].ItemObj[i].y_speed = 0;
+						map[current_map].ItemObj[i].x_speed *= 0.5;
+					}
                  
     
-			    //horizontal movement
-				if (!block_x)
-				{//not blocked, move
-					map[current_map].ItemObj[i].x += map[current_map].ItemObj[i].x_speed;
-				} 
-				else 
-				{
-					map[current_map].ItemObj[i].x_speed = 0;
-				}
+					//horizontal movement
+					if (!block_x)
+					{
+						//not blocked, move
+						map[current_map].ItemObj[i].x += map[current_map].ItemObj[i].x_speed;
+					} 
+					else 
+					{
+						map[current_map].ItemObj[i].x_speed = 0;
+					}
                  
-				//item             
-				box1_x1 = map[current_map].ItemObj[i].x;
-				box1_y1 = map[current_map].ItemObj[i].y;
-				box1_x2 = map[current_map].ItemObj[i].x+Item[map[current_map].ItemObj[i].itemID].w;
-				box1_y2 = map[current_map].ItemObj[i].y+Item[map[current_map].ItemObj[i].itemID].h;
+					//item             
+					box1_x1 = map[current_map].ItemObj[i].x;
+					box1_y1 = map[current_map].ItemObj[i].y;
+					box1_x2 = map[current_map].ItemObj[i].x+Item[map[current_map].ItemObj[i].itemID].w;
+					box1_y2 = map[current_map].ItemObj[i].y+Item[map[current_map].ItemObj[i].itemID].h;
 
-                
-				//Despawn items that fell off the edge 
-				if (map[current_map].ItemObj[i].y > map[current_map].death_pit)
-				{
+					
+					//Despawn items that fell off the edge 
+					if (map[current_map].ItemObj[i].y > map[current_map].death_pit)
+					{
 					std::string Packet = "0";
 					Packet += DESPAWN_ITEM;
 					Packet += i;
@@ -6302,14 +6216,14 @@ unsigned int lastTime = Clock();
 					map[current_map].ItemObj[i].remove();
 				}//end despawn items that fell off the edge of the map
 	 
-				//check for players intersecting
-				for (int c = 0; c < MAX_CLIENTS; c++)
-				{
-					//ninja loot
-					bool isMine = false;
+					//check for players intersecting
+					for (int c = 0; c < MAX_CLIENTS; c++)
+					{
+						//ninja loot
+						bool isMine = false;
 
-					if (map[current_map].ItemObj[i].owner == -1 || map[current_map].ItemObj[i].owner == c)
-						isMine = true;
+						if (map[current_map].ItemObj[i].owner == -1 || map[current_map].ItemObj[i].owner == c)
+							isMine = true;
 					
 					//player
 					float box2_x1 = User[c].x + 25;
@@ -6377,26 +6291,24 @@ unsigned int lastTime = Clock();
                 }
             }
         } //end timestep
-        Sleep(10);
+        Sleep(1);
     }//end while true
-    
 }
 
 
 void despawnTarget(int target, int current_map)
 {
-        std::string packet = "0";
-        packet += DESPAWN_TARGET;
-        packet += target;
-        packet += current_map;
-        packet[0] = packet.length();
+	std::string packet = "0";
+	packet += DESPAWN_TARGET;
+	packet += target;
+	packet += current_map;
+	packet[0] = packet.length();
 
-        for (int i = 0; i < MAX_CLIENTS; i++)
-        {
-                if (User[i].Ident)
-                        User[i].SendPacket(packet);
-        }
-
+	for (int i = 0; i < MAX_CLIENTS; i++)
+	{
+		if (User[i].Ident)
+			User[i].SendPacket(packet);
+	}
 }
 
 void spawnTarget(int target, int current_map)
@@ -6412,851 +6324,815 @@ void spawnTarget(int target, int current_map)
 		if (User[i].Ident)
 			User[i].SendPacket(packet);
 	}	
-	
-		
 }
 
 
-
-	
 /* perform attack actions */
 void Attack(int CurrSock, float numx, float numy)
 {
-  
-   			     //set the current map
-   			     int current_map = User[CurrSock].current_map;
+	//set the current map
+	int current_map = User[CurrSock].current_map;
     
-			     if (User[CurrSock].attacking ||  !User[CurrSock].ground)
-                             {
-                                if (User[CurrSock].attacking)
-                                {
-                                   printf("tried to attack while attacking...\7\7\n");
-			           
-				   //if not in que, put it there.
-                                   if (User[CurrSock].que_action == 0)
-                                   {
-                                      User[CurrSock].que_action = ATTACK;
-                                   }
-                                }
-                                
-                                if (!User[CurrSock].ground){
-                                   printf("tried to attack while jumping...\7\7\n");
-                                }
-                             }
-                             else
-                             {
-				 //printf("attack!\n");
-                                 User[CurrSock].attacking = true;
-                                 User[CurrSock].attack_ticker = Clock();
-                                 User[CurrSock].x_speed = 0;
-                                 
-                                 bool good = false;
-                                 
-                                 if 
-                                 (
-                                         (
-                                             (
-                                                 (numx - User[CurrSock].x <= 0 && numx - User[CurrSock].x > -snap_distance) 
-                                                 ||
-                                                 (numx - User[CurrSock].x >= 0 && numx - User[CurrSock].x < snap_distance)
-                                             ) 
-                                             &&
-                                             (
-                                                 (numy - User[CurrSock].y <= 0 && numy - User[CurrSock].y > -snap_distance) 
-                                                 ||
-                                                 (numy - User[CurrSock].y >= 0 && numy - User[CurrSock].y < snap_distance)
-                                             )
-                                         )
-								)
-								{
-									//update server variables
-									User[CurrSock].x = numx;
-									User[CurrSock].y = numy;
-									good = true;
-								}
-								else
-								{
-									printf("ATTACK FAIL: (%.2f,%.2f)\n", numx, numy);
-									printf("ACTUAL VAL: (%.2f,%.2f)\n\n", User[CurrSock].x, User[CurrSock].y);     
-									
-									//correction packet
-									numx = (int)User[CurrSock].x;
-									numy = (int)User[CurrSock].y;
-								}
-								
-								std::string Packet = "0";
-								
-									
-								char *p;
-								char b1, b2, b3, b4;
-								//build correction packet
-								Packet = "0";
-								Packet += ATTACK;
-								Packet += CurrSock;
-								//ID
-		
-								//break up X into 4 bytes
-								p=(char*)&numx;
-								b1=p[0]; b2=p[1]; b3=p[2]; b4=p[3];
-								Packet += b1;
-								Packet += b2;
-								Packet += b3;
-								Packet += b4;
-		
-								//break up Y into 4 bytes
-								p=(char*)&numy;
-								b1=p[0]; b2=p[1]; b3=p[2]; b4=p[3];
-								Packet += b1;
-								Packet += b2;
-								Packet += b3;
-								Packet += b4;  
-								
-								//send to yourself
-								Packet[0] = Packet.length();
-								
-								for (int i = 0; i < MAX_CLIENTS; i++)
-								{
-									if (User[i].Ident && (i !=CurrSock || !good) && User[i].current_map == User[CurrSock].current_map)
-										User[i].SendPacket(Packet);
-								}
- 
-                                Packet = "0";
-								
-								for (int i = 0; i < MAX_CLIENTS; i++)
-                                {
-									if (!User[i].Ident)
-										continue;
+	//Que next action 
+	if (User[CurrSock].attacking)
+	{
+		printf("%s tried to attack while attacking...\7\7\n", User[CurrSock].Nick.c_str());
 
-									bool inParty = false;
-									if (User[i].partyStatus == PARTY && User[i].party == User[CurrSock].party)
-									inParty = true;
+		//if not in que, put it there.
+	    if (User[CurrSock].que_action == 0)
+	    {
+			User[CurrSock].que_action = ATTACK;
+		}
+	   
+	   return;
+	}
 
-                                    if (i != CurrSock && !inParty  && User[i].current_map == User[CurrSock].current_map)
-                                    {
-                                       //check for collision
-                                       //horizontal
-                                       float x_dist, y_dist;
-                                       if (User[CurrSock].facing_right)
-                                          x_dist = User[i].x - User[CurrSock].x;
-                                       else
-                                          x_dist = User[CurrSock].x - User[i].x;
-                                          
-                                       //vertical   
-                                       y_dist = User[i].y - User[CurrSock].y;
-                                       
-                                       
-                                       //how far away you can hit, plus weapon
-                                       int max_dist = 30;
-                                       int weap = User[CurrSock].equip[0];
-                                       if (weap != 0){
-                                           max_dist += Item[weap].reach;
-                                       }
-                                       
-                                       //attack events
-                                       if (x_dist > 0 && x_dist < max_dist && y_dist > -60 && y_dist < 30)
-                                       {
-                                          
-											int dam = User[CurrSock].strength - User[i].defence; 
-											int hat = User[CurrSock].equip[1];
- 
-                                          //weapon
-                                          if (weap != 0)
-                                             dam += Item[weap].str;
-                                             
-                                          if (hat > 0)
-					     dam += Item[hat].str;					 
+	//Cannot attack while mid-air
+	if (!User[CurrSock].ground)
+	{
+	   printf("%s tried to attack while jumping...\7\7\r\n", User[CurrSock].Nick.c_str());
+	   return;
+	}
+	
+	printf("%s is attacking!\r\n", User[CurrSock].Nick.c_str());
+	User[CurrSock].attacking = true;
+	User[CurrSock].attack_ticker = Clock();
+	User[CurrSock].x_speed = 0;
 
-					  //other user
-					  weap = User[i].equip[0];
-					  hat = User[i].equip[1];
-			
-					  if (weap != 0)
-                                             dam -= Item[weap].def;
+	bool good = false;
 
-                                          if (hat > 0)
-                                             dam -= Item[hat].def;
+	if 
+	(((
+		 (numx - User[CurrSock].x <= 0 && numx - User[CurrSock].x > -snap_distance) 
+		 ||
+		 (numx - User[CurrSock].x >= 0 && numx - User[CurrSock].x < snap_distance)
+	 ) 
+	 &&
+	 (
+		 (numy - User[CurrSock].y <= 0 && numy - User[CurrSock].y > -snap_distance) 
+		 ||
+		 (numy - User[CurrSock].y >= 0 && numy - User[CurrSock].y < snap_distance)
+	)))
+	{
+		//update server variables
+		User[CurrSock].x = numx;
+		User[CurrSock].y = numy;
+		good = true;
+	}
+	else
+	{
+		printf("ATTACK FAIL: (%.2f,%.2f)\n", numx, numy);
+		printf("ACTUAL VAL: (%.2f,%.2f)\n\n", User[CurrSock].x, User[CurrSock].y);     
 
-						
+		//correction packet
+		numx = (int)User[CurrSock].x;
+		numy = (int)User[CurrSock].y;
+	}
+	
+	
+	printf("%s attack good? %i\r\n", User[CurrSock].Nick.c_str(), good);
 
-					  //dont give free hp
-                                          if (dam < 0)
-                                          { 
-                                             dam = 0;
-                                          }
-                                             
-                                          std::string Packet;
-                                          if (User[i].hp <= dam)
-                                          {
-                                             printf("Respawn, x:%.2f y:%.2f\n", User[i].x, User[i].y);
-                                             Respawn(User[i].current_map, i);
-                                             printf("Respawned, x:%.2f y:%.2f\n", User[i].x, User[i].y);
-                                            
-                                          }//end died
-                                          else
-                                          {
-                                             User[i].hp -= dam;
-                                             Packet = "0";
-                                             Packet += STAT_HP;
-                                             Packet += User[i].hp;
-                                             Packet[0] = Packet.length();
-                                             User[i].SendPacket(Packet);
-                                             
-                                             Packet = "0";
-                                             Packet += TARGET_HIT;
-                                             Packet += 1; // player
-                                             Packet += i;
-                                             Packet[0] = Packet.length();
-                                             
-                                             //party hp notification					     
-                                             std::string hpPacket = "0";
-                                             hpPacket += BUDDY_HP;
-                                             hpPacket += i;
-                                             hpPacket += (int)((User[i].hp / (float)User[i].max_hp) * 80);
-                                             hpPacket[0] = hpPacket.length();
+	std::string Packet = "0";
 
-					    for (int i1 = 0; i1 < MAX_CLIENTS; i1++)
-                                            {
-                                                if (User[i1].Ident && User[i1].current_map == User[i].current_map);
-                                                {
-                                                    User[i1].SendPacket(Packet);
-																		 
-						    if (i != i1 && User[i1].partyStatus == PARTY && User[i1].party == User[i].party)
+
+	char *p;
+	char b1, b2, b3, b4;
+	//build correction packet
+	Packet = "0";
+	Packet += ATTACK;
+	Packet += CurrSock;
+	//ID
+
+	//break up X into 4 bytes
+	p=(char*)&numx;
+	b1=p[0]; b2=p[1]; b3=p[2]; b4=p[3];
+	Packet += b1;
+	Packet += b2;
+	Packet += b3;
+	Packet += b4;
+
+	//break up Y into 4 bytes
+	p=(char*)&numy;
+	b1=p[0]; b2=p[1]; b3=p[2]; b4=p[3];
+	Packet += b1;
+	Packet += b2;
+	Packet += b3;
+	Packet += b4;  
+	Packet[0] = Packet.length();
+
+	for (int i = 0; i < MAX_CLIENTS; i++)
+	{
+		if (User[i].Ident && (i != CurrSock || !good) && User[i].current_map == User[CurrSock].current_map)
+			User[i].SendPacket(Packet);
+	}
+
+	Packet = "0";
+
+	//loop all players		
+	printf("Looping all players.\r\n");
+	for (int i = 0; i < MAX_CLIENTS; i++)
+	{
+		if (!User[i].Ident)
+			continue;
+
+		bool inParty = false;
+		if (User[i].partyStatus == PARTY && User[i].party == User[CurrSock].party)
+			inParty = true;
+
+		if (i != CurrSock && !inParty  && User[i].current_map == User[CurrSock].current_map)
+		{
+			//check for collision
+			//horizontal
+			float x_dist, y_dist;
+			if (User[CurrSock].facing_right)
+				x_dist = User[i].x - User[CurrSock].x;
+			else
+				x_dist = User[CurrSock].x - User[i].x;
+			  
+			//vertical   
+			y_dist = User[i].y - User[CurrSock].y;
+		   
+			//how far away you can hit, plus weapon
+			int max_dist = 30;
+			int weap = User[CurrSock].equip[0];
+			if (weap != 0){
+			   max_dist += Item[weap].reach;
+			}
+		   
+			//attack events
+			if (x_dist > 0 && x_dist < max_dist && y_dist > -60 && y_dist < 30)
+			{
+				int dam = User[CurrSock].strength - User[i].defence; 
+				int hat = User[CurrSock].equip[1];
+
+				//weapon
+				if (weap != 0)
+					dam += Item[weap].str;
+				 
+				if (hat > 0)
+					dam += Item[hat].str;					 
+
+				//other user
+				weap = User[i].equip[0];
+				hat = User[i].equip[1];
+
+				if (weap != 0)
+					dam -= Item[weap].def;
+
+				if (hat > 0)
+					dam -= Item[hat].def;
+				
+				//don't give free hp
+				if (dam < 0)
+				{ 
+					dam = 0;
+				}
+				 
+				std::string Packet;
+				if (User[i].hp <= dam)
+				{
+					printf("Respawn, x:%.2f y:%.2f\n", User[i].x, User[i].y);
+					Respawn(User[i].current_map, i);
+					printf("Respawned, x:%.2f y:%.2f\n", User[i].x, User[i].y);
+				
+				}//end died
+				else
+				{
+					User[i].hp -= dam;
+					Packet = "0";
+					Packet += STAT_HP;
+					Packet += User[i].hp;
+					Packet[0] = Packet.length();
+					User[i].SendPacket(Packet);
+					
+					Packet = "0";
+					Packet += TARGET_HIT;
+					Packet += 1; // player
+					Packet += i;
+					Packet[0] = Packet.length();
+					
+					//party hp notification					     
+					std::string hpPacket = "0";
+					hpPacket += BUDDY_HP;
+					hpPacket += i;
+					hpPacket += (int)((User[i].hp / (float)User[i].max_hp) * 80);
+					hpPacket[0] = hpPacket.length();
+
+					for (int i1 = 0; i1 < MAX_CLIENTS; i1++)
+					{
+						if (User[i1].Ident && User[i1].current_map == User[i].current_map);
+						{
+							User[i1].SendPacket(Packet);
+												 
+							if (i != i1 && User[i1].partyStatus == PARTY && User[i1].party == User[i].party)
 								User[i1].SendPacket(hpPacket);
 						}
-                                            }
-                                          }//end lose hp
-                                       }//end hit
-                                    }
-                                }//end loop everyone
-                                
-
-				// TODO
-				//loop all targets 
-				for (int i = 0; i < map[current_map].num_targets; i++)
-				{
-				    if (!map[current_map].Target[i].active)
-					continue;
-
-		  		    //horizontal
-		  		    float x_dist, y_dist;
-		                    if (User[CurrSock].facing_right)
-		                       x_dist = map[current_map].Target[i].x - (User[CurrSock].x + 38);
-		                    else
-		                       x_dist = (User[CurrSock].x + 25) - (map[current_map].Target[i].x + map[current_map].Target[i].w);
-		  		    //vertical   
-		                    y_dist = map[current_map].Target[i].y - User[CurrSock].y;
-		 		
-				    //how far away you can hit, plus weapon
-				    int max_dist = 30;
-				    int weap = User[CurrSock].equip[0];
-				    if (weap != 0)
-				    {
-					max_dist += Item[weap].reach;
-				    }
-
-				    //attack events
-				    if (x_dist > -map[current_map].Target[i].w && x_dist < max_dist && y_dist > 0 && y_dist < 60)
-				    {
-					//make this target disappear
-					map[current_map].Target[i].respawn_ticker = Clock();
-					map[current_map].Target[i].active = false;
-					despawnTarget(i, current_map);
-
-					//spawn some loot
-					if (map[current_map].Target[i].loot >= 0) 
-					{
-					  SKO_ItemObject lootItem = map[current_map].Target[i].getLootItem();
-					  lootItem.owner = CurrSock;
-					  SpawnLoot(current_map, lootItem);
 					}
-		
-					//give player some XP
-					GiveXP(CurrSock, 1);
-				    } else {
-					printf("missed target %i. x_dist: %.2f y_dist: %.2fi -map[current_map].Target[i].w: %i\n", 
-						i, x_dist, y_dist, -map[current_map].Target[i].w);	
-				    	
-for (int f = 0; f < map[current_map].num_targets; f++)
-printf("Target[%i]: x:%i y:%i w:%i h:%i\n", f, map[current_map].Target[f].x, map[current_map].Target[f].y, map[current_map].Target[f].w, map[current_map].Target[f].h);
-				    }
-				
-				}
-				
+				}//end lose hp
+			}//end hit
+		}
+	}//end loop everyone
 
+	//loop all targets 
+	printf("Checking all targets\r\n");
+	for (int i = 0; i < map[current_map].num_targets; i++)
+	{
+		if (!map[current_map].Target[i].active)
+			continue;
+
+		//horizontal
+		float x_dist, y_dist;
+		if (User[CurrSock].facing_right)
+		   x_dist = map[current_map].Target[i].x - (User[CurrSock].x + 38);
+		else
+		   x_dist = (User[CurrSock].x + 25) - (map[current_map].Target[i].x + map[current_map].Target[i].w);
+		//vertical   
+		y_dist = map[current_map].Target[i].y - User[CurrSock].y;
 	
-                                //loop all enemies
-                                for (int i = 0; i < map[current_map].num_enemies; i++)
-                                {
-				       bool partyBlocked = false;
-					   
-				   //if enemy is blocked by a party dibs
-				   if (map[current_map].Enemy[i]->dibsPlayer >= 0)
-				   {
-						//then assume it's blocked
-						partyBlocked = true;
-						
-						//if the player is you, it's not blocked
-						if (map[current_map].Enemy[i]->dibsPlayer == CurrSock)
-							partyBlocked = false;
-						
-						//but if you are part of the party it isn't blocked
-						if (User[CurrSock].partyStatus == PARTY)
-						{
-						    if (User[map[current_map].Enemy[i]->dibsPlayer].partyStatus == PARTY && 
-							User[map[current_map].Enemy[i]->dibsPlayer].party == User[CurrSock].party)
-								partyBlocked = false;
+		//how far away you can hit, plus weapon
+		int max_dist = 30;
+		int weap = User[CurrSock].equip[0];
+		if (weap != 0)
+		{
+			max_dist += Item[weap].reach;
+		}
+
+		//attack events
+		if (x_dist > -map[current_map].Target[i].w && x_dist < max_dist && y_dist > 0 && y_dist < 60)
+		{
+			//make this target disappear
+			map[current_map].Target[i].respawn_ticker = Clock();
+			map[current_map].Target[i].active = false;
+			despawnTarget(i, current_map);
+
+			//spawn some loot
+			if (map[current_map].Target[i].loot >= 0) 
+			{
+			  SKO_ItemObject lootItem = map[current_map].Target[i].getLootItem();
+			  lootItem.owner = CurrSock;
+			  SpawnLoot(current_map, lootItem);
+			}
+
+			//give player some XP
+			GiveXP(CurrSock, 1);
+		} 
+		else 
+		{
+			printf("missed target %i. x_dist: %.2f y_dist: %.2fi -map[current_map].Target[i].w: %i\n", 
+				i, x_dist, y_dist, -map[current_map].Target[i].w);	
+				
+			for (int f = 0; f < map[current_map].num_targets; f++)
+				printf("Target[%i]: x:%i y:%i w:%i h:%i\n", f, map[current_map].Target[f].x, map[current_map].Target[f].y, map[current_map].Target[f].w, map[current_map].Target[f].h);
+		}
+	}
+
+	//loop all enemies
+	printf("Checking all enemies: %i\r\n", map[current_map].num_enemies);
+	for (int i = 0; i < map[current_map].num_enemies; i++)
+	{
+		bool partyBlocked = false;
+		   
+		//if enemy is blocked by a party dibs
+		if (map[current_map].Enemy[i]->dibsPlayer >= 0)
+		{
+			//then assume it's blocked
+			partyBlocked = true;
+			printf("partyBlocked because dibsPlayer = %i\r\n", map[current_map].Enemy[i]->dibsPlayer);
+			//if the player is you, it's not blocked
+			if (map[current_map].Enemy[i]->dibsPlayer == CurrSock)
+				partyBlocked = false;
+			
+			//but if you are part of the party it isn't blocked
+			if (User[CurrSock].partyStatus == PARTY)
+			{
+				if (User[map[current_map].Enemy[i]->dibsPlayer].partyStatus == PARTY && 
+				User[map[current_map].Enemy[i]->dibsPlayer].party == User[CurrSock].party)
+					partyBlocked = false;
+				
+			}
+		}
+						   
+		//check is they are active and not dib'sed by a party
+		if (!map[current_map].Enemy[i]->dead && !partyBlocked)
+		{
+			printf("Checking enemy: %i on map: %i\r\n", i, current_map);
+			//check for collision
+			//horizontal
+			float x_dist, y_dist;
+			if (User[CurrSock].facing_right)
+				x_dist = map[current_map].Enemy[i]->x - User[CurrSock].x;
+			else
+				x_dist = User[CurrSock].x - map[current_map].Enemy[i]->x;
+			
+			//vertical   
+			y_dist = map[current_map].Enemy[i]->y - User[CurrSock].y;
+			//how far away you can hit, plus weapon
+			int max_dist = 30;
+			int weap = User[CurrSock].equip[0];
+			if (weap != 0)
+			{
+			   max_dist += Item[weap].reach;
+			}
+						   
+			//attack events
+			if (x_dist >= 0 && x_dist < max_dist && y_dist > -60 && y_dist < 60)
+			{
+				int dam = User[CurrSock].strength - map[current_map].Enemy[i]->defence; 
+	
+				//keep track of damage
+				map[current_map].Enemy[i]->dibsDamage[CurrSock] += dam;
+								
+				//weapon
+				if (weap != 0)
+					dam += Item[weap].str;
 							
+				printf("%s hit an enemy! damage is: %i\r\n", User[CurrSock].Nick.c_str());			
+					
+					
+				//don't give free hp
+				if (dam < 0)
+				{ 
+					dam = 0;
+				}
+				else
+				{
+					//damage! dibs this mob for the current player who hit it
+					map[current_map].Enemy[i]->dibsPlayer = CurrSock;
+					map[current_map].Enemy[i]->dibsTicker = Clock();
+								
+					Packet = "0";
+					Packet += TARGET_HIT;
+					Packet += (char)0; // npc
+					Packet += i;
+					Packet[0] = Packet.length();
+								
+					for (int i1 = 0; i1 < MAX_CLIENTS; i1++)
+					{
+						if (User[i1].Ident && User[i1].current_map == current_map)
+						{
+							User[i1].SendPacket(Packet);
 						}
-				   }
-									   
-                                       //check is they are active and not dib'sed by a party
-                                       if (!map[current_map].Enemy[i]->dead && !partyBlocked)
-                                       {
-                                           //check for collision
-                                           //horizontal
-                                           float x_dist, y_dist;
-                                           if (User[CurrSock].facing_right)
-                                              x_dist = map[current_map].Enemy[i]->x - User[CurrSock].x;
-                                           else
-                                              x_dist = User[CurrSock].x - map[current_map].Enemy[i]->x;
-                                           //vertical   
-                                           y_dist = map[current_map].Enemy[i]->y - User[CurrSock].y;
-                                           //how far away you can hit, plus weapon
-                                           int max_dist = 30;
-                                           int weap = User[CurrSock].equip[0];
-                                           if (weap != 0)
-										   {
-                                               max_dist += Item[weap].reach;
-                                           }
-                                       
-						//attack events
-						if (x_dist > 0 && x_dist < max_dist && y_dist > -60 && y_dist < 60)
-						{
-							int dam = User[CurrSock].strength - map[current_map].Enemy[i]->defence; 
-											  
-							 //keep track of damage
-							  map[current_map].Enemy[i]->dibsDamage[CurrSock] += dam;
-											  
-							  //weapon
-							  if (weap != 0)
-								 dam += Item[weap].str;
-												 
-							  //dont give free hp
-							  if (dam < 0)
-							  { 
-								 dam = 0;
-							  }
-							  else
-							  {
-// 								//damage! dibs this mob for thwe current player who hit it
-								map[current_map].Enemy[i]->dibsPlayer = CurrSock;
-								map[current_map].Enemy[i]->dibsTicker = Clock();
-											  
-								 Packet = "0";
-								 Packet += TARGET_HIT;
-								 Packet += (char)0; // npc
-								 Packet += i;
-								 Packet[0] = Packet.length();
-											 
-	 
-								 for (int i1 = 0; i1 < MAX_CLIENTS; i1++)
-							 	 {
-									 if (User[i1].Ident && User[i1].current_map == current_map)
-									 {
-										User[i1].SendPacket(Packet);
-									 }
-								 }
-						          }
-											  
-							 std::string Packet;
-							if (map[current_map].Enemy[i]->hp <= dam)
-							{
-							    //keep track of damage but remove overflow
-							    int extraHpHurt = (dam - map[current_map].Enemy[i]->hp); 
-							 	map[current_map].Enemy[i]->dibsDamage[CurrSock] -= extraHpHurt;
-												
-									
-								//Divide Loot between a party
-								if (User[CurrSock].partyStatus == PARTY)
-								{
-									DivideLoot(i, User[CurrSock].party);
-								} 
-								else//not in a party, they get all the loots!
-								{
-									for (int it = 0; it < map[current_map].Enemy[i]->lootAmount; it++)
-														GiveLoot(i, CurrSock);
-												}
-												
-												//kill the enemy after loot is dropped !! :P
-												KillEnemy(current_map, i);
-												 
-												float bonus_clan_xp = 0;
-												float splitXP = map[current_map].Enemy[i]->xp;
-												
-												//if in a clan add bonus xp
-												if (User[CurrSock].Clan[0] == '[')
-												{
-													bonus_clan_xp = map[current_map].Enemy[i]->xp * 0.10;//10% bonus
-												}
-												printf("User is in a clan so bonus xp for them! %i\n", (int)bonus_clan_xp);
-												if (User[CurrSock].partyStatus == PARTY)
-												{
-													//give bonus XP for party
-													float bonusXP = splitXP * 0.10;
-													float totalDamage = 0;
-													
-													//find total damage from all party members
-													for (int p = 0; p < MAX_CLIENTS; p++)
-														if (User[p].Ident && User[p].partyStatus == PARTY && User[p].party == User[CurrSock].party)
-															totalDamage += map[current_map].Enemy[i]->dibsDamage[p];
-														
-													
-													
-													//find total damage from all party members
-													for (int p = 0; p < MAX_CLIENTS; p++)
-														if (User[p].Ident && User[p].partyStatus == PARTY && User[p].party == User[CurrSock].party)
-														{
-															//base XP they deserve
-															float gimmieXP = 0;
-															float pl_dmg = (float)map[current_map].Enemy[i]->dibsDamage[p];
-															
-															if (pl_dmg > 0)
-																gimmieXP = pl_dmg / totalDamage;
-															
-															printf("Player %s dealt %.2f percent of the damage or %i HP out of %i HP done by the party.\n", 
-																User[p].Nick.c_str(), gimmieXP*100, map[current_map].Enemy[i]->dibsDamage[p], (int)totalDamage);
-															gimmieXP *= splitXP;
-															
-															//add bonus XP
-															gimmieXP += bonusXP;
-															printf("Player %s earned %.2f XP points\n", User[p].Nick.c_str(), gimmieXP);
-															
-															int pXpGiven = (int)gimmieXP;
-																
-															//get the decimal alone
-															gimmieXP = gimmieXP - pXpGiven;
-															gimmieXP *= 100;
-																
-															//slight chance of bonus xp :)
-															printf("Player %s will be given %i XP points for sure but has a %.2f chance for a bonus XP\n", User[p].Nick.c_str(),  pXpGiven, gimmieXP);
-															if (Roll(gimmieXP))
-															{
-																pXpGiven++;
-															}
-															
-															GiveXP(p, pXpGiven + bonus_clan_xp);
-															printf("Player %s was given %i XP points\n", User[p].Nick.c_str(), pXpGiven);	
-														}
-												}//end split xp with party
-												else
-												{
-													//just give myself xp
-													GiveXP(CurrSock, map[current_map].Enemy[i]->xp + bonus_clan_xp);
-													printf("[SOLO] Player %s was given %i XP points\n", User[CurrSock].Nick.c_str(), map[current_map].Enemy[i]->xp);
-												}
-										}//end died
-									    else
-									    {
-											 map[current_map].Enemy[i]->hp -= dam;
-							 
-											 //enemy health bars
-											 int hp = (unsigned char)((float)map[current_map].Enemy[i]->hp / map[current_map].Enemy[i]->hp_max*hpBar);
-
-											 //packet
-											 std::string hpPacket = "0";
-											 hpPacket += NPC_HP;
-											 hpPacket += i;
-											 hpPacket += current_map;
-											 hpPacket += hp;
-											 hpPacket[0] = hpPacket.length();
+					}
+				}
+								
+				std::string Packet;
+				if (map[current_map].Enemy[i]->hp <= dam)
+				{
+					//keep track of damage but remove overflow
+					int extraHpHurt = (dam - map[current_map].Enemy[i]->hp); 
+					map[current_map].Enemy[i]->dibsDamage[CurrSock] -= extraHpHurt;
 							
-											for (int c = 0; c < MAX_CLIENTS; c ++)
-												if (User[c].Ident)
-													User[c].SendPacket(hpPacket);
-											printf("sending bandit hp shiz :)\n");	
-									    }//end not died enemy, just damage
-							    }//end hit
-						}//end loop if you hit enemys
-				}  // end if enemy is dead
+					//Divide Loot between a party
+					if (User[CurrSock].partyStatus == PARTY)
+					{
+						DivideLoot(i, User[CurrSock].party);
+					} 
+					else//not in a party, they get all the loots!
+					{
+						for (int it = 0; it < map[current_map].Enemy[i]->lootAmount; it++)
+							GiveLoot(i, CurrSock);
+					}
+									
+					//kill the enemy after loot is dropped !! :P
+					KillEnemy(current_map, i);
+					 
+					float bonus_clan_xp = 0;
+					float splitXP = map[current_map].Enemy[i]->xp;
+					
+					//if in a clan add bonus xp
+					if (User[CurrSock].Clan[0] == '[')
+					{
+						bonus_clan_xp = map[current_map].Enemy[i]->xp * 0.10;//10% bonus
+					}
+					printf("User is in a clan so bonus xp for them! %i\n", (int)bonus_clan_xp);
+					if (User[CurrSock].partyStatus == PARTY)
+					{
+						//give bonus XP for party
+						float bonusXP = splitXP * 0.10;
+						float totalDamage = 0;
+						
+						//find total damage from all party members
+						for (int p = 0; p < MAX_CLIENTS; p++)
+							if (User[p].Ident && User[p].partyStatus == PARTY && User[p].party == User[CurrSock].party)
+								totalDamage += map[current_map].Enemy[i]->dibsDamage[p];
+							
+						
+						
+						//find total damage from all party members
+						for (int p = 0; p < MAX_CLIENTS; p++)
+							if (User[p].Ident && User[p].partyStatus == PARTY && User[p].party == User[CurrSock].party)
+							{
+								//base XP they deserve
+								float gimmieXP = 0;
+								float pl_dmg = (float)map[current_map].Enemy[i]->dibsDamage[p];
+								
+								if (pl_dmg > 0)
+									gimmieXP = pl_dmg / totalDamage;
+								
+								printf("Player %s dealt %.2f percent of the damage or %i HP out of %i HP done by the party.\n", 
+									User[p].Nick.c_str(), gimmieXP*100, map[current_map].Enemy[i]->dibsDamage[p], (int)totalDamage);
+								gimmieXP *= splitXP;
+								
+								//add bonus XP
+								gimmieXP += bonusXP;
+								printf("Player %s earned %.2f XP points\n", User[p].Nick.c_str(), gimmieXP);
+								
+								int pXpGiven = (int)gimmieXP;
+									
+								//get the decimal alone
+								gimmieXP = gimmieXP - pXpGiven;
+								gimmieXP *= 100;
+									
+								//slight chance of bonus xp :)
+								printf("Player %s will be given %i XP points for sure but has a %.2f chance for a bonus XP\n", User[p].Nick.c_str(),  pXpGiven, gimmieXP);
+								if (Roll(gimmieXP))
+								{
+									pXpGiven++;
+								}
+								
+								GiveXP(p, pXpGiven + bonus_clan_xp);
+								printf("Player %s was given %i XP points\n", User[p].Nick.c_str(), pXpGiven);	
+							}
+						}//end split xp with party
+						else
+						{
+							//just give myself xp
+							GiveXP(CurrSock, map[current_map].Enemy[i]->xp + bonus_clan_xp);
+							printf("[SOLO] Player %s was given %i XP points\n", User[CurrSock].Nick.c_str(), map[current_map].Enemy[i]->xp);
+						}
+				}//end died
+				else
+				{
+					 map[current_map].Enemy[i]->hp -= dam;
+	 
+					 //enemy health bars
+					 int hp = (unsigned char)((float)map[current_map].Enemy[i]->hp / map[current_map].Enemy[i]->hp_max*hpBar);
 
-		}//end ok to attack 
+					 //packet
+					 std::string hpPacket = "0";
+					 hpPacket += NPC_HP;
+					 hpPacket += i;
+					 hpPacket += current_map;
+					 hpPacket += hp;
+					 hpPacket[0] = hpPacket.length();
+	
+					for (int c = 0; c < MAX_CLIENTS; c ++)
+						if (User[c].Ident)
+							User[c].SendPacket(hpPacket);
+					printf("sending bandit hp shiz :)\n");	
+				}//end not died enemy, just damage
+			}//end hit
+			else 
+			{
+				printf("%s did not hit enemy because x_dist:%i, y_dist:%i, max_dist:%i\r\n", 
+					User[CurrSock].Nick.c_str(), (int)x_dist, (int)y_dist, (int)max_dist);
+			}
+		}//end loop if you hit enemys
+		else
+		{
+			printf("Skippy enemy[%i] because dead:%i, partyBlocked:%i, partBlockedBy:%i\r\n", 
+				i, (int)map[current_map].Enemy[i]->dead, partyBlocked, map[current_map].Enemy[i]->dibsPlayer);
+		}
+	}  // end if enemy is dead
 }
 
 void Stop(int CurrSock, float numx, float numy)
 {
  //you cant move when attacking!
-                             if (User[CurrSock].attacking){
-                                printf("tried to move stop when attacking.\7\n");
-                                //if not in que, put it there.
-                                if (User[CurrSock].que_action == 0)
-                                {
-                                   User[CurrSock].que_action = MOVE_STOP;
-                                }
-                             }
-                             else
-                             {
-                                    
-                                // printf("OK\n"); 
-                                   
-                                 //physics
-                                 User[CurrSock].x_speed = 0;
-                                     
-                                 
-                                 bool good = false;
-                                 
-                                 if 
-                                 (
-                                         (
-                                             (
-                                                 (numx - User[CurrSock].x <= 0 && numx - User[CurrSock].x > -snap_distance) 
-                                                 ||
-                                                 (numx - User[CurrSock].x >= 0 && numx - User[CurrSock].x < snap_distance)
-                                             ) 
-                                             &&
-                                             (
-                                                 (numy - User[CurrSock].y <= 0 && numy - User[CurrSock].y > -snap_distance) 
-                                                 ||
-                                                 (numy - User[CurrSock].y >= 0 && numy - User[CurrSock].y < snap_distance)
-                                             )
-                                         )
-                                 )
-                                 {
-                                      //update server variables
-                                      User[CurrSock].x = numx;
-                                      User[CurrSock].y = numy;
-                                      good = true;
-                                 }
-                                 else
-                                 {
-                                     printf("MOVE STOP FAIL: (%.2f,%.2f)\n", numx, numy);
-                                     printf("ACTUAL VAL: (%.2f,%.2f)\n\n", User[CurrSock].x, User[CurrSock].y);     
-                                    
-                                     //correction packet
-                                     numx = (int)User[CurrSock].x;
-                                     numy = (int)User[CurrSock].y;
-                                 }
-                                      
-                                 //corrections
-                                    
-                                    char *p;
-                                    char b1, b2, b3, b4;
-                                    //build correction packet
-                                    std::string Packet = "0";
-                                    Packet += MOVE_STOP;
-                                    Packet += CurrSock;
-    
-                                    //break up X into 4 bytes
-                                    p=(char*)&numx;
-                                    b1=p[0]; b2=p[1]; b3=p[2]; b4=p[3];
-                                    Packet += b1;
-                                    Packet += b2;
-                                    Packet += b3;
-                                    Packet += b4;
-    
-                                    //break up Y into 4 bytes
-                                    p=(char*)&numy;
-                                    b1=p[0]; b2=p[1]; b3=p[2]; b4=p[3];
-                                    Packet += b1;
-                                    Packet += b2;
-                                    Packet += b3;
-                                    Packet += b4;  
-                                    
-                                    //send to yourself
-                                    Packet[0] = Packet.length();
-                                    
-                                    
-                                 for (int i1 = 0; i1 < MAX_CLIENTS; i1++)
-                                 {
-                                     if (i1 != CurrSock && User[i1].Ident  && User[i1].current_map == User[CurrSock].current_map) //don't send to yourself or other maps
-                                     {
-                                         // Send data
-                                         User[i1].SendPacket(Packet);
-                                     }      
-                           
-                                 }  
-                             }//ok to move  
+	if (User[CurrSock].attacking)
+	{
+		printf("tried to move stop when attacking.\7\n");
+		//if not in que, put it there.
+		if (User[CurrSock].que_action == 0)
+		{
+		   User[CurrSock].que_action = MOVE_STOP;
+		}
+		
+		return;
+	}
+	
+	//physics
+	User[CurrSock].x_speed = 0;
+	 
+	bool good = false;
+
+	if 
+	(((
+		(numx - User[CurrSock].x <= 0 && numx - User[CurrSock].x > -snap_distance) 
+		||
+		(numx - User[CurrSock].x >= 0 && numx - User[CurrSock].x < snap_distance)
+		) 
+		&&
+		(
+		(numy - User[CurrSock].y <= 0 && numy - User[CurrSock].y > -snap_distance) 
+		||
+		(numy - User[CurrSock].y >= 0 && numy - User[CurrSock].y < snap_distance)
+	)))
+	{
+	  //update server variables
+	  User[CurrSock].x = numx;
+	  User[CurrSock].y = numy;
+	}
+	else
+	{
+	 printf("MOVE STOP FAIL: (%.2f,%.2f)\n", numx, numy);
+	 printf("ACTUAL VAL: (%.2f,%.2f)\n\n", User[CurrSock].x, User[CurrSock].y);     
+
+	 //correction packet
+	 numx = (int)User[CurrSock].x;
+	 numy = (int)User[CurrSock].y;
+	}
+	  
+	//corrections
+	char *p;
+	char b1, b2, b3, b4;
+	//build correction packet
+	std::string Packet = "0";
+	Packet += MOVE_STOP;
+	Packet += CurrSock;
+
+	//break up X into 4 bytes
+	p=(char*)&numx;
+	b1=p[0]; b2=p[1]; b3=p[2]; b4=p[3];
+	Packet += b1;
+	Packet += b2;
+	Packet += b3;
+	Packet += b4;
+
+	//break up Y into 4 bytes
+	p=(char*)&numy;
+	b1=p[0]; b2=p[1]; b3=p[2]; b4=p[3];
+	Packet += b1;
+	Packet += b2;
+	Packet += b3;
+	Packet += b4;  
+	Packet[0] = Packet.length();
+
+	for (int i1 = 0; i1 < MAX_CLIENTS; i1++)
+	{
+		if (User[i1].Ident && (i1 != CurrSock || !good) && User[i1].current_map == User[CurrSock].current_map) //don't send to yourself or other maps
+		{
+			// Send data
+			User[i1].SendPacket(Packet);
+		}  
+	}    
 }
 
 void Right(int CurrSock, float numx, float numy)
 {
- //you cant move when attacking!
-                             if (User[CurrSock].attacking){
-                                printf("tried to move right when attacking.\7\n");
-                                //if not in que, put it there.
-                                if (User[CurrSock].que_action == 0)
-                                {
-                                   User[CurrSock].que_action = MOVE_RIGHT;
-                                }
-                             }
-                             else
-                             {
+	//you cant move when attacking!
+	if (User[CurrSock].attacking)
+	{
+		printf("tried to move right when attacking.\7\n");
+		//if not in que, put it there.
+		if (User[CurrSock].que_action == 0)
+		{
+			User[CurrSock].que_action = MOVE_RIGHT;
+		}
+		
+		return;
+	}
 
-                                // printf("OK\n"); 
+	User[CurrSock].facing_right = true;
+	//physics
+	User[CurrSock].x_speed = 2;
 
-                                 User[CurrSock].facing_right = true;
-                                 //physics
-                                 User[CurrSock].x_speed = 2;
+	bool good = false;
 
+	if
+	(((
+		(numx - User[CurrSock].x <= 0 && numx - User[CurrSock].x > -snap_distance)
+		||
+		(numx - User[CurrSock].x >= 0 && numx - User[CurrSock].x < snap_distance)
+		)
+		&&
+		(
+		(numy - User[CurrSock].y <= 0 && numy - User[CurrSock].y > -snap_distance)
+		||
+		(numy - User[CurrSock].y >= 0 && numy - User[CurrSock].y < snap_distance)
+	)))
+	{
+		//update server variables
+		User[CurrSock].x = numx;
+		User[CurrSock].y = numy;
+		good = true;
+	}
+	else
+	{
+		printf("MOVE RIGHT FAIL: (%.2f,%.2f)\n", numx, numy);
+		printf("ACTUAL VAL: (%.2f,%.2f)\n\n", User[CurrSock].x, User[CurrSock].y);
 
-                                 bool good = false;
+		//correction packet
+		numx = (int)User[CurrSock].x;
+		numy = (int)User[CurrSock].y;
+	}
+	//corrections
 
-                                 if
-                                 (
-                                         (
-                                             (
-                                                 (numx - User[CurrSock].x <= 0 && numx - User[CurrSock].x > -snap_distance)
-                                                 ||
-                                                 (numx - User[CurrSock].x >= 0 && numx - User[CurrSock].x < snap_distance)
-                                             )
-                                             &&
-                                             (
-                                                 (numy - User[CurrSock].y <= 0 && numy - User[CurrSock].y > -snap_distance)
-                                                 ||
-                                                 (numy - User[CurrSock].y >= 0 && numy - User[CurrSock].y < snap_distance)
-                                             )
-                                         )
-                                 )
-                                 {
-                                      //update server variables
-                                      User[CurrSock].x = numx;
-                                      User[CurrSock].y = numy;
-                                      good = true;
-                                 }
-                                 else
-                                 {
-                                     printf("MOVE RIGHT FAIL: (%.2f,%.2f)\n", numx, numy);
-                                     printf("ACTUAL VAL: (%.2f,%.2f)\n\n", User[CurrSock].x, User[CurrSock].y);
+	char *p;
+	char b1, b2, b3, b4;
+	//build correction packet
+	std::string Packet = "0";
+	Packet += MOVE_RIGHT;
+	Packet += CurrSock;
 
-                                     //correction packet
-                                     numx = (int)User[CurrSock].x;
-                                     numy = (int)User[CurrSock].y;
-                                 }
-//corrections
+	//break up X into 4 bytes
+	p=(char*)&numx;
+	b1=p[0]; b2=p[1]; b3=p[2]; b4=p[3];
+	Packet += b1;
+	Packet += b2;
+	Packet += b3;
+	Packet += b4;
 
-                                    char *p;
-                                    char b1, b2, b3, b4;
-                                    //build correction packet
-                                    std::string Packet = "0";
-                                    Packet += MOVE_RIGHT;
-                                    Packet += CurrSock;
+	//break up Y into 4 bytes
+	p=(char*)&numy;
+	b1=p[0]; b2=p[1]; b3=p[2]; b4=p[3];
+	Packet += b1;
+	Packet += b2;
+	Packet += b3;
+	Packet += b4;
 
-                                    //break up X into 4 bytes
-                                    p=(char*)&numx;
-                                    b1=p[0]; b2=p[1]; b3=p[2]; b4=p[3];
-                                    Packet += b1;
-                                    Packet += b2;
-                                    Packet += b3;
-                                    Packet += b4;
-
-                                    //break up Y into 4 bytes
-                                    p=(char*)&numy;
-                                    b1=p[0]; b2=p[1]; b3=p[2]; b4=p[3];
-                                    Packet += b1;
-                                    Packet += b2;
-                                    Packet += b3;
-                                    Packet += b4;
-
-                                    //send to yourself
-                                    Packet[0] = Packet.length();
+	//send to yourself
+	Packet[0] = Packet.length();
 
 
-                                 for (int i1 = 0; i1 < MAX_CLIENTS; i1++)
-                                 {
-                                     if (i1 != CurrSock && User[i1].Ident  && User[i1].current_map == User[CurrSock].current_map) //don't send to yourself or other maps
-                                     {
-                                         // Send data
-                                         User[i1].SendPacket(Packet);
-                                     }
-
-                                 }
-                             }//ok to move  
+	for (int i1 = 0; i1 < MAX_CLIENTS; i1++)
+	{
+		if (i1 != CurrSock && User[i1].Ident  && User[i1].current_map == User[CurrSock].current_map) //don't send to yourself or other maps
+		{
+			// Send data
+			User[i1].SendPacket(Packet);
+		}
+	}
 }
 
 void Left (int CurrSock, float numx, float numy)
 {
-			     //you cant move when attacking!
-                             if (User[CurrSock].attacking){
-                                printf("tried to move left when attacking.\7\n");
-                                //if not in que, put it there.
-                                if (User[CurrSock].que_action == 0)
-                                {
-                                   User[CurrSock].que_action = MOVE_LEFT;
-                                }
-                             }
-                             else
-                             {
-                                    
-                                // printf("OK\n"); 
-                                   
-                                 User[CurrSock].facing_right = false;
-                                 //physics
-                                 User[CurrSock].x_speed = -2;
-                                     
-                                 
-                                 bool good = false;
-                                 
-                                 if 
-                                 (
-                                         (
-                                             (
-                                                 (numx - User[CurrSock].x <= 0 && numx - User[CurrSock].x > -snap_distance) 
-                                                 ||
-                                                 (numx - User[CurrSock].x >= 0 && numx - User[CurrSock].x < snap_distance)
-                                             ) 
-                                             &&
-                                             (
-                                                 (numy - User[CurrSock].y <= 0 && numy - User[CurrSock].y > -snap_distance) 
-                                                 ||
-                                                 (numy - User[CurrSock].y >= 0 && numy - User[CurrSock].y < snap_distance)
-                                             )
-                                         )
-                                 )
-                                 {
-                                      //update server variables
-                                      User[CurrSock].x = numx;
-                                      User[CurrSock].y = numy;
-                                      good = true;
-                                 }
-                                 else
-                                 {
-                                     printf("MOVE RIGHT FAIL: (%.2f,%.2f)\n", numx, numy);
-                                     printf("ACTUAL VAL: (%.2f,%.2f)\n\n", User[CurrSock].x, User[CurrSock].y);     
-                                    
-                                     //correction packet
-                                     numx = (int)User[CurrSock].x;
-                                     numy = (int)User[CurrSock].y;
-                                 }
-                                      
-                                 //corrections
-                                    
-                                    char *p;
-                                    char b1, b2, b3, b4;
-                                    //build correction packet
-                                    std::string Packet = "0";
-                                    Packet += MOVE_LEFT;
-                                    Packet += CurrSock;
-    
-                                    //break up X into 4 bytes
-                                    p=(char*)&numx;
-                                    b1=p[0]; b2=p[1]; b3=p[2]; b4=p[3];
-                                    Packet += b1;
-                                    Packet += b2;
-                                    Packet += b3;
-                                    Packet += b4;
-    
-                                    //break up Y into 4 bytes
-                                    p=(char*)&numy;
-                                    b1=p[0]; b2=p[1]; b3=p[2]; b4=p[3];
-                                    Packet += b1;
-                                    Packet += b2;
-                                    Packet += b3;
-                                    Packet += b4;  
-                                    
-                                    //send to yourself
-                                    Packet[0] = Packet.length();
-                                    
-                                    
-                                 for (int i1 = 0; i1 < MAX_CLIENTS; i1++)
-                                 {
-                                     if (User[i1].Ident && (i1!=CurrSock || !good)  && User[i1].current_map == User[CurrSock].current_map)
-                                     {
-                                         // Send data
-                                         User[i1].SendPacket(Packet);
-                                     }      
-                           
-                                 }  
-                             }//ok to move 
+	//you cant move when attacking!
+	if (User[CurrSock].attacking)
+	{
+		printf("tried to move left when attacking.\7\n");
+		//if not in que, put it there.
+		if (User[CurrSock].que_action == 0)
+		{
+			User[CurrSock].que_action = MOVE_LEFT;
+		}
+		return;
+	}
+
+	User[CurrSock].facing_right = false;
+	//physics
+	User[CurrSock].x_speed = -2;
+
+	bool good = false;
+
+	if 
+	(((
+		(numx - User[CurrSock].x <= 0 && numx - User[CurrSock].x > -snap_distance) 
+		||
+		(numx - User[CurrSock].x >= 0 && numx - User[CurrSock].x < snap_distance)
+		) 
+		&&
+		(
+		(numy - User[CurrSock].y <= 0 && numy - User[CurrSock].y > -snap_distance) 
+		||
+		(numy - User[CurrSock].y >= 0 && numy - User[CurrSock].y < snap_distance)
+	)))
+	{
+		//update server variables
+		User[CurrSock].x = numx;
+		User[CurrSock].y = numy;
+		good = true;
+	}
+	else
+	{
+		printf("MOVE RIGHT FAIL: (%.2f,%.2f)\n", numx, numy);
+		printf("ACTUAL VAL: (%.2f,%.2f)\n\n", User[CurrSock].x, User[CurrSock].y);     
+
+		//correction packet
+		numx = (int)User[CurrSock].x;
+		numy = (int)User[CurrSock].y;
+	}
+
+	//corrections
+	char *p;
+	char b1, b2, b3, b4;
+	//build correction packet
+	std::string Packet = "0";
+	Packet += MOVE_LEFT;
+	Packet += CurrSock;
+
+	//break up X into 4 bytes
+	p=(char*)&numx;
+	b1=p[0]; b2=p[1]; b3=p[2]; b4=p[3];
+	Packet += b1;
+	Packet += b2;
+	Packet += b3;
+	Packet += b4;
+
+	//break up Y into 4 bytes
+	p=(char*)&numy;
+	b1=p[0]; b2=p[1]; b3=p[2]; b4=p[3];
+	Packet += b1;
+	Packet += b2;
+	Packet += b3;
+	Packet += b4;  
+
+	//send to yourself
+	Packet[0] = Packet.length();
+
+
+	for (int i1 = 0; i1 < MAX_CLIENTS; i1++)
+	{
+		if (User[i1].Ident && (i1!=CurrSock || !good)  && User[i1].current_map == User[CurrSock].current_map)
+		{
+			// Send data
+			User[i1].SendPacket(Packet);
+		} 
+	}  
 }
+
 void Jump(int CurrSock, float numx, float numy)
 {
 	//you cant move when attacking!
-                             if (User[CurrSock].attacking){
-                                printf("tried to jump while attacking...\7\n");
-				//if not in que, put it there.
-                                if (User[CurrSock].que_action == 0)
-                                {
-                                   User[CurrSock].que_action = MOVE_JUMP;
-                                }
-                             }
-                             else
-                             {                                
-                                //printf("WEEEEE!\n"); 
-                                 
-                                 bool good = false;
-                                 
-                                 if 
-                                 (
-                                         (
-                                             (
-                                                 (numx - User[CurrSock].x <= 0 && numx - (int)User[CurrSock].x > -snap_distance) 
-                                                 ||
-                                                 (numx - User[CurrSock].x >= 0 && numx - (int)User[CurrSock].x < snap_distance)
-                                             ) 
-                                             &&
-                                             (
-                                                 (numy - User[CurrSock].y <= 0 && numy - (int)User[CurrSock].y > -snap_distance) 
-                                                 ||
-                                                 (numy - User[CurrSock].y >= 0 && numy - (int)User[CurrSock].y < snap_distance)
-                                             )
-                                         )
-                                 )
-                                 {
-                                      //update server variables
-                                      User[CurrSock].x = numx;
-                                      User[CurrSock].y = numy;
-                                      good = true;
-                                 }
-                                 else
-                                 {
-                                     printf("MOVE JUMP FAIL: (%.2f,%.2f)\n", numx, numy);
-                                     printf("ACTUAL VAL: (%.2f,%.2f)\n\n", User[CurrSock].x, User[CurrSock].y);
-                                    
-                                     //correction packet
-                                     numx = (int)User[CurrSock].x;
-                                     numy = (int)User[CurrSock].y;
-                                 }
-    
-                                      
-                                 //corrections
-                                    char *p;
-                                    char b1, b2, b3, b4;
-                                    //build correction packet
-                                    std::string Packet = "0";
-                                    Packet += MOVE_JUMP;
-                                    //ID
-                                    Packet += CurrSock;
-    
-                                    //break up X into 4 bytes
-                                    p=(char*)&numx;
-                                    b1=p[0]; b2=p[1]; b3=p[2]; b4=p[3];
-                                    Packet += b1;
-                                    Packet += b2;
-                                    Packet += b3;
-                                    Packet += b4;
-    
-                                    //break up Y into 4 bytes
-                                    p=(char*)&numy;
-                                    b1=p[0]; b2=p[1]; b3=p[2]; b4=p[3];
-                                    Packet += b1;
-                                    Packet += b2;
-                                    Packet += b3;
-                                    Packet += b4; 
-                                    
-                                    //send to yourself
-                                    Packet[0] = Packet.length();
-                               
-                                 for (int i1 = 0; i1 < MAX_CLIENTS; i1++)
-                                 {
-                                     if (User[i1].Ident && (i1!=CurrSock || !good)  && User[i1].current_map == User[CurrSock].current_map) 
-                                     {
-                                         User[i1].SendPacket(Packet);   
-                                     } 
-                                 }
-                                 
-                                 //physics
-                                 User[CurrSock].y_speed = -6;
-                           }//okay to jump
+	if (User[CurrSock].attacking)
+	{
+		printf("tried to jump while attacking...\7\n");
+		//if not in que, put it there.
+		if (User[CurrSock].que_action == 0)
+		{
+			User[CurrSock].que_action = MOVE_JUMP;
+		}
+		return;
+	}          
+	bool good = false;
 
+	if 
+	(((
+		(numx - User[CurrSock].x <= 0 && numx - (int)User[CurrSock].x > -snap_distance) 
+		||
+		(numx - User[CurrSock].x >= 0 && numx - (int)User[CurrSock].x < snap_distance)
+		) 
+		&&
+		(
+		(numy - User[CurrSock].y <= 0 && numy - (int)User[CurrSock].y > -snap_distance) 
+		||
+		(numy - User[CurrSock].y >= 0 && numy - (int)User[CurrSock].y < snap_distance)
+	)))
+	{
+		//update server variables
+		User[CurrSock].x = numx;
+		User[CurrSock].y = numy;
+		good = true;
+	}
+	else
+	{
+		printf("MOVE JUMP FAIL: (%.2f,%.2f)\n", numx, numy);
+		printf("ACTUAL VAL: (%.2f,%.2f)\n\n", User[CurrSock].x, User[CurrSock].y);
+
+		//correction packet
+		numx = (int)User[CurrSock].x;
+		numy = (int)User[CurrSock].y;
+	}
+
+
+	//corrections
+	char *p;
+	char b1, b2, b3, b4;
+	//build correction packet
+	std::string Packet = "0";
+	Packet += MOVE_JUMP;
+	//ID
+	Packet += CurrSock;
+
+	//break up X into 4 bytes
+	p=(char*)&numx;
+	b1=p[0]; b2=p[1]; b3=p[2]; b4=p[3];
+	Packet += b1;
+	Packet += b2;
+	Packet += b3;
+	Packet += b4;
+
+	//break up Y into 4 bytes
+	p=(char*)&numy;
+	b1=p[0]; b2=p[1]; b3=p[2]; b4=p[3];
+	Packet += b1;
+	Packet += b2;
+	Packet += b3;
+	Packet += b4; 
+
+	//send to yourself
+	Packet[0] = Packet.length();
+
+	for (int i1 = 0; i1 < MAX_CLIENTS; i1++)
+	{
+		if (User[i1].Ident && (i1!=CurrSock || !good)  && User[i1].current_map == User[CurrSock].current_map) 
+		{
+			User[i1].SendPacket(Packet);   
+		} 
+	}
+
+	//physics
+	User[CurrSock].y_speed = -6;
 }
 
 void DivideLoot(int enemy, int party)
@@ -7337,8 +7213,7 @@ void KillEnemy(int current_map, int enemy)
 {
   
 	printf("Map %i Enemy %i killed at (%i, %i) spawns at (%i, %i)\n", 
-		current_map, enemy, (
-		int)map[current_map].Enemy[enemy]->x,  (int)map[current_map].Enemy[enemy]->y, (int)map[current_map].Enemy[enemy]->sx, (int)map[current_map].Enemy[enemy]->sy);
+		current_map, enemy, (int)map[current_map].Enemy[enemy]->x,  (int)map[current_map].Enemy[enemy]->y, (int)map[current_map].Enemy[enemy]->sx, (int)map[current_map].Enemy[enemy]->sy);
 	//set enemy to dead
 	map[current_map].Enemy[enemy]->dead = true;
 
@@ -7347,62 +7222,62 @@ void KillEnemy(int current_map, int enemy)
 	map[current_map].Enemy[enemy]->respawn_ticker = Clock();
 	
 		 
-	 //disappear
-	 map[current_map].Enemy[enemy]->x = -1000;
-	 map[current_map].Enemy[enemy]->y = -1000;
+	//disappear
+	map[current_map].Enemy[enemy]->x = -100000;
+	map[current_map].Enemy[enemy]->y = -100000;
 
 	printf("Now he's at (%i, %i) and spawns at (%i, %i)\n", (int)map[current_map].Enemy[enemy]->x,  (int)map[current_map].Enemy[enemy]->y, (int)map[current_map].Enemy[enemy]->sx, (int)map[current_map].Enemy[enemy]->sy);
         
 	 
-	 //tell players he disappeared
-	 std::string Packet = "0";
-	 Packet += ENEMY_MOVE_STOP;
-	 Packet += enemy;
-	 Packet += current_map;
-	 char*p=(char*)&map[current_map].Enemy[enemy]->x;
-	 Packet += p[0];
-	 Packet += p[1];
-	 Packet += p[2];
-	 Packet += p[3];
-	 p=(char*)&map[current_map].Enemy[enemy]->y;
-	 Packet += p[0];
-	 Packet += p[1];
-	 Packet += p[2];
-	 Packet += p[3];
+	//tell players he disappeared
+	std::string Packet = "0";
+	Packet += ENEMY_MOVE_STOP;
+	Packet += enemy;
+	Packet += current_map;
+	char*p=(char*)&map[current_map].Enemy[enemy]->x;
+	Packet += p[0];
+	Packet += p[1];
+	Packet += p[2];
+	Packet += p[3];
+	p=(char*)&map[current_map].Enemy[enemy]->y;
+	Packet += p[0];
+	Packet += p[1];
+	Packet += p[2];
+	Packet += p[3];
 	  
-	 //send packet to all players
-	 Packet[0] = Packet.length();
-	 for (int i = 0; i < MAX_CLIENTS; i++)
-	 {
-		 if (User[i].Ident)
+	//send packet to all players
+	Packet[0] = Packet.length();
+	for (int i = 0; i < MAX_CLIENTS; i++)
+	{
+		if (User[i].Ident)
 			User[i].SendPacket(Packet);
-	 }
+	}
 
 	printf("Enemy killed, (%i,%i)\n", (int)map[current_map].Enemy[enemy]->x, (int)map[current_map].Enemy[enemy]->y);
 }
 
 void SpawnLoot(int current_map, SKO_ItemObject lootItem)
 {
-	 int rand_i;
-        for (rand_i = 0; rand_i < 255; rand_i++)
-        {
-                 if (map[current_map].ItemObj[rand_i].status == false)
-                        break;
-        }
+	int rand_i;
+	for (rand_i = 0; rand_i < 255; rand_i++)
+	{
+		if (map[current_map].ItemObj[rand_i].status == false)
+			break;
+	}
 
-         if (rand_i == 255)
-         {
-                if (map[current_map].currentItem == 255)
-                   map[current_map].currentItem = 0;
+	if (rand_i == 255)
+	{
+		if (map[current_map].currentItem == 255)
+			map[current_map].currentItem = 0;
 
-                rand_i = map[current_map].currentItem;
-                map[current_map].currentItem++;
-         }
+		rand_i = map[current_map].currentItem;
+		map[current_map].currentItem++;
+	}
 	
 
-         map[current_map].ItemObj[rand_i] = SKO_ItemObject(lootItem.itemID, lootItem.x, lootItem.y, lootItem.x_speed, lootItem.y_speed, lootItem.amount);
-	 map[current_map].ItemObj[rand_i].owner = lootItem.owner;
-	 map[current_map].ItemObj[rand_i].ownerTicker = Clock();
+	map[current_map].ItemObj[rand_i] = SKO_ItemObject(lootItem.itemID, lootItem.x, lootItem.y, lootItem.x_speed, lootItem.y_speed, lootItem.amount);
+	map[current_map].ItemObj[rand_i].owner = lootItem.owner;
+	map[current_map].ItemObj[rand_i].ownerTicker = Clock();
 
 	char *p;
 	char b1,b2,b3,b4;
@@ -7445,24 +7320,22 @@ void SpawnLoot(int current_map, SKO_ItemObject lootItem)
 
 	for (int i = 0; i < MAX_CLIENTS; i++)
 	{
-	 if (User[i].Ident  && User[i].current_map == current_map)
-		User[i].SendPacket(Packet);
+		if (User[i].Ident  && User[i].current_map == current_map)
+			User[i].SendPacket(Packet);
 	}
 	
 	printf("Item spawn packet (loot): ");
-	 for (int pk =0; pk < Packet.length(); pk++)
+	for (int pk =0; pk < Packet.length(); pk++)
 		printf("[%i]", (int)(unsigned char)Packet[pk]);
 	printf("\n");
-
 }
 
 void GiveLoot(int enemy, int player)
 {
-	 int current_map = User[player].current_map;
+	int current_map = User[player].current_map;
 	 
 	// remember about disabled items
 	SKO_ItemObject lootItem = map[current_map].Enemy[enemy]->getLootItem();
-	  
 
 	//holiday event    
 	if (HOLIDAY)
@@ -7478,165 +7351,158 @@ void GiveLoot(int enemy, int player)
 		  //37.5 chance of a normal drop
 	}          
 	
-	 lootItem.x = map[current_map].Enemy[enemy]->x + 16 + (32-Item[lootItem.itemID].w)/2.0;
-	 lootItem.y = map[current_map].Enemy[enemy]->y +
-		      map[current_map].Enemy[enemy]->y1 + Item[lootItem.itemID].h;
-         lootItem.x_speed = (float)(rand() % 50 - 25)/100.0;
-	 lootItem.y_speed = (float)(rand() % 300 - 500)/100.0;
+	lootItem.x = map[current_map].Enemy[enemy]->x + 16 + (32-Item[lootItem.itemID].w)/2.0;
+	lootItem.y = map[current_map].Enemy[enemy]->y +
+	map[current_map].Enemy[enemy]->y1 + Item[lootItem.itemID].h;
+	lootItem.x_speed = (float)(rand() % 50 - 25)/100.0;
+	lootItem.y_speed = (float)(rand() % 300 - 500)/100.0;
 	  
-	 //printf("Enemy[enemy]->x is %i\n", (int)Enemy[enemy]->x);
-	 //printf("Item[lootItem.itemID].w is %i\n", (int)Item[lootItem.itemID].w);
-	 //printf("lootItem.itemID is %i\n", (int)lootItem.itemID);
+	//printf("Enemy[enemy]->x is %i\n", (int)Enemy[enemy]->x);
+	//printf("Item[lootItem.itemID].w is %i\n", (int)Item[lootItem.itemID].w);
+	//printf("lootItem.itemID is %i\n", (int)lootItem.itemID);
 	 
-	 lootItem.owner = player;
+	lootItem.owner = player;
 
- 
-		
-
-	 SpawnLoot(current_map, lootItem);
+	SpawnLoot(current_map, lootItem);
 }
 
 void EnemyAttack(int i, int current_map)
 {
-			map[current_map].Enemy[i]->x_speed = 0;
-			//check if anyone got hit
-                        for (int u = 0; u < MAX_CLIENTS; u++)
-                        {
-                            if (User[u].current_map == current_map && User[u].Ident)
-                            {
-                               //check for collision
-                               //horizontal
-                               float x_dist, y_dist;
-                               if (map[current_map].Enemy[i]->facing_right)
-                                  x_dist = User[u].x - map[current_map].Enemy[i]->x;
-                               else
-                                  x_dist = map[current_map].Enemy[i]->x - User[u].x;
-                               //vertical   
-                               y_dist = User[u].y - map[current_map].Enemy[i]->y;
+	map[current_map].Enemy[i]->x_speed = 0;
+	//check if anyone got hit
+	for (int u = 0; u < MAX_CLIENTS; u++)
+	{
+		if (User[u].current_map == current_map && User[u].Ident)
+		{
+			//check for collision
+			//horizontal
+			float x_dist, y_dist;
+			if (map[current_map].Enemy[i]->facing_right)
+				x_dist = User[u].x - map[current_map].Enemy[i]->x;
+			else
+				x_dist = map[current_map].Enemy[i]->x - User[u].x;
+			//vertical   
+			y_dist = User[u].y - map[current_map].Enemy[i]->y;
 
-                               if (x_dist >= 0 && x_dist < 60 && y_dist >= -64 && y_dist <= 64)
-                               {
-                                  int dam = 0;
-				  int weap = User[u].equip[0];
-				  int hat = User[u].equip[1];
+			if (x_dist >= 0 && x_dist < 60 && y_dist >= -64 && y_dist <= 64)
+			{
+				int dam = 0;
+				int weap = User[u].equip[0];
+				int hat = User[u].equip[1];
 
-				  dam = map[current_map].Enemy[i]->strength - User[u].defence;
-                                  
-				  if (weap > 0)
-				  	dam -= Item[weap].def;
-				  if (hat > 0)
-					dam -= Item[hat].def;
-				  
-				  //dont give free hp
-                                  if (dam <= 0)
-                                  {
-                                      dam = 0;
-                                  }
-                                  else
-                                  {
-                                         std::string hpPacket = "0";
-                                             hpPacket += TARGET_HIT;
-                                             hpPacket += (char)1; // player
-                                             hpPacket += u;
-                                             hpPacket[0] = hpPacket.length();
+				dam = map[current_map].Enemy[i]->strength - User[u].defence;
+							  
+				if (weap > 0)
+				dam -= Item[weap].def;
+				if (hat > 0)
+				dam -= Item[hat].def;
+
+				//dont give free hp
+			    if (dam <= 0)
+			    {
+					dam = 0;
+			    }
+				else
+				{
+					std::string hpPacket = "0";
+					hpPacket += TARGET_HIT;
+					hpPacket += (char)1; // player
+					hpPacket += u;
+					hpPacket[0] = hpPacket.length();
 
 
-                                             for (int i1 = 0; i1 < MAX_CLIENTS; i1++)
-                                             {
-                                                 if (User[i1].Ident)
-                                                 {
-                                                    User[i1].SendPacket(hpPacket);
-                                                 }
-                                             }
-                                  }
-                                  std::string Packet;
-				  if (User[u].hp <= dam)
-                                  {
-                                     printf("Respawning, x:%i y:%i\n", (int)User[u].x, (int)User[u].y);
+					for (int i1 = 0; i1 < MAX_CLIENTS; i1++)
+					{
+						if (User[i1].Ident)
+						{
+							User[i1].SendPacket(hpPacket);
+						}
+					}
+				}
+				std::string Packet;
+				if (User[u].hp <= dam)
+				{	
+					printf("Respawning, x:%i y:%i\n", (int)User[u].x, (int)User[u].y);
 
-                                     Respawn(User[u].current_map, u);
+					Respawn(User[u].current_map, u);
 
-                                     printf("Respawned!, x:%i y:%i\n", (int)User[u].x, (int)User[u].y);
+					printf("Respawned!, x:%i y:%i\n", (int)User[u].x, (int)User[u].y);
+				}//end died
+				else
+				{
+					User[u].hp -= dam;
+					std::string Packet2 = "0";
+					Packet2 += STAT_HP;
+					Packet2 += User[u].hp;
+					Packet2[0] = Packet2.length();
+					User[u].SendPacket(Packet2);
 
-                                  }//end died
-                                  else
-                                  {
-                                     User[u].hp -= dam;
-                                     std::string Packet2 = "0";
-                                     Packet2 += STAT_HP;
-                                     Packet2 += User[u].hp;
-                                     Packet2[0] = Packet2.length();
-                                     User[u].SendPacket(Packet2);
+					//party hp notification
+					std::string hpPacket = "0";
+					hpPacket += BUDDY_HP;
+					hpPacket += u;
+					hpPacket += (int)((User[u].hp / (float)User[u].max_hp) * 80);
+					hpPacket[0] = hpPacket.length();
 
-                                     //party hp notification
-                                     std::string hpPacket = "0";
-                                     hpPacket += BUDDY_HP;
-                                     hpPacket += u;
-                                     hpPacket += (int)((User[u].hp / (float)User[u].max_hp) * 80);
-                                     hpPacket[0] = hpPacket.length();
-
-                                     for (int pl = 0; pl < MAX_CLIENTS; pl ++)
-                                     {
-                                        if (pl != u && User[pl].Ident && User[pl].partyStatus == PARTY && User[pl].party == User[u].party)
-                                                User[pl].SendPacket(hpPacket);
-                                     }
-
-                                  }//end lose hp
-                               }//end hit
-                            }
-                        }//end loop everyone
-
+					for (int pl = 0; pl < MAX_CLIENTS; pl ++)
+					{
+						if (pl != u && User[pl].Ident && User[pl].partyStatus == PARTY && User[pl].party == User[u].party)
+							User[pl].SendPacket(hpPacket);
+					}
+				}//end lose hp
+			}//end hit
+		}
+	}//end loop everyone
 }
 
 void Warp(int i, SKO_Portal portal)
 {
 	//move the player to this spot
-        User[i].current_map = portal.map;
-        User[i].x = portal.spawn_x;
-        User[i].y = portal.spawn_y;
+	User[i].current_map = portal.map;
+	User[i].x = portal.spawn_x;
+	User[i].y = portal.spawn_y;
 
-        //tell everyone
-        std::string warpPacket = "0";
-        warpPacket += WARP;
+	//tell everyone
+	std::string warpPacket = "0";
+	warpPacket += WARP;
 	warpPacket += i;
 	warpPacket += User[i].current_map;
 
-        
 	printf("Warping player %s to map %i at (%i, %i)\n", User[i].Nick.c_str(), User[i].current_map, (int)User[i].x, (int)User[i].y);	
 
 	//break up the int as 4 bytes
-        char * p = (char*)&User[i].x;
-        char b1=p[0], b2=p[1], b3=p[2], b4=p[3];
+	char * p = (char*)&User[i].x;
+	char b1=p[0], b2=p[1], b3=p[2], b4=p[3];
 
-        //spit out each of the bytes
-        warpPacket += b1;
+	//spit out each of the bytes
+	warpPacket += b1;
 	warpPacket += b2;
 	warpPacket += b3;
 	warpPacket += b4;
 
-        p=(char*)&User[i].y;
-        b1=p[0]; b2=p[1]; b3=p[2]; b4=p[3];
+	p=(char*)&User[i].y;
+	b1=p[0]; b2=p[1]; b3=p[2]; b4=p[3];
 
 	//spit out each of the bytes
-        warpPacket += b1;
-        warpPacket += b2;
-        warpPacket += b3;
-        warpPacket += b4;
+	warpPacket += b1;
+	warpPacket += b2;
+	warpPacket += b3;
+	warpPacket += b4;
 
 
 	warpPacket[0] = warpPacket.length();
 
 
-        for (int pla = 0; pla < MAX_CLIENTS; pla++)
-        {
-            if (User[pla].Ident)
-            {
-               //send packet to evertyone :)
-               User[pla].SendPacket(warpPacket);
-            }
-        }
+	for (int pla = 0; pla < MAX_CLIENTS; pla++)
+	{
+		if (User[pla].Ident)
+		{
+		   //send packet to evertyone :)
+		   User[pla].SendPacket(warpPacket);
+		}
+	}
 
-	//TODO shoow all items adn targets on warp?
+	//TODO show all items and targets on warp?
 
 }
 
@@ -7644,10 +7510,13 @@ void GiveXP(int CurrSock, int xp)
 {
 	printf("GiveXP(%i, %i);\n", CurrSock, xp);
 
-	if (xp < 0 || xp > 1000) {
+	if (xp < 0 || xp > 1000) 
+	{
 		printf("[WARN] Tried to give weird xp: %i\n", xp);
 		return;
-	} else {
+	} 
+	else 
+	{
 		printf("Clear to give %i XP \n", xp);
 	}
 
@@ -7658,79 +7527,35 @@ void GiveXP(int CurrSock, int xp)
 	//add xp
 	if (User[CurrSock].addXP(xp))
 	{
-		   //you leveled up, send all stats
-		   
-		   
-		   //level
-		   Packet = "0";
-		   Packet += STAT_LEVEL;
-		   Packet += User[CurrSock].level;
-		   Packet[0] = Packet.length();
-		   User[CurrSock].SendPacket(Packet);
-		   
-		   
-		   //hp max
-		   Packet = "0";
-		   Packet += STATMAX_HP;
-		   Packet += User[CurrSock].max_hp;
-		   Packet[0] = Packet.length();
-		   User[CurrSock].SendPacket(Packet);
-		   
-		   //hp
-		   Packet = "0";
-		   Packet += STAT_HP;
-		   Packet += User[CurrSock].hp;
-		   Packet[0] = Packet.length();
-		   User[CurrSock].SendPacket(Packet);
-		   
-		   //stat_points
-		   Packet = "0";
-		   Packet += STAT_POINTS;
-		   Packet += User[CurrSock].stat_points;
-		   Packet[0] = Packet.length();
-		   User[CurrSock].SendPacket(Packet);
-		   
-		   //xp
-		   Packet = "0";
-		   Packet += STAT_XP;
-		   p=(char*)&User[CurrSock].xp;
-		   b1=p[0]; b2=p[1]; b3=p[2]; b4=p[3];
-		   Packet += b1;
-		   Packet += b2;
-		   Packet += b3;
-		   Packet += b4;
-		   Packet[0] = Packet.length();
-		   User[CurrSock].SendPacket(Packet);
-		   
-		   //max xp
-		   Packet = "0";
-		   Packet += STATMAX_XP;
-		   p=(char*)&User[CurrSock].max_xp;
-		   b1=p[0]; b2=p[1]; b3=p[2]; b4=p[3];
-		   Packet += b1;
-		   Packet += b2;
-		   Packet += b3;
-		   Packet += b4;
-		   Packet[0] = Packet.length();
-		   User[CurrSock].SendPacket(Packet);
-			   
+		//you leveled up, send all stats
 
-			//tell party members my level
-			std::string lvlPacket = "0";
-			lvlPacket += BUDDY_LEVEL;
-			lvlPacket += CurrSock;
-			lvlPacket += User[CurrSock].level;
-			lvlPacket[0] = lvlPacket.length();
+		//level
+		Packet = "0";
+		Packet += STAT_LEVEL;
+		Packet += User[CurrSock].level;
+		Packet[0] = Packet.length();
+		User[CurrSock].SendPacket(Packet);
 
-			for (int pl = 0; pl < MAX_CLIENTS; pl++)
-			{
-					if (pl != CurrSock && User[pl].Ident && User[pl].partyStatus == PARTY && User[pl].party == User[CurrSock].party)
-							User[pl].SendPacket(lvlPacket);
-			}
-			
-		}//end gain xp
-	   
+		//hp max
+		Packet = "0";
+		Packet += STATMAX_HP;
+		Packet += User[CurrSock].max_hp;
+		Packet[0] = Packet.length();
+		User[CurrSock].SendPacket(Packet);
 
+		//hp
+		Packet = "0";
+		Packet += STAT_HP;
+		Packet += User[CurrSock].hp;
+		Packet[0] = Packet.length();
+		User[CurrSock].SendPacket(Packet);
+
+		//stat_points
+		Packet = "0";
+		Packet += STAT_POINTS;
+		Packet += User[CurrSock].stat_points;
+		Packet[0] = Packet.length();
+		User[CurrSock].SendPacket(Packet);
 
 		//xp
 		Packet = "0";
@@ -7743,25 +7568,62 @@ void GiveXP(int CurrSock, int xp)
 		Packet += b4;
 		Packet[0] = Packet.length();
 		User[CurrSock].SendPacket(Packet);
-  
-		//tell party members my xp
-		std::string xpPacket = "0";
-		xpPacket += BUDDY_XP;
-		xpPacket += CurrSock;
-		xpPacket += (int)((User[CurrSock].xp / (float)User[CurrSock].max_xp) * 80);
-		xpPacket[0] = xpPacket.length();
+
+		//max xp
+		Packet = "0";
+		Packet += STATMAX_XP;
+		p=(char*)&User[CurrSock].max_xp;
+		b1=p[0]; b2=p[1]; b3=p[2]; b4=p[3];
+		Packet += b1;
+		Packet += b2;
+		Packet += b3;
+		Packet += b4;
+		Packet[0] = Packet.length();
+		User[CurrSock].SendPacket(Packet);
+
+		//tell party members my level
+		std::string lvlPacket = "0";
+		lvlPacket += BUDDY_LEVEL;
+		lvlPacket += CurrSock;
+		lvlPacket += User[CurrSock].level;
+		lvlPacket[0] = lvlPacket.length();
 
 		for (int pl = 0; pl < MAX_CLIENTS; pl++)
 		{
 			if (pl != CurrSock && User[pl].Ident && User[pl].partyStatus == PARTY && User[pl].party == User[CurrSock].party)
-				User[pl].SendPacket(xpPacket);
+				User[pl].SendPacket(lvlPacket);
 		}
+	}//end gain xp
+	   
+	//xp
+	Packet = "0";
+	Packet += STAT_XP;
+	p=(char*)&User[CurrSock].xp;
+	b1=p[0]; b2=p[1]; b3=p[2]; b4=p[3];
+	Packet += b1;
+	Packet += b2;
+	Packet += b3;
+	Packet += b4;
+	Packet[0] = Packet.length();
+	User[CurrSock].SendPacket(Packet);
+
+	//tell party members my xp
+	std::string xpPacket = "0";
+	xpPacket += BUDDY_XP;
+	xpPacket += CurrSock;
+	xpPacket += (int)((User[CurrSock].xp / (float)User[CurrSock].max_xp) * 80);
+	xpPacket[0] = xpPacket.length();
+
+	for (int pl = 0; pl < MAX_CLIENTS; pl++)
+	{
+		if (pl != CurrSock && User[pl].Ident && User[pl].partyStatus == PARTY && User[pl].party == User[CurrSock].party)
+			User[pl].SendPacket(xpPacket);
+	}
 }
 
 
 void Respawn(int current_map, int i)
 {
-
 	//place their coords
 	User[i].x = map[current_map].spawn_x;
 	User[i].y = map[current_map].spawn_y;
@@ -7769,8 +7631,8 @@ void Respawn(int current_map, int i)
 	User[i].hp = User[i].max_hp;
 
 	std::string Packet1 = "0";
-        Packet1 += RESPAWN;
-      	Packet1 += i;
+	Packet1 += RESPAWN;
+	Packet1 += i;
                               
 	float numx = User[i].x;       
 	char * p = (char*)&numx;
@@ -7788,16 +7650,14 @@ void Respawn(int current_map, int i)
 
 	Packet1[0] = Packet1.length();
 
-        //tell everyone they died
-        for (int ii = 0; ii < MAX_CLIENTS; ii++)
-        {
-            if (User[ii].Ident)
-            {
-               User[ii].SendPacket(Packet1);
-            }
-        } 
-	
-
+	//tell everyone they died
+	for (int ii = 0; ii < MAX_CLIENTS; ii++)
+	{
+		if (User[ii].Ident)
+		{
+		   User[ii].SendPacket(Packet1);
+		}
+	} 
 }
 
 

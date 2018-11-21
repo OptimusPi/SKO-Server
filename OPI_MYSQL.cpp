@@ -2,36 +2,36 @@
             
 void OPI_MYSQL::cleanup()
 { 
-        log("cleanup MYSQL...\n");
-        //just initialize the connection
-        if (result){
-               log("result is true.\nmysql_free_result(result);\n");
-               mysql_free_result(result);
-        } else { 
-                log("result is NULL.\n");
-        }
+	log("cleanup MYSQL...\n");
+	//just initialize the connection
+	if (result){
+		   log("result is true.\nmysql_free_result(result);\n");
+		   mysql_free_result(result);
+	} else { 
+			log("result is NULL.\n");
+	}
 
-        if (conn){
-           log("connection is true. checking result.\n");
-           log("mysql_close(conn);\n");
-           mysql_close(conn);
-        } 
-        else {
-           log("conn is NULL.\n");
-        }
+	if (conn){
+	   log("connection is true. checking result.\n");
+	   log("mysql_close(conn);\n");
+	   mysql_close(conn);
+	} 
+	else {
+	   log("conn is NULL.\n");
+	}
 
-        log("result = NULL;\n");
-        result = NULL;
+	log("result = NULL;\n");
+	result = NULL;
 }
  
 
 OPI_MYSQL::OPI_MYSQL()
 {
-	sem_init(&mutex, 0, 1);
-	sem_init(&mutex2, 0, 1);    
+	sem_init(&queryMutex, 0, 1);
+	sem_init(&cleanMutex, 0, 1);    
  
 
-        conn = new MYSQL();
+	conn = new MYSQL();
 
 	//just initialize the connection
         if (mysql_init(conn) == NULL){
@@ -59,10 +59,9 @@ OPI_MYSQL::~OPI_MYSQL()
 void OPI_MYSQL::log(std::string output)
 {
      
-         //logFile << "[" << Clock() << "] " << output << std::endl;
-         printf("[OPI_MYSQL] %s\n", output.c_str());
-         logCount++;
-     
+	//logFile << "[" << Clock() << "] " << output << std::endl;
+	printf("[OPI_MYSQL] %s\n", output.c_str());
+	logCount++;
 }
 
 
@@ -81,13 +80,12 @@ int OPI_MYSQL::ping()
 
 bool OPI_MYSQL::connect(std::string server_in, std::string database_in, std::string user_in, std::string password_in)
 {
-        //save values for reconnect
-        std::strcpy(server, server_in.c_str());
-        std::strcpy(database, database_in.c_str());
-        std::strcpy(user, user_in.c_str());
-        std::strcpy(password, password_in.c_str());
+	//save values for reconnect
+	std::strcpy(server, server_in.c_str());
+	std::strcpy(database, database_in.c_str());
+	std::strcpy(user, user_in.c_str());
+	std::strcpy(password, password_in.c_str());
        
-
 	conn = mysql_init(NULL); 
 
         //make the connection
@@ -101,13 +99,13 @@ bool OPI_MYSQL::connect(std::string server_in, std::string database_in, std::str
 		database, 
 		0, 
 		NULL, 
-		(unsigned long)0))
-
+		(unsigned long)0
+	))
 		Connected = true;
-       mysql_close(conn);
+    
+	mysql_close(conn);
        
-        return Connected;
-
+    return Connected;
 }
 
 
@@ -154,7 +152,7 @@ int OPI_MYSQL::query(std::string statement)
 
 int OPI_MYSQL::query(std::string statement, bool once)
 {
-    sem_wait(&mutex);
+    sem_wait(&queryMutex);
 	
     log("OPI_MYSQL::query()\n\t");
     log(statement);
@@ -238,7 +236,7 @@ int OPI_MYSQL::query(std::string statement, bool once)
     mysql_close(conn);
     Connected = false; 
 
-    sem_post(&mutex);
+    sem_post(&queryMutex);
 
     //return error/success
     return returnVal;
@@ -294,20 +292,9 @@ int OPI_MYSQL::count()
     return rowCount;
 }
 
-bool OPI_MYSQL::isResult()
-{
-     //tell whether or not there is data result.
-     if (result)
-        return true;
-        
-     return false;
-}
-
-
-
 std::string OPI_MYSQL::clean(std::string dirty_str)
 {
-    sem_wait(&mutex);
+    sem_wait(&cleanMutex);
     
     conn = mysql_init(NULL);
     
@@ -327,7 +314,7 @@ std::string OPI_MYSQL::clean(std::string dirty_str)
     mysql_real_escape_string(conn, clean_char, dirty_str.c_str(), dirty_str.size());
     
 
-    sem_post(&mutex);
+    sem_post(&cleanMutex);
 
     //return the value
     return (const char*)clean_char;
