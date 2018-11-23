@@ -4,6 +4,10 @@
 
 echo "Starting Stick-Knights-Online server"
 
+#clear TCP port
+echo "Clearing port 1337"
+fuser 1337/tcp
+
 #backup the server log
 echo -n "backing up server log file..."
 if [ -e "server.log" ]

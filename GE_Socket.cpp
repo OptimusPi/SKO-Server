@@ -19,7 +19,6 @@ GE_Socket::GE_Socket()
     IP = ""; 
     byte_counter = 0;//counts data in bytes 
     bandwidth = 0;//bytes per second 
-    micro_seconds = 0;//counter 
     stream_ticker = 0;   
     timeout.tv_sec = 0; 
     timeout.tv_usec = 0;    
@@ -106,10 +105,12 @@ int GE_Socket::GetStatus2()
     { 
         Status |= GE_Socket_OK; 
     } 
-    if( FD_ISSET(Socket,&wset) ){  
+    if( FD_ISSET(Socket,&wset) )
+	{  
         Status |= GE_Socket_Write; 
     } 
-    else if( FD_ISSET(Socket,&rset) ){ 
+    else if( FD_ISSET(Socket,&rset) ){
+		
          Status |= GE_Socket_Read; 
     } 
      
@@ -129,16 +130,14 @@ int GE_Socket::GetStatus()
     fd_set wset; 
     fd_set eset; 
  
-    FD_ZERO(&rset);  
-    FD_ZERO(&wset);  
-    FD_ZERO(&eset);  
-    FD_SET((unsigned int)Socket,&rset);  
-    FD_SET((unsigned int)Socket,&wset);  
-    FD_SET((unsigned int)Socket,&eset); 
+    FD_ZERO(&rset);
+    FD_ZERO(&wset);
+    FD_ZERO(&eset);
+    FD_SET((unsigned int)Socket,&rset);
+    FD_SET((unsigned int)Socket,&wset);
+    FD_SET((unsigned int)Socket,&eset);
  
-    //printf("Time a: %i\n", Clock()); 
     int i = select(FD_SETSIZE,&rset,&wset,&eset,(struct timeval*)&timeout); 
-    //printf("Time b: %i\n", Clock()); 
      
     if (i == -1){ 
        perror("In GetStatus(), select() returned error"); 
@@ -168,10 +167,8 @@ int GE_Socket::GetStatus()
  
  
 bool GE_Socket::Create(unsigned int Port){ 
-   
     
     Socket = socket( AF_INET, SOCK_STREAM, 0 ); 
-    
  
     sin.sin_family = AF_INET; 
     sin.sin_addr.s_addr = INADDR_ANY; 
@@ -216,18 +213,18 @@ GE_Socket* GE_Socket::Accept(){
      int nresult = setsockopt(client,            /* socket affected */ 
                                  IPPROTO_TCP,     /* set option at TCP level */ 
                                  TCP_NODELAY,     /* name of option */ 
-                                 (char *) &flag,  /* the cast is historical 
-                                                         cruft */ 
+                                 (char *) &flag,  /* the cast is historical cruft */ 
                                  sizeof(int));    /* length of option value */ 
      if (nresult < 0){ 
-        printf("ERROR cant set TCP_NODELAY or some shiz...\n"); 
+        printf("ERROR cant set TCP_NODELAY or other options.\n"); 
      } 
       
     if ( client == 0 ) 
     { 
-        perror("[ ERR ] invalid socket??"); 
+        perror("[ ERR ] invalid socket when trying to accept connection."); 
         return NULL; 
     } 
+	
     GE_Socket *nSock = new GE_Socket(); 
     nSock->sin = sin; 
     nSock->Socket = client; 
@@ -240,35 +237,28 @@ void GE_Socket::Close()
     Data = "";
     Connected = false; 
     if (Socket > 0)
-	close(Socket);
-    //crashes the server xD 
-    //WSACleanup(); //Clean up Winsock 
+		close(Socket);
 } 
  
 int GE_Socket::Send(std::string in_Data) 
 { 
-        if( send(Socket, in_Data.c_str(), in_Data.length(), 0) == 0 ) 
-        { 
-            perror("SEND() FAILED!!!\n"); 
-            printf("send_Data [%s] send_Data.length [%i]\n", in_Data.c_str(), (int)in_Data.length()); 
-            printf("Packet code was %i\n", in_Data[1]); 
-             
-            printf("getStatus returns this: [%i]\n", GetStatus()); 
-            Close(); 
-             
-            return (int)GE_Socket_Error; 
-        }     
-     
-         
-         
-        return (int)GE_Socket_OK; 
+	if( send(Socket, in_Data.c_str(), in_Data.length(), 0) == 0 ) 
+	{ 
+		perror("GE_Socket::Send() FAILED!\n"); 
+		printf("send_Data [%s] send_Data.length [%i]\n", in_Data.c_str(), (int)in_Data.length()); 
+		printf("Packet code was %i\n", in_Data[1]); 
+		 
+		printf("getStatus returns this: [%i]\n", GetStatus()); 
+		Close(); 
+		 
+		return (int)GE_Socket_Error; 
+	}     
+ 
+	return (int)GE_Socket_OK; 
 } 
  
  
 int GE_Socket::Recv(){ 
-     
-    int timea = Clock(); 
-     
     fd_set sset; 
      
     FD_ZERO(&sset);  
@@ -279,40 +269,24 @@ int GE_Socket::Recv(){
  
  
     if (FD_ISSET(Socket,&sset)) { 
-     
-        int timeb = Clock();     
         iResult = recv (Socket,recvbuf,DEFAULT_BUFLEN,0); 
-        int timec = Clock(); 
-        int timed = 0; 
         if (iResult > 0)  
         { 
            Data.append(recvbuf, iResult); 
-           timed = Clock(); 
         } 
         else if (iResult == 0 ) 
         { 
             perror("recv failed,\n[Connection has gracefully been closed]");
             Close(); 
-            return 1;   
+            return (int)GE_Socket_Error;   
         } 
         else 
         { 
             printf("iResult is :%i\n", iResult); 
             perror("recv failed for an unknown reason"); 
             Close(); 
-            return 1; 
+            return (int)GE_Socket_Error; 
 	    printf("iABCD DISCONNECTED?! But Attempting to continue...\n");
-        } 
-         
-        if ((int)(Clock() - timea) > 5 ) 
-        { 
-                printf("\7*\n GE_Socket::Recv() took a long time.\n It took %d milliseconds.\n",(unsigned int)( Clock() - timea));           
-                printf("(recvbuf) packet type is: %i\n", recvbuf[0]); 
-                printf("timea: %d", timea); 
-                printf("timeb: %d", timeb); 
-                printf("timec: %d", timec); 
-                printf("timed: %d", timed);  
-                printf("clock: %d", Clock());        
         } 
     }         
          

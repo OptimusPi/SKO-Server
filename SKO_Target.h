@@ -18,7 +18,7 @@ class SKO_Target
 		int 	id;
 		bool 	active;
 		int 	loot;
-		int 	respawn_ticker;
+		unsigned long int respawn_ticker;
 		int	required_weapon;
 
 	SKO_Target();

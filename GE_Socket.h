@@ -49,8 +49,7 @@ private:
 	std::string         IP;
 	int                 byte_counter;//counts data in bytes
 	int                 bandwidth;//bytes per second
-	double              micro_seconds;//counter
-	unsigned  int   stream_ticker;
+	unsigned long int   stream_ticker;
 
 	~GE_Socket();
 	GE_Socket();
