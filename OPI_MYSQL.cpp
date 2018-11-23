@@ -209,13 +209,6 @@ int OPI_MYSQL::query(std::string statement, bool once)
 			{
 			   rowCount = mysql_num_rows(result);
 			   numOfFields = mysql_num_fields(result);
-			} 
-			else 
-			{
-				//TODO - umm... this fixed a bug but is result 
-				//printf("OPI_MYSQL QUERY FAIL! %i \r\n", result);
-				//Sleep(6000);
-				//fail = true;
 			}
 	    } 
 	    else 
@@ -300,20 +293,12 @@ std::string OPI_MYSQL::clean(std::string dirty_str)
     
     //variables
     char * clean_char = new char[(dirty_str.size() * 2) + 1];
-    //char * dirty_char = (char*)malloc(dirty_str.length() * 2);
-
-    //int i;
-    //for (i = 0; i < dirty_str.length(); i++)
-	//dirty_char[i] = dirty_str[i];
-    //dirty_char[i] = '\0';
-	
 
     //clean string
     printf("mysql_real_escape_string(%d, [clean_char], [%s], %i);", 
 		(long)conn, dirty_str.c_str(), dirty_str.size());
     mysql_real_escape_string(conn, clean_char, dirty_str.c_str(), dirty_str.size());
     
-
     sem_post(&cleanMutex);
 
     //return the value
