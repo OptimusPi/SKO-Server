@@ -29,8 +29,7 @@ std::string Hash(std::string _password, std::string _salt)
     // high-level API
     argon2d_hash_raw(t_cost, m_cost, parallelism, pwd, pwdlen, salt, SALTLEN, hash, HASHLEN);
 
-
-    for( int i=0; i<HASHLEN; ++i ) 
+    for (int i = 0; i < HASHLEN; ++i) 
 		hashResult += hash[i]; 
 	
     return base64_encode(hashResult);	

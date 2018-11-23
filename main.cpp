@@ -703,16 +703,13 @@ void saveAllProfiles()
     int playersMac = 0; 
     float averagePing = 0;
 
-	printf("SAVE ALL PROFILES- loop all players \r\n");
 	
     //loop all players
     for (int i = 0; i < MAX_CLIENTS; i++)
     {
-		printf("User[%i]: %s %i %i\r\n", i, User[i].Nick.c_str(), (int)User[i].Ident, (int)User[i].Save);
-        //save each player who is logged in
+		//save each player who is logged in
         if (User[i].Ident || User[i].Save)
         {
-			printf("Saving profile: [%s]\n", User[i].Nick.c_str());
             save_profile(i);
             printf("\e[35;0m[Saved %s]\e[m\n", User[i].Nick.c_str());
             numSaved++;
@@ -745,7 +742,7 @@ void saveAllProfiles()
     int numPlayers = (playersLinux + playersWindows + playersMac);
 
 	printf("number of players: %i, average ping: %i\r\n", numPlayers, averagePing);
-	Sleep(6000);
+
     if (!savePaused)
     {
     	if (numPlayers > 0)
@@ -826,10 +823,8 @@ int load_data(int CurrSock)
 		User[CurrSock].current_map = db->getInt(22);
 		
 		
-	printf("%s is on map: %i\r\n", User[CurrSock].Nick.c_str(), User[CurrSock].current_map);
 		User[CurrSock].inventory_order = base64_decode(db->getString(23));  
 		
-		printf("the length of the inventory is : %i \n", (int)User[CurrSock].inventory_order.length());
 		//playtime stats
 		User[CurrSock].loginTime = Clock();
 						   
@@ -842,7 +837,6 @@ int load_data(int CurrSock)
 		if (db->count())
 		{
 			db->nextRow();
-			printf("loading inventory...\n");  
 		   
 			for (int i = 0; i < NUM_ITEMS; i++)
 			{
@@ -854,10 +848,7 @@ int load_data(int CurrSock)
 					User[CurrSock].inventory_index++;
 				
 				if (User[CurrSock].inventory_index > 23) 
-				{
-					printf("User[%i] is full of items.", CurrSock);
 					break;
-				}
 			}
 		}
 		else 
@@ -875,14 +866,13 @@ int load_data(int CurrSock)
 		if (db->count())
 		{
 			db->nextRow();
-			printf("loading bank...\n");  
+			printf("loading bank...\n");
 		   
 			for (int i = 0; i < NUM_ITEMS; i++)
 			{
 			   //grab an item from the row
 			   User[CurrSock].bank[i] = db->getInt(i+1); 
-			}
-				 
+			}	 
 		}
 		else 
 		{
@@ -910,8 +900,7 @@ int load_data(int CurrSock)
 	{
 		User[CurrSock].Moderator = false;
 	}  
-
-	printf("returnVals: %i\n", returnVals);    
+ 
 	return  returnVals;
 }
 
@@ -932,18 +921,17 @@ int main()
 	//stdout buffer so we can tail -f the logs
 	setbuf(stdout, NULL);
 	setbuf(stderr, NULL);
+	
+	printf("Starting Server...\r\n");
 
-	printf("Testing hasher...\n");
-
-	printf("Test 1 %s\r\n", Hash("password", "2616e26e9c5a4decb08353c1bcb2cf7e").c_str());
-	printf("Test 2 %s\r\n", Hash("password", "2616e26e9c5a4decb08353c1bcb2cf7e").c_str());
-	printf("Test 3 %s\r\n", Hash("passwordy", "2616e26e9c5a4decb08353c1bcb2cf7f").c_str());
-
-	printf("Hasher done!\n");
-
-
-	printf("Starting Server...\n");
-
+	std::string hashTestResult = Hash("password", "2616e26e9c5a4decb08353c1bcb2cf7e");
+	printf("Testing hasher...%s\r\n", hashTestResult.c_str());
+	
+	if (hashTestResult != "Quq6He1Ku8vXTw4hd0cXeEZAw0nqbpwPxZn50NcOVbk=")
+	{
+		printf("The hasher does not seem to be working properly. Check argon2 version.\r\n");
+		return 1;
+	}
 
     db = new OPI_MYSQL();
 
