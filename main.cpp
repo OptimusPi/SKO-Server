@@ -1,4 +1,4 @@
-/* INCLUDES */
+a* INCLUDES */
 #include <stdio.h>
 #include <stdlib.h>
 #include <pthread.h>
@@ -1869,7 +1869,7 @@ void *MainLoop(void *arg)
 						printf("loading all targets..\n");
 						for (int i = 0; i < map[current_map].num_targets; i++)
 						{	
-							printf("%i of %i targets on this map loading...\r\n", i, map[current_map].num_taragets);
+							printf("%i of %i targets on this map loading...\r\n", i, map[current_map].num_targets);
 							if (map[current_map].Target[i].active){
 								printf("target[%i] is active, so trying to spawn...\r\n", i);
 								spawnTarget(i, current_map);
