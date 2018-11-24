@@ -1869,7 +1869,7 @@ void *MainLoop(void *arg)
 						printf("loading all targets..\n");
 						for (int i = 0; i < map[current_map].num_targets; i++)
 						{	
-							printf("%i of %i targets on this map loading...\r\n", i, map[current_map].num_targets);
+							printf("%i of %i targets on this map loading...\r\n", i, map[current_map].num_taragets);
 							if (map[current_map].Target[i].active){
 								printf("target[%i] is active, so trying to spawn...\r\n", i);
 								spawnTarget(i, current_map);
@@ -6571,14 +6571,6 @@ void Attack(int CurrSock, float numx, float numy)
 			//give player some XP
 			GiveXP(CurrSock, 1);
 		} 
-		else 
-		{
-			printf("missed target %i. x_dist: %.2f y_dist: %.2fi -map[current_map].Target[i].w: %i\n", 
-				i, x_dist, y_dist, -map[current_map].Target[i].w);	
-				
-			for (int f = 0; f < map[current_map].num_targets; f++)
-				printf("Target[%i]: x:%i y:%i w:%i h:%i\n", f, map[current_map].Target[f].x, map[current_map].Target[f].y, map[current_map].Target[f].w, map[current_map].Target[f].h);
-		}
 	}
 
 	//loop all enemies
