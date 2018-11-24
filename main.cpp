@@ -60,7 +60,7 @@ const char VERSION_CHECK = 255,
            LOADED = 254,
            SERVER_FULL = 253,
 	   PONG = 252,
-	       VERSION_MAJOR = 1, VERSION_MINOR = 2, VERSION_PATCH = 0,
+	       VERSION_MAJOR = 1, VERSION_MINOR = 2, VERSION_PATCH = 1,
            PING = 0,
            CHAT = 1,
            
@@ -707,29 +707,30 @@ void saveAllProfiles()
     //loop all players
     for (int i = 0; i < MAX_CLIENTS; i++)
     {
-		//save each player who is logged in
-        if (User[i].Ident || User[i].Save)
+		//save each player who is marked to save
+        if (User[i].Save)
         {
             save_profile(i);
             printf("\e[35;0m[Saved %s]\e[m\n", User[i].Nick.c_str());
             numSaved++;
-
+		}
+		
+		//Count every player who is logged in
+		if (User[i].Ident)
+        {
 			printf("SAVE ALL PROFILES- numSaved: %i \r\n", numSaved);
-		    if (User[i].Ident)
-		    {
-				savePaused = false;
-				printf("SAVE ALL PROFILES- Ident is true \r\n");
-				if (User[i].OS == LINUX_OS)
-					playersLinux++;
-				if (User[i].OS == WINDOWS_OS)
-					playersWindows++;
-				if (User[i].OS == MAC_OS)
-					playersMac++;
-				
-				printf("SAVE ALL PROFILES- playersWindows: %i \r\n", playersWindows);
-				averagePing += User[i].ping; 
-				printf("SAVE ALL PROFILES- averagePing: %i \r\n", averagePing);
-			}
+			savePaused = false;
+			printf("SAVE ALL PROFILES- Ident is true \r\n");
+			if (User[i].OS == LINUX_OS)
+				playersLinux++;
+			if (User[i].OS == WINDOWS_OS)
+				playersWindows++;
+			if (User[i].OS == MAC_OS)
+				playersMac++;
+			
+			printf("SAVE ALL PROFILES- playersWindows: %i \r\n", playersWindows);
+			averagePing += User[i].ping; 
+			printf("SAVE ALL PROFILES- averagePing: %i \r\n", averagePing);
 		}
     }
     
@@ -1614,6 +1615,9 @@ void *MainLoop(void *arg)
 					printf(">>>about to load data.\n");
 					if (load_data(CurrSock) == 0)
 					{
+						//set identified
+						User[CurrSock].Ident = true;
+						
 						/* */
 						//log ip
 						printf("i.p. logging...\n");
@@ -1865,8 +1869,13 @@ void *MainLoop(void *arg)
 						printf("loading all targets..\n");
 						for (int i = 0; i < map[current_map].num_targets; i++)
 						{	
-						if (map[current_map].Target[i].active)
-						spawnTarget(i, current_map);
+							printf("%i of %i targets on this map loading...\r\n", i, map[current_map].num_taragets);
+							if (map[current_map].Target[i].active){
+								printf("target[%i] is active, so trying to spawn...\r\n", i);
+								spawnTarget(i, current_map);
+							} else {
+								printf("target[%i] is not active, so not spawning...\r\n", i);
+							}
 						}
 
 
@@ -2095,8 +2104,6 @@ void *MainLoop(void *arg)
 										
 						//mark this client to save when they disconnect..since Send/Recv change Ident!!
 						User[CurrSock].Save = true;
-						//set identified
-						User[CurrSock].Ident = true;
 						
 						saveAllProfiles();									
 					}
