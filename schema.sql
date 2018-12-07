@@ -6,14 +6,6 @@ SET time_zone = "+00:00";
 /*!40101 SET @OLD_COLLATION_CONNECTION=@@COLLATION_CONNECTION */;
 /*!40101 SET NAMES utf8 */;
 
-
-CREATE TABLE IF NOT EXISTS `account` (
-  `id` int(10) NOT NULL,
-  `username` varchar(50) NOT NULL,
-  `bio` varchar(255) NOT NULL,
-  PRIMARY KEY (`id`)
-) ENGINE=InnoDB DEFAULT CHARSET=latin1;
-
 CREATE TABLE IF NOT EXISTS `ban` (
   `idban` int(11) NOT NULL AUTO_INCREMENT,
   `player_id` int(11) NOT NULL,
@@ -22,7 +14,7 @@ CREATE TABLE IF NOT EXISTS `ban` (
   PRIMARY KEY (`idban`),
   UNIQUE KEY `player_id_UNIQUE` (`player_id`),
   KEY `player_id` (`player_id`)
-) ENGINE=MyISAM  DEFAULT CHARSET=latin1 AUTO_INCREMENT=1 ;
+) ENGINE=InnoDB  DEFAULT CHARSET=latin1 AUTO_INCREMENT=1 ;
 
 CREATE TABLE IF NOT EXISTS `bank` (
   `player_id` int(11) NOT NULL,
@@ -88,7 +80,7 @@ CREATE TABLE IF NOT EXISTS `bank` (
   `ITEM_59` int(11) unsigned NOT NULL DEFAULT '0',
   `ITEM_60` int(11) unsigned NOT NULL DEFAULT '0',
   PRIMARY KEY (`player_id`)
-) ENGINE=MyISAM DEFAULT CHARSET=latin1;
+) ENGINE=InnoDB DEFAULT CHARSET=latin1;
 
 CREATE TABLE IF NOT EXISTS `clan` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
@@ -176,14 +168,14 @@ CREATE TABLE IF NOT EXISTS `inventory` (
   `ITEM_59` int(11) unsigned NOT NULL DEFAULT '0',
   `ITEM_60` int(11) unsigned NOT NULL DEFAULT '0',
   PRIMARY KEY (`player_id`)
-) ENGINE=MyISAM DEFAULT CHARSET=latin1;
+) ENGINE=InnoDB DEFAULT CHARSET=latin1;
 
 CREATE TABLE IF NOT EXISTS `ip_ban` (
   `ip` varchar(45) NOT NULL,
   `banned_by` varchar(45) DEFAULT NULL,
   `ban_reason` varchar(45) DEFAULT NULL,
   PRIMARY KEY (`ip`)
-) ENGINE=MyISAM DEFAULT CHARSET=latin1;
+) ENGINE=InnoDB DEFAULT CHARSET=latin1;
 
 CREATE TABLE IF NOT EXISTS `ip_log` (
   `idip_log` int(11) NOT NULL AUTO_INCREMENT,
@@ -191,20 +183,6 @@ CREATE TABLE IF NOT EXISTS `ip_log` (
   `ip` varchar(45) NOT NULL,
   PRIMARY KEY (`player_id`,`ip`),
   UNIQUE KEY `idip_log` (`idip_log`)
-) ENGINE=MyISAM  DEFAULT CHARSET=latin1 AUTO_INCREMENT=1 ;
-
-CREATE TABLE IF NOT EXISTS `mail` (
-  `mid` int(10) NOT NULL AUTO_INCREMENT,
-  `from_id` int(11) NOT NULL,
-  `to_id` int(11) NOT NULL,
-  `sent_date` varchar(50) NOT NULL,
-  `sent_time` varchar(50) NOT NULL,
-  `subject` varchar(200) NOT NULL,
-  `message` varchar(500) NOT NULL,
-  `clan_req` int(10) NOT NULL DEFAULT '0',
-  `opened` int(1) NOT NULL DEFAULT '0',
-  `ip_addr` varchar(20) NOT NULL,
-  PRIMARY KEY (`mid`)
 ) ENGINE=InnoDB  DEFAULT CHARSET=latin1 AUTO_INCREMENT=1 ;
 
 CREATE TABLE IF NOT EXISTS `moderator` (
@@ -212,27 +190,13 @@ CREATE TABLE IF NOT EXISTS `moderator` (
   `player_id` int(11) NOT NULL,
   PRIMARY KEY (`idmoderator`),
   UNIQUE KEY `player_id_UNIQUE` (`player_id`)
-) ENGINE=MyISAM  DEFAULT CHARSET=latin1 AUTO_INCREMENT=1 ;
+) ENGINE=InnoDB  DEFAULT CHARSET=latin1 AUTO_INCREMENT=1 ;
 
 CREATE TABLE IF NOT EXISTS `mute` (
   `player_id` int(11) NOT NULL,
   `muted_by` varchar(45) DEFAULT NULL,
   PRIMARY KEY (`player_id`)
-) ENGINE=MyISAM DEFAULT CHARSET=latin1;
-
-CREATE TABLE IF NOT EXISTS `orders` (
-  `id` int(10) NOT NULL AUTO_INCREMENT,
-  `playerid` int(10) NOT NULL,
-  `item` int(10) NOT NULL,
-  `date` varchar(50) NOT NULL,
-  `time` varchar(50) NOT NULL,
-  `amount` varchar(50) NOT NULL,
-  `method` varchar(50) NOT NULL,
-  `transid` varchar(255) NOT NULL,
-  `status` varchar(20) NOT NULL,
-  PRIMARY KEY (`id`),
-  UNIQUE KEY `transid` (`transid`)
-) ENGINE=InnoDB  DEFAULT CHARSET=latin1 AUTO_INCREMENT=1 ;
+) ENGINE=InnoDB DEFAULT CHARSET=latin1;
 
 CREATE TABLE IF NOT EXISTS `player` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
@@ -263,7 +227,7 @@ CREATE TABLE IF NOT EXISTS `player` (
   `email` varchar(255) NOT NULL,
   PRIMARY KEY (`id`),
   UNIQUE KEY `username` (`username`)
-) ENGINE=MyISAM  DEFAULT CHARSET=latin1 AUTO_INCREMENT=1 ;
+) ENGINE=InnoDB  DEFAULT CHARSET=latin1 AUTO_INCREMENT=1 ;
 
 CREATE TABLE IF NOT EXISTS `status` (
   `id` int(11) unsigned NOT NULL AUTO_INCREMENT,
