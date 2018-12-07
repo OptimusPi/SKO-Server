@@ -4,7 +4,7 @@ DMYSQL_CXXFLAGS=-stdlib=libc++
 LDLIBS=-lpthread -lmysqlclient -lSDL -largon2
 SOURCES:=$(wildcard *.cpp)
 OBJECTS:=$(patsubst %.cpp,%.o,$(SOURCES))
-EXECUTABLE=skoserver
+EXECUTABLE=skoserver-dev
 
 all : $(EXECUTABLE)
 

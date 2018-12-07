@@ -23,7 +23,7 @@ sleep 1
 
 # SKO Server Binaries
 echo -e -n "${color2}Copying SKO Server code .."
-cp skoserver ..
+cp skoserver-dev ../skoserver
 echo -e "${color2}. Done!"
 sleep 1
 

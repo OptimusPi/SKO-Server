@@ -419,11 +419,11 @@ int create_profile(std::string Username, std::string Password, std::string IP)
 	   db->nextRow();
 	   std::string player_salt = db->getString(0);
 	   
-       sql = "INSERT INTO player (username, password, level, x, y, hp, str, def, xp_max, hp_max, current_map, salt) VALUES('";
+       sql = "INSERT INTO player (username, password, level, facing_right, x, y, hp, str, def, xp_max, hp_max, current_map, salt) VALUES('";
        sql += db->clean(Username);
        sql += "', '";
        sql += db->clean(Hash(Password, player_salt));
-       sql += "', '1', '400', '300', '10', '2', '1', '10', '10', '2', '";
+       sql += "', '1', b'1', '314', '300', '10', '2', '1', '10', '10', '2', '";
 	   sql += db->clean(player_salt);
 	   sql += "')";
        printf(sql.c_str());
@@ -1869,7 +1869,7 @@ void *MainLoop(void *arg)
 						printf("loading all targets..\n");
 						for (int i = 0; i < map[current_map].num_targets; i++)
 						{	
-							printf("%i of %i targets on this map loading...\r\n", i, map[current_map].num_taragets);
+							printf("%i of %i targets on this map loading...\r\n", i, map[current_map].num_targets);
 							if (map[current_map].Target[i].active){
 								printf("target[%i] is active, so trying to spawn...\r\n", i);
 								spawnTarget(i, current_map);
@@ -2001,7 +2001,7 @@ void *MainLoop(void *arg)
 									Message1 += b2;
 									Message1 += b3;
 									Message1 += b4;
-									Message1 += (char)User[i].facing_right;
+									Message1 += User[i].facing_right ? 1 : 0;
 									Message1 += User[i].current_map;
 									Message1 += User[i].Nick;
 									Message1 += "|";
@@ -2063,7 +2063,7 @@ void *MainLoop(void *arg)
 									Message1 += b2;
 									Message1 += b3;
 									Message1 += b4;
-									Message1 += (char)(int)User[CurrSock].facing_right;
+									Message1 += User[CurrSock].facing_right ? 1 : 0;
 									Message1 += User[CurrSock].current_map;
 									Message1 += User[CurrSock].Nick;
 									Message1 += "|";
@@ -5592,8 +5592,8 @@ void *EnemyLoop(void *arg)
                  
              }//end not dead 
          
-	  //amoothly operate by sleeping at least a tick before going to the next enemy
-	  Sleep(2);
+	  //smoothly operate by sleeping at least a tick before going to the next enemy
+	  Sleep(10);
 
 	  } // end enemy for loop
            
@@ -5616,7 +5616,7 @@ void *EnemyLoop(void *arg)
 					  int random_delay = 2500 + rand() % 169;
 					
 					
-					  int random_action = rand() % 6; //2:1 ratio stopping to moving. To make him not seem like a meth tweaker 					
+					  int random_action = rand() % 4; //2:1 ratio stopping to moving. To make him not seem like a meth tweaker 					
 
 					  switch (random_action)
 					  {
@@ -5724,7 +5724,7 @@ void *EnemyLoop(void *arg)
              }//end not dead 
          
 	  //amoothly operate by sleeping at least a tick before going to the next enemy
-	  Sleep(2);
+	  Sleep(10);
 
 	  } // end enemy for loop
            
@@ -5733,7 +5733,7 @@ void *EnemyLoop(void *arg)
            //}
                     
            //you don't need to check more than x times per second...
-           Sleep(10);
+           Sleep(100);
      }
 }
 

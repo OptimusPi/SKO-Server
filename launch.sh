@@ -5,8 +5,8 @@
 echo "Starting Stick-Knights-Online server"
 
 #clear TCP port
-echo "Clearing port 1337"
-fuser 1337/tcp
+echo "Clearing port 1338"
+fuser 1338/tcp
 
 #backup the server log
 echo -n "backing up server log file..."
@@ -20,7 +20,7 @@ echo "...done!"
 
 #run the server
 echo -n "Starting server..."
-nohup ./skoserver > server.log &
+nohup ./skoserver-dev > server.log &
 
 #All done!
 echo "...Stick-Knights-Online server is running!"
