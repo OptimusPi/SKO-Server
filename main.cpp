@@ -21,8 +21,9 @@
 #include "SKO_Target.h"
 #include "base64.h"
 #include "hasher.h"
-
+#include "SKO_Repository.h"
 #include "SKO_PacketTypes.h"
+#include "SKO_Network.h"
 
 /* DEFINES */
 // Maximum number of clients allowed to connect
