@@ -34,15 +34,14 @@ private:
 
 	fd_set sset;
 	struct timeval timeout;
-        int temp;
-        int sendTime;
+    int temp;
+    int sendTime;
 	char recvbuf[DEFAULT_BUFLEN];
-        int iResult, iSendResult;
 
     
 	char TempBuf;
  public:
-	int				Socket;
+	int					Socket;
 	std::string			Data;
 	struct sockaddr_in	sin;
 	bool				Connected;

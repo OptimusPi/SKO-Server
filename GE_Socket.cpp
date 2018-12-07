@@ -2,18 +2,12 @@
 
 GE_Socket::~GE_Socket()
 {		
-	printf("~GE_Socket() {Socket is %i}\n", Socket);
-	if (Socket) { 
-		//printf (">     close(%i);\n", (int)Socket);
+	if (Socket)
 		close (Socket);	
-	} else {
-		//printf(">     Nothing to clean up.\n");
-	}
 }
  
 GE_Socket::GE_Socket() 
 { 
- 
     Data = ""; 
     Connected = false; 
     IP = ""; 
@@ -44,14 +38,12 @@ void GE_Socket::Stream()
        //calculate and set the bandwidth usage 
        if (byte_counter > 0) 
           bandwidth = (unsigned int)((double)byte_counter / seconds); 
-        
-        
+
        //reset stream          
        byte_counter = 0; 
         
        //reset clock 
        stream_ticker = Clock(); 
-        
     } 
 } 
  
@@ -75,7 +67,6 @@ std::string GE_Socket::Get_IP()
    ipStr += IP.c_str(); 
     
    return ipStr; 
- 
 } 
  
 int GE_Socket::GetStatus2() 
@@ -119,12 +110,10 @@ int GE_Socket::GetStatus2()
  
 int GE_Socket::GetStatus() 
 { 
-   
     if( Connected == false ) { 
        printf("GetStatus() says Connected == false. Returning GE_SOCKET_ERROR\n"); 
        return GE_Socket_Error; 
-    } 
-          
+    }  
     
     fd_set rset; 
     fd_set wset; 
@@ -139,7 +128,8 @@ int GE_Socket::GetStatus()
  
     int i = select(FD_SETSIZE,&rset,&wset,&eset,(struct timeval*)&timeout); 
      
-    if (i == -1){ 
+    if (i == -1)
+    { 
        perror("In GetStatus(), select() returned error"); 
        Close(); 
        return GE_Socket_Error; 
@@ -155,10 +145,12 @@ int GE_Socket::GetStatus()
     { 
         Status |= GE_Socket_OK; 
     } 
-    if( FD_ISSET(Socket,&wset) ){  
+    if( FD_ISSET(Socket,&wset) )
+    {  
         Status |= GE_Socket_Write; 
     } 
-    else if( FD_ISSET(Socket,&rset) ){ 
+    else if( FD_ISSET(Socket,&rset) )
+    { 
          Status |= GE_Socket_Read; 
     } 
      
@@ -166,8 +158,8 @@ int GE_Socket::GetStatus()
 } 
  
  
-bool GE_Socket::Create(unsigned int Port){ 
-    
+bool GE_Socket::Create(unsigned int Port)
+{ 
     Socket = socket( AF_INET, SOCK_STREAM, 0 ); 
  
     sin.sin_family = AF_INET; 
@@ -201,7 +193,8 @@ bool GE_Socket::Listen()
     return true; 
 } 
  
-GE_Socket* GE_Socket::Accept(){ 
+GE_Socket* GE_Socket::Accept()
+{ 
     int client; 
     socklen_t length; 
  
@@ -215,9 +208,10 @@ GE_Socket* GE_Socket::Accept(){
                                  TCP_NODELAY,     /* name of option */ 
                                  (char *) &flag,  /* the cast is historical cruft */ 
                                  sizeof(int));    /* length of option value */ 
-     if (nresult < 0){ 
+    if (nresult < 0)
+    { 
         printf("ERROR cant set TCP_NODELAY or other options.\n"); 
-     } 
+    } 
       
     if ( client == 0 ) 
     { 
@@ -258,18 +252,18 @@ int GE_Socket::Send(std::string in_Data)
 } 
  
  
-int GE_Socket::Recv(){ 
+int GE_Socket::Recv()
+{ 
     fd_set sset; 
      
     FD_ZERO(&sset);  
     FD_SET((unsigned int)Socket,&sset);  
-     
  
-    select(FD_SETSIZE,&sset,NULL,NULL,(struct timeval*)&timeout); 
+    select(FD_SETSIZE, &sset, NULL, NULL, (struct timeval*)&timeout);
  
- 
-    if (FD_ISSET(Socket,&sset)) { 
-        iResult = recv (Socket,recvbuf,DEFAULT_BUFLEN,0); 
+    if (FD_ISSET(Socket,&sset)) 
+    { 
+        int iResult = recv (Socket, recvbuf, DEFAULT_BUFLEN, 0); 
         if (iResult > 0)  
         { 
            Data.append(recvbuf, iResult); 
@@ -282,11 +276,10 @@ int GE_Socket::Recv(){
         } 
         else 
         { 
-            printf("iResult is :%i\n", iResult); 
-            perror("recv failed for an unknown reason"); 
+            perror("recv failed for an unexpected reason.");
+            printf("recv error ID: ", iResult); 
             Close(); 
             return (int)GE_Socket_Error; 
-	    printf("iABCD DISCONNECTED?! But Attempting to continue...\n");
         } 
     }         
          

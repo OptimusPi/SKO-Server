@@ -198,7 +198,7 @@ int OPI_MYSQL::query(std::string statement, bool once)
  
         printf("mysql_real_query(%d, [%s], %i);\n", (long)conn, statement.c_str(), statement.size()); 
 	    returnVal = mysql_real_query(conn, statement.c_str(), statement.size());
-	    printf("return value is: %i \r\n", returnVal);
+	    printf("return value is: %i \n", returnVal);
 	    if (returnVal == 0)
 	    {
 			printf("query success!\n");

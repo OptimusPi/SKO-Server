@@ -22,6 +22,8 @@
 #include "base64.h"
 #include "hasher.h"
 
+#include "SKO_PacketTypes.h"
+
 /* DEFINES */
 // Maximum number of clients allowed to connect
 #define MAX_CLIENTS 16
@@ -55,57 +57,14 @@ const float GRAVITY = 0.169;
 //operating system
 const char WINDOWS_OS = 1, LINUX_OS = 2, MAC_OS = 3;
 
-//packet codes
-const char VERSION_CHECK = 255,
-           LOADED = 254,
-           SERVER_FULL = 253,
-	   PONG = 252,
-	       VERSION_MAJOR = 1, VERSION_MINOR = 2, VERSION_PATCH = 1,
-           PING = 0,
-           CHAT = 1,
-           
-	   INVITE = 1,
-           CANCEL = 2,
-           BUSY = 3,
-           ACCEPT = 4,
-           CONFIRM = 5,
-           OFFER = 6,
-           READY = 7,
-
-	   LOGIN = 2, REGISTER = 3,
-           LOGIN_SUCCESS = 4, LOGIN_FAIL_DOUBLE = 5, LOGIN_FAIL_NONE = 6, LOGIN_FAIL_BANNED = 7,
-           REGISTER_SUCCESS = 8, REGISTER_FAIL_DOUBLE = 9,
-           MOVE_LEFT = 10, MOVE_RIGHT = 11, MOVE_JUMP = 12, MOVE_STOP = 13,
-           JOIN = 14, EXIT = 15, 
-           VERSION_SUCCESS = 16, VERSION_FAIL = 17,
-           STAT_HP = 18, STAT_XP = 19, STAT_LEVEL = 20, STAT_STR = 21, STAT_DEF = 22,
-           STATMAX_HP = 23, STATMAX_XP = 24,
-           RESPAWN = 26,
-           SPAWN_ITEM = 27, DESPAWN_ITEM = 28, POCKET_ITEM = 29, DEPOCKET_ITEM = 30, BANK_ITEM = 31, DEBANK_ITEM = 32,
-           STAT_POINTS = 33, ATTACK = 34,
-           ENEMY_ATTACK = 35, ENEMY_MOVE_LEFT = 36, ENEMY_MOVE_RIGHT = 37, ENEMY_MOVE_STOP = 38,
-           USE_ITEM = 39, EQUIP = 40, TARGET_HIT = 41, STAT_REGEN = 42,
-           DROP_ITEM = 43, TRADE = 44, PARTY = 45, CLAN = 46, BANK = 47, SHOP = 48, BUY = 49, SELL = 50,
-	   NPC_HP = 51,
-	   INVENTORY = 52,
-           BUDDY_XP = 53, BUDDY_HP = 54, BUDDY_LEVEL = 55,
-	   WARP = 56,
-	   SPAWN_TARGET = 57, DESPAWN_TARGET = 58,
- 	   NPC_MOVE_LEFT = 59, NPC_MOVE_RIGHT = 60, NPC_MOVE_STOP = 61, NPC_TALK = 62,
-	   MAKE_CLAN = 63,
-	   CAST_SPELL = 64;
-
-
 //holiday events
 unsigned const char HOLIDAY_NPC_DROP = ITEM_EASTER_EGG, HOLIDAY_BOX_DROP = ITEM_BUNNY_EARS;
 const bool HOLIDAY = false;
-
 
 bool blocked(int current_map, float box1_x1, float box1_y1, float box1_x2, float box1_y2, bool npc);
 
  //attack time
 int attack_speed = 40*6;
-
 
 //Database connection
 OPI_MYSQL *db;// = new OPI_MYSQL();;
@@ -116,20 +75,20 @@ bool persistLock = false;
 
 void despawnTarget(int target, int current_map);
 void spawnTarget(int target, int current_map);
-void quitParty(int CurrSock);
 void Respawn(int current_map, int i);
 void Warp(int i, SKO_Portal portal);
+void DivideLoot(int enemy, int party);
+void KillEnemy(int current_map, int enemy);
+void SpawnLoot(int current_map, SKO_ItemObject loot);
+void GiveLoot(int enemy, int player);
+void EnemyAttack(int i, int current_map);
 void Attack(int CurrSock, float x, float y);
 void Jump(int CurrSock, float x, float y);
 void Left(int CurrSock, float x, float y);
 void Right(int CurrSock, float x, float y);
 void Stop(int CurrSock, float x, float y);
 void GiveXP(int CurrSock, int xp);
-void DivideLoot(int enemy, int party);
-void KillEnemy(int current_map, int enemy);
-void SpawnLoot(int current_map, SKO_ItemObject loot);
-void GiveLoot(int enemy, int player);
-void EnemyAttack(int i, int current_map);
+void quitParty(int CurrSock);
 
 void trim(std::string s)
 {
@@ -138,8 +97,6 @@ void trim(std::string s)
 	ss.clear();
 	ss >> s;
 }
- 
-
   
 std::string lower(std::string myString)
 {
@@ -151,7 +108,6 @@ std::string lower(std::string myString)
   return myString;
 }
 
-   
 int ipban(int Mod_i, std::string IP, std::string Reason)
 {
     //are you a moderator
@@ -689,7 +645,7 @@ int savePaused = false;
 
 void saveAllProfiles()
 {
-    printf("SAVE ALL PROFILES \r\n");
+    printf("SAVE ALL PROFILES \n");
 	
     //if another thread is saving then hold your horses
     while (persistLock) Sleep(1000);
@@ -718,9 +674,9 @@ void saveAllProfiles()
 		//Count every player who is logged in
 		if (User[i].Ident)
         {
-			printf("SAVE ALL PROFILES- numSaved: %i \r\n", numSaved);
+			printf("SAVE ALL PROFILES- numSaved: %i \n", numSaved);
 			savePaused = false;
-			printf("SAVE ALL PROFILES- Ident is true \r\n");
+			printf("SAVE ALL PROFILES- Ident is true \n");
 			if (User[i].OS == LINUX_OS)
 				playersLinux++;
 			if (User[i].OS == WINDOWS_OS)
@@ -728,21 +684,21 @@ void saveAllProfiles()
 			if (User[i].OS == MAC_OS)
 				playersMac++;
 			
-			printf("SAVE ALL PROFILES- playersWindows: %i \r\n", playersWindows);
+			printf("SAVE ALL PROFILES- playersWindows: %i \n", playersWindows);
 			averagePing += User[i].ping; 
-			printf("SAVE ALL PROFILES- averagePing: %i \r\n", averagePing);
+			printf("SAVE ALL PROFILES- averagePing: %i \n", averagePing);
 		}
     }
     
-	printf("SAVE ALL PROFILES- numSaved: %i \r\n", numSaved);
+	printf("SAVE ALL PROFILES- numSaved: %i \n", numSaved);
     if (numSaved) 
 	{
-       printf("Saved %i players.\nsavePaused is %i\r\n", numSaved, (int)savePaused);
+       printf("Saved %i players.\nsavePaused is %i\n", numSaved, (int)savePaused);
     }
 
     int numPlayers = (playersLinux + playersWindows + playersMac);
 
-	printf("number of players: %i, average ping: %i\r\n", numPlayers, averagePing);
+	printf("number of players: %i, average ping: %i\n", numPlayers, averagePing);
 
     if (!savePaused)
     {
@@ -923,14 +879,14 @@ int main()
 	setbuf(stdout, NULL);
 	setbuf(stderr, NULL);
 	
-	printf("Starting Server...\r\n");
+	printf("Starting Server...\n");
 
 	std::string hashTestResult = Hash("password", "2616e26e9c5a4decb08353c1bcb2cf7e");
-	printf("Testing hasher...%s\r\n", hashTestResult.c_str());
+	printf("Testing hasher...%s\n", hashTestResult.c_str());
 	
 	if (hashTestResult != "Quq6He1Ku8vXTw4hd0cXeEZAw0nqbpwPxZn50NcOVbk=")
 	{
-		printf("The hasher does not seem to be working properly. Check argon2 version.\r\n");
+		printf("The hasher does not seem to be working properly. Check argon2 version.\n");
 		return 1;
 	}
 
@@ -997,13 +953,13 @@ int main()
         //SQL Server Password
         std::getline (ConfigFile, line); 
         databasePassword = line.c_str();
-		printf("password: %s\r\n", databasePassword.c_str());
+		printf("password: %s\n", databasePassword.c_str());
 
 		ConfigFile.close();
     }
     else 
 	{
-        printf("COULD NOT OPEN CONFIG\r\n");
+        printf("COULD NOT OPEN CONFIG\n");
         return 1;
     }
     
@@ -1017,7 +973,7 @@ int main()
 
 	if (db->connect(databaseHostname.c_str(), databaseSchema.c_str(), databaseUsername.c_str(), databasePassword.c_str()) == 0)
 	{
-       printf("Could not connect.\r\n");
+       printf("Could not connect.\n");
        db->getError();
 	   return 1;
     }
@@ -1174,9 +1130,9 @@ Item[ITEM_SNOW_BALL]=       SKO_Item(12,    12,    5,    0,    0,    0,     0,  
         }          
     }   
    
-    printf("Done loading!\r\nStopping main, threads will continue.\r\n");
+    printf("Done loading!\nStopping main, threads will continue.\n");
     if (pthread_join(queThread, NULL)){
-        printf("Could not join thread for que...\r\n");
+        printf("Could not join thread for que...\n");
     } 
 	
 	return 0;
@@ -1194,7 +1150,7 @@ void *DbLoop(void *arg)
 		//auto save
 		if (Clock() - persistTicker >= persistRate)
 		{
-			printf("Auto Save...\r\n");
+			printf("Auto Save...\n");
 			saveAllProfiles();
 			//reset ticker
 			persistTicker = Clock();
@@ -1211,94 +1167,92 @@ void *QueLoop(void *arg)
 		for( int CurrSock = 0; CurrSock < MAX_CLIENTS; CurrSock++ )
 		{
             //check Que
-            if (User[CurrSock].Que)
-            {
-                //receive
-                if (User[CurrSock].Sock->Recv() & GE_Socket_OK)
-    			{
-                     printf("A client is trying to connect...\n");
-                                        
-                     //if you got anything                            
-                     if (User[CurrSock].Sock->Data.length() >= 6)
-                     {
-                         printf("Data.length() = [%i]\n", (int)User[CurrSock].Sock->Data.length());
-                         //if the packet code was VERSION_CHECK
-                         if (User[CurrSock].Sock->Data[1] == VERSION_CHECK)
-                         {
-                             printf("User[CurrSock].Sock->Data[1] == VERSION_CHECK\n");                      
-                             if (User[CurrSock].Sock->Data[2] == VERSION_MAJOR && User[CurrSock].Sock->Data[3] == VERSION_MINOR && User[CurrSock].Sock->Data[4] == VERSION_PATCH)                      
-                             {
-                                //winning
-                                printf("Correct version!\n");
-                                std::string packet = "0";
-                                packet += VERSION_SUCCESS;
-                                packet[0] = packet.length();
-                                User[CurrSock].Sock->Data = "";
-                                User[CurrSock].Status = true;
-                                User[CurrSock].Que = false;
-                                User[CurrSock].SendPacket(packet);
-                                printf("Que Time: \t%ul\n", User[CurrSock].QueTime);
-                                printf("Current Time: \t%ul\n", Clock());
-                                
-                                //operating system statistics
-                                User[CurrSock].OS = User[CurrSock].Sock->Data[5];
-                             }
-                             else //not correct version
-                             { 
-                                  std::string packet = "0";
-                                  packet += VERSION_FAIL;
-                                  packet[0] = packet.length();
-                                  User[CurrSock].SendPacket(packet);
-                                  printf ("error, packet code failed on VERSION_CHECK see look:\n");
-				  printf(">>>[read values] VERSION_MAJOR: %i VERSION_MINOR: %i VERSION_PATCH: %i\n", 
-						User[CurrSock].Sock->Data[2], User[CurrSock].Sock->Data[3], User[CurrSock].Sock->Data[4]);
-				  printf(">>>[expected values] VERSION_MAJOR: %i VERSION_MINOR: %i VERSION_PATCH: %i\n",	
-						VERSION_MAJOR, VERSION_MINOR, VERSION_PATCH);
-                                  User[CurrSock].Que = false;
-                                  User[CurrSock].Sock->Close();
-                             }
-                        }
-                        else //not correct packet type...
-                        {
-                                  printf("Here is the back packet! ");
-                                  
-                                  for (int i = 0; i < User[CurrSock].Sock->Data.length(); i++)
-                                  {
-                                      printf("[%i]", User[CurrSock].Sock->Data[i]);
-                                  }
-                                  printf("\n");
-                                  
-                                  std::string packet = "0";
-                                  packet += VERSION_FAIL;
-                                  packet[0] = packet.length();
-                                  User[CurrSock].SendPacket(packet);
-                                  printf ("error, packet code failed on VERSION_CHECK (2)\n");
-                                  User[CurrSock].Que = false;
-                                  User[CurrSock].Sock->Close();
-                        }
-                     }
-                     
-                   }
-                   else  // Recv returned error!
-                   { 
-                         User[CurrSock].Que = false;
-                         User[CurrSock].Status = false;
-                         User[CurrSock].Ident = false;
-                         User[CurrSock].Sock->Close();
-						 User[CurrSock] = SKO_Player();
-                         printf("*\n**\n*\nQUE FAIL! (Recv returned error) IP IS %s*\n**\n*\n\n", User[CurrSock].Sock->IP.c_str());
-                   }
-                   
-                   //didn't recv anything, don't kill unless it's too long
-                   if (Clock() - User[CurrSock].QueTime >= 500)
-                   {
-                       User[CurrSock].Que = false;
-                       User[CurrSock].Sock->Close();
-                       printf("Closing socket %i for timeout.\n", CurrSock);
-                       printf("*\n**\n*\nQUE FAIL! IP IS %s*\n**\n*\n\n", User[CurrSock].Sock->IP.c_str());
-                   } 
-                                          
-            } //end que
+            if (!User[CurrSock].Que)
+				continue;
+
+			//receive
+			if (User[CurrSock].Sock->Recv() & GE_Socket_OK)
+			{
+				printf("A client is trying to connect...\n");
+				printf("Data.length() = [%i]\n", (int)User[CurrSock].Sock->Data.length());
+
+				//if you got anything                            
+				if (User[CurrSock].Sock->Data.length() >= 6)
+				{
+					//if the packet code was VERSION_CHECK
+					if (User[CurrSock].Sock->Data[1] == VERSION_CHECK)
+					{
+						printf("User[CurrSock].Sock->Data[1] == VERSION_CHECK\n");                      
+						if (User[CurrSock].Sock->Data[2] == VERSION_MAJOR && User[CurrSock].Sock->Data[3] == VERSION_MINOR && User[CurrSock].Sock->Data[4] == VERSION_PATCH)                      
+						{
+							printf("Correct version!\n");
+							std::string packet = "0";
+							packet += VERSION_SUCCESS;
+							packet[0] = packet.length();
+							User[CurrSock].Sock->Data = "";
+							User[CurrSock].Status = true;
+							User[CurrSock].Que = false;
+							User[CurrSock].SendPacket(packet);
+							printf("Que Time: \t%ul\n", User[CurrSock].QueTime);
+							printf("Current Time: \t%ul\n", Clock());
+							
+							//operating system statistics
+							User[CurrSock].OS = User[CurrSock].Sock->Data[5];
+							}
+							else //not correct version
+							{ 
+								std::string packet = "0";
+								packet += VERSION_FAIL;
+								packet[0] = packet.length();
+								User[CurrSock].SendPacket(packet);
+								printf ("error, packet code failed on VERSION_CHECK see look:\n");
+				printf(">>>[read values] VERSION_MAJOR: %i VERSION_MINOR: %i VERSION_PATCH: %i\n", 
+					User[CurrSock].Sock->Data[2], User[CurrSock].Sock->Data[3], User[CurrSock].Sock->Data[4]);
+				printf(">>>[expected values] VERSION_MAJOR: %i VERSION_MINOR: %i VERSION_PATCH: %i\n",	
+					VERSION_MAJOR, VERSION_MINOR, VERSION_PATCH);
+								User[CurrSock].Que = false;
+								User[CurrSock].Sock->Close();
+							}
+					}
+					else //not correct packet type...
+					{
+								printf("Here is the back packet! ");
+								
+								for (int i = 0; i < User[CurrSock].Sock->Data.length(); i++)
+								{
+									printf("[%i]", User[CurrSock].Sock->Data[i]);
+								}
+								printf("\n");
+								
+								std::string packet = "0";
+								packet += VERSION_FAIL;
+								packet[0] = packet.length();
+								User[CurrSock].SendPacket(packet);
+								printf ("error, packet code failed on VERSION_CHECK (2)\n");
+								User[CurrSock].Que = false;
+								User[CurrSock].Sock->Close();
+					}
+				}
+					
+			}
+			else  // Recv returned error!
+			{ 
+					User[CurrSock].Que = false;
+					User[CurrSock].Status = false;
+					User[CurrSock].Ident = false;
+					User[CurrSock].Sock->Close();
+					User[CurrSock] = SKO_Player();
+					printf("*\n**\n*\nQUE FAIL! (Recv returned error) IP IS %s*\n**\n*\n\n", User[CurrSock].Sock->IP.c_str());
+			}
+			
+			//didn't recv anything, don't kill unless it's too long
+			if (Clock() - User[CurrSock].QueTime >= 500)
+			{
+				User[CurrSock].Que = false;
+				User[CurrSock].Sock->Close();
+				printf("Closing socket %i for timeout.\n", CurrSock);
+				printf("*\n**\n*\nQUE FAIL! IP IS %s*\n**\n*\n\n", User[CurrSock].Sock->IP.c_str());
+			} 
         } //end for loop
          
         //checking que loop 2 times per second is plenty fast
@@ -1321,7 +1275,7 @@ void *ConnectLoop(void *arg)
 				
 					if (tempPing > 60000) 
 					{
-						printf("\e[31;0mClosing socket based on ping >= 30000.\e[m\n");
+						printf("\e[31;0mClosing socket based on ping greater than one minute.\e[m\n");
 						User[i].Sock->Close();
 					}
 				}//end pingWaiting
@@ -1348,25 +1302,21 @@ void *ConnectLoop(void *arg)
 		{
 
 
-		// Declare a temp int
+			// Declare a temp int
 			int incomingSocket;
 			
 			// Increase i until it finds an empty socket
 			for ( incomingSocket = 0;  incomingSocket < MAX_CLIENTS; incomingSocket++ ) 
-		{
-			 if (User[incomingSocket].Save == true || User[incomingSocket].Status == true || User[incomingSocket].Ident == true)
-			 { 
-				continue;
-			 }
-			 //else if (User[incomingSocket].Sock != NULL && User[incomingSocket].Sock->Connected == true)
-			 //{
-			 //	continue;
-			 //}
-			 else
-			 {
-				break;
-			 }
-		}
+			{
+				if (User[incomingSocket].Save == true || User[incomingSocket].Status == true || User[incomingSocket].Ident == true)
+				{ 
+					continue;
+				}
+				else
+				{
+					break;
+				}
+			}
 	
 		//break
 		if (incomingSocket >= MAX_CLIENTS)
@@ -1386,7 +1336,7 @@ void *ConnectLoop(void *arg)
 			printf("> User[incomingSocket].Status == %i\n", (int)User[incomingSocket].Status);
 			printf("> User[incomingSocket].Ident == %i\n", (int)User[incomingSocket].Ident);
 
-				//make them mute and such
+			//make them mute and such
 			User[incomingSocket] = SKO_Player();
 			User[incomingSocket].Sock = ListenSock->Accept();
 					
@@ -1869,12 +1819,12 @@ void *MainLoop(void *arg)
 						printf("loading all targets..\n");
 						for (int i = 0; i < map[current_map].num_targets; i++)
 						{	
-							printf("%i of %i targets on this map loading...\r\n", i, map[current_map].num_targets);
+							printf("%i of %i targets on this map loading...\n", i, map[current_map].num_targets);
 							if (map[current_map].Target[i].active){
-								printf("target[%i] is active, so trying to spawn...\r\n", i);
+								printf("target[%i] is active, so trying to spawn...\n", i);
 								spawnTarget(i, current_map);
 							} else {
-								printf("target[%i] is not active, so not spawning...\r\n", i);
+								printf("target[%i] is not active, so not spawning...\n", i);
 							}
 						}
 
@@ -1956,7 +1906,7 @@ void *MainLoop(void *arg)
 
 							//packet
 							std::string hpPacket = "0";
-							hpPacket += NPC_HP;
+							hpPacket += ENEMY_HP;
 							hpPacket += i;
 							hpPacket += current_map;
 							hpPacket += hp;
@@ -5325,7 +5275,7 @@ void *EnemyLoop(void *arg)
                   int hp = (unsigned char)((float)map[current_map].Enemy[i]->hp / map[current_map].Enemy[i]->hp_max*hpBar);
                   //packet
                   std::string hpPacket = "0";
-                  hpPacket += NPC_HP;
+                  hpPacket += ENEMY_HP;
                   hpPacket += i;
 		  hpPacket += current_map;
 		  hpPacket += hp;
@@ -6345,11 +6295,11 @@ void Attack(int CurrSock, float numx, float numy)
 	//Cannot attack while mid-air
 	if (!User[CurrSock].ground)
 	{
-	   printf("%s tried to attack while jumping...\7\7\r\n", User[CurrSock].Nick.c_str());
+	   printf("%s tried to attack while jumping...\7\7\n", User[CurrSock].Nick.c_str());
 	   return;
 	}
 	
-	printf("%s is attacking!\r\n", User[CurrSock].Nick.c_str());
+	printf("%s is attacking!\n", User[CurrSock].Nick.c_str());
 	User[CurrSock].attacking = true;
 	User[CurrSock].attack_ticker = Clock();
 	User[CurrSock].x_speed = 0;
@@ -6385,7 +6335,7 @@ void Attack(int CurrSock, float numx, float numy)
 	}
 	
 	
-	printf("%s attack good? %i\r\n", User[CurrSock].Nick.c_str(), good);
+	printf("%s attack good? %i\n", User[CurrSock].Nick.c_str(), good);
 
 	std::string Packet = "0";
 
@@ -6424,7 +6374,7 @@ void Attack(int CurrSock, float numx, float numy)
 	Packet = "0";
 
 	//loop all players		
-	printf("Looping all players.\r\n");
+	printf("Looping all players.\n");
 	for (int i = 0; i < MAX_CLIENTS; i++)
 	{
 		if (!User[i].Ident)
@@ -6529,7 +6479,7 @@ void Attack(int CurrSock, float numx, float numy)
 	}//end loop everyone
 
 	//loop all targets 
-	printf("Checking all targets\r\n");
+	printf("Checking all targets\n");
 	for (int i = 0; i < map[current_map].num_targets; i++)
 	{
 		if (!map[current_map].Target[i].active)
@@ -6574,7 +6524,7 @@ void Attack(int CurrSock, float numx, float numy)
 	}
 
 	//loop all enemies
-	printf("Checking all enemies: %i\r\n", map[current_map].num_enemies);
+	printf("Checking all enemies: %i\n", map[current_map].num_enemies);
 	for (int i = 0; i < map[current_map].num_enemies; i++)
 	{
 		bool partyBlocked = false;
@@ -6584,7 +6534,7 @@ void Attack(int CurrSock, float numx, float numy)
 		{
 			//then assume it's blocked
 			partyBlocked = true;
-			printf("partyBlocked because dibsPlayer = %i\r\n", map[current_map].Enemy[i]->dibsPlayer);
+			printf("partyBlocked because dibsPlayer = %i\n", map[current_map].Enemy[i]->dibsPlayer);
 			//if the player is you, it's not blocked
 			if (map[current_map].Enemy[i]->dibsPlayer == CurrSock)
 				partyBlocked = false;
@@ -6602,7 +6552,7 @@ void Attack(int CurrSock, float numx, float numy)
 		//check is they are active and not dib'sed by a party
 		if (!map[current_map].Enemy[i]->dead && !partyBlocked)
 		{
-			printf("Checking enemy: %i on map: %i\r\n", i, current_map);
+			printf("Checking enemy: %i on map: %i\n", i, current_map);
 			//check for collision
 			//horizontal
 			float x_dist, y_dist;
@@ -6633,7 +6583,7 @@ void Attack(int CurrSock, float numx, float numy)
 				if (weap != 0)
 					dam += Item[weap].str;
 							
-				printf("%s hit an enemy! damage is: %i\r\n", User[CurrSock].Nick.c_str());			
+				printf("%s hit an enemy! damage is: %i\n", User[CurrSock].Nick.c_str());			
 					
 					
 				//don't give free hp
@@ -6757,7 +6707,7 @@ void Attack(int CurrSock, float numx, float numy)
 
 					 //packet
 					 std::string hpPacket = "0";
-					 hpPacket += NPC_HP;
+					 hpPacket += ENEMY_HP;
 					 hpPacket += i;
 					 hpPacket += current_map;
 					 hpPacket += hp;
@@ -6771,13 +6721,13 @@ void Attack(int CurrSock, float numx, float numy)
 			}//end hit
 			else 
 			{
-				printf("%s did not hit enemy because x_dist:%i, y_dist:%i, max_dist:%i\r\n", 
+				printf("%s did not hit enemy because x_dist:%i, y_dist:%i, max_dist:%i\n", 
 					User[CurrSock].Nick.c_str(), (int)x_dist, (int)y_dist, (int)max_dist);
 			}
 		}//end loop if you hit enemys
 		else
 		{
-			printf("Skippy enemy[%i] because dead:%i, partyBlocked:%i, partBlockedBy:%i\r\n", 
+			printf("Skippy enemy[%i] because dead:%i, partyBlocked:%i, partBlockedBy:%i\n", 
 				i, (int)map[current_map].Enemy[i]->dead, partyBlocked, map[current_map].Enemy[i]->dibsPlayer);
 		}
 	}  // end if enemy is dead
