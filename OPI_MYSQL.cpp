@@ -71,7 +71,7 @@ int OPI_MYSQL::ping()
      int a = 1;
      printf("ping a\n");
      if (conn != NULL){
-	printf("ping b\n");
+		printf("ping b\n");
          a = (int) mysql_ping(conn);
      }
      printf("ping c\n");
@@ -80,17 +80,25 @@ int OPI_MYSQL::ping()
 
 bool OPI_MYSQL::connect(std::string server_in, std::string database_in, std::string user_in, std::string password_in)
 {
+	//return value
+	bool success = false;
+
 	//save values for reconnect
 	std::strcpy(server, server_in.c_str());
 	std::strcpy(database, database_in.c_str());
 	std::strcpy(user, user_in.c_str());
 	std::strcpy(password, password_in.c_str());
        
+	printf("Set OPI_MYSQL server details [%s][%s][%s][%s]\n", server, database, user, password);
+
 	conn = mysql_init(NULL); 
 
-        //make the connection
-        //return reconnect();
-        //MYSQL * returnVal = 
+	printf("mysql_init() called\n");
+
+
+	//make the connection
+	//return reconnect();
+	//MYSQL * returnVal = 
 	if (mysql_real_connect(
 		(MYSQL *)conn, 
 		server, 
@@ -101,19 +109,17 @@ bool OPI_MYSQL::connect(std::string server_in, std::string database_in, std::str
 		NULL, 
 		(unsigned long)0
 	))
-		Connected = true;
+	success = true;
     
+	printf("mysql_real_connect() called\n");
 	mysql_close(conn);
        
-    return Connected;
+    return success;
 }
 
 
 int OPI_MYSQL::reconnect()
 {
-
-	         
-
         Connected = false;
         //log("reconnect()\n");
          

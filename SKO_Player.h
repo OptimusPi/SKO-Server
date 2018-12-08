@@ -3,6 +3,9 @@
 #include "GE_Socket.h"
 #include <pthread.h>
 
+#ifndef __SKO_PLAYER_H_
+#define __SKO_PLAYER_H_
+
 class SKO_Player
 {
     
@@ -120,3 +123,5 @@ public:
    unsigned long int pvpKills;	
 	
 };
+
+#endif

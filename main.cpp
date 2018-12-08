@@ -5,6 +5,7 @@
 #include <errno.h>
 #include <stdint.h>
 
+#include "Global.h"
 #include "SKO_Player.h"
 #include "SKO_Item.h"
 #include "SKO_ItemObject.h"
@@ -25,9 +26,10 @@
 #include "SKO_PacketTypes.h"
 #include "SKO_Network.h"
 
+
+
 /* DEFINES */
 // Maximum number of clients allowed to connect
-#define MAX_CLIENTS 16
 #include "KE_Timestep.h"
 
 
@@ -866,11 +868,8 @@ static void *Physics(void *Arg);
 static void *TargetLoop(void *Arg);
 static void *EnemyLoop(void *arg);
 static void *MainLoop(void *arg);
-static void *QueLoop(void *arg);
-static void *ConnectLoop(void *arg);
 static void *DbLoop(void *arg);
 
-GE_Socket*	ListenSock;
 int snap_distance = 64;
 
 /* CODE */
@@ -891,7 +890,7 @@ int main()
 		return 1;
 	}
 
-    db = new OPI_MYSQL();
+
 
      //load maps and stuff 
     for (int mp = 0; mp < NUM_MAPS; mp++)
@@ -903,10 +902,7 @@ int main()
         
         map[mp] = SKO_Map(fileName.str());
     }
-       
-    // Create a new socket to listen for incoming connections with
-	ListenSock = new GE_Socket();
-	
+
 	for ( int i = 0; i < MAX_CLIENTS; i++ ) 
 	{
 	   printf("User[%i] = SKO_Player();\n", i);
@@ -963,7 +959,6 @@ int main()
         printf("COULD NOT OPEN CONFIG\n");
         return 1;
     }
-    
         
 	trim(databaseHostname);
 	trim(databaseUsername);
@@ -972,9 +967,10 @@ int main()
 	
 	printf("About to connect to database.\n");
 
-	if (db->connect(databaseHostname.c_str(), databaseSchema.c_str(), databaseUsername.c_str(), databasePassword.c_str()) == 0)
+    db = new OPI_MYSQL();
+	if (!db->connect(databaseHostname, databaseSchema, databaseUsername, databasePassword))
 	{
-       printf("Could not connect.\n");
+       printf("Could not connect to MYSQL database.\n");
        db->getError();
 	   return 1;
     }
@@ -1053,33 +1049,22 @@ Item[ITEM_SNOW_BALL]=       SKO_Item(12,    12,    5,    0,    0,    0,     0,  
       for (int i = 0; i < 256; i++)
 	  map[mp].ItemObj[i] = SKO_ItemObject();
    
-   
-   
-   //start listening since we're good!
-   	// Bind to port 1337[or whatever]
-	int i1 = ListenSock->Create( serverPort );
-	
-	if (i1 == 1)
-	   printf("Bind to port %i...Success!\n", serverPort);
-    else
-       printf("Bind to port %i...Failure!\nError: %i\n", serverPort, i1);
     
-	// Start ListenSock listening for incoming connections
-	int ii = ListenSock->Listen();
-	
-	
-	if (ii == 1)
-	   printf("Listen on socket...Success!\n");
-	else
-	   printf("Bind to port ...Failure!\nError: %ii\n", ii);
-       
-    if (i1+ii == 2) { //important important
-       printf("listen sock connected == true\n");
-       ListenSock->Connected = true;  //debugger fixes!!!! //FFFUUUUUUUUUUU-
-    } else {
-       printf("Failed so exiting.\n");
-		return 1;	
-    }
+    SKO_Network network = SKO_Network(db, serverPort);
+	printf("Initialized SKO_Network.\n");
+
+	printf("Starting up SKO_Network...\n");
+    std::string networkStatus = network.Startup();
+    printf("SKO_Network status is: %s\n", networkStatus);
+
+	if (networkStatus == "success") {
+		//TODO: make nice logging function that abstracts the console colors
+		printf(kGreen "SKO Network initialized successfully.\n" kNormal);
+	} else {
+		printf(kRed "Could not initialize SKO_Network. Here is the status: [%s]\n%s", networkStatus.c_str());
+		network.Cleanup();
+		return 1;
+	}
     
    
    /* initialize random seed: */
@@ -1087,7 +1072,7 @@ Item[ITEM_SNOW_BALL]=       SKO_Item(12,    12,    5,    0,    0,    0,     0,  
        
        
    //multi threading
-   pthread_t physicsThread, queThread, connectThread, dbThread, enemyThread, targetThread; 
+   pthread_t physicsThread, dbThread, enemyThread, targetThread; 
    pthread_t mainThread[MAX_CLIENTS];
     
     if (pthread_create(&dbThread, NULL, DbLoop, 0)){
@@ -1113,14 +1098,7 @@ Item[ITEM_SNOW_BALL]=       SKO_Item(12,    12,    5,    0,    0,    0,     0,  
             return 1;
         }
     }
-    if (pthread_create(&queThread, NULL, QueLoop, 0)){
-        printf("Could not create thread for que...\n");
-        return 1;
-    }
-    if (pthread_create(&connectThread, NULL, ConnectLoop, 0)){
-        printf("Could not create thread for connect...\n");
-        return 1;
-    }
+
     
     for (unsigned long int i = 0; i < MAX_CLIENTS; i++)
     {
@@ -1132,7 +1110,7 @@ Item[ITEM_SNOW_BALL]=       SKO_Item(12,    12,    5,    0,    0,    0,     0,  
     }   
    
     printf("Done loading!\nStopping main, threads will continue.\n");
-    if (pthread_join(queThread, NULL)){
+    if (pthread_join(mainThread[0], NULL)){
         printf("Could not join thread for que...\n");
     } 
 	
@@ -1160,240 +1138,6 @@ void *DbLoop(void *arg)
     }
 }
 
-void *QueLoop(void *arg)
-{
-     while (!SERVER_QUIT)
-     {
-        // Cycle through all connections
-		for( int CurrSock = 0; CurrSock < MAX_CLIENTS; CurrSock++ )
-		{
-            //check Que
-            if (!User[CurrSock].Que)
-				continue;
-
-			//receive
-			if (User[CurrSock].Sock->Recv() & GE_Socket_OK)
-			{
-				printf("A client is trying to connect...\n");
-				printf("Data.length() = [%i]\n", (int)User[CurrSock].Sock->Data.length());
-
-				//if you got anything                            
-				if (User[CurrSock].Sock->Data.length() >= 6)
-				{
-					//if the packet code was VERSION_CHECK
-					if (User[CurrSock].Sock->Data[1] == VERSION_CHECK)
-					{
-						printf("User[CurrSock].Sock->Data[1] == VERSION_CHECK\n");                      
-						if (User[CurrSock].Sock->Data[2] == VERSION_MAJOR && User[CurrSock].Sock->Data[3] == VERSION_MINOR && User[CurrSock].Sock->Data[4] == VERSION_PATCH)                      
-						{
-							printf("Correct version!\n");
-							std::string packet = "0";
-							packet += VERSION_SUCCESS;
-							packet[0] = packet.length();
-							User[CurrSock].Sock->Data = "";
-							User[CurrSock].Status = true;
-							User[CurrSock].Que = false;
-							User[CurrSock].SendPacket(packet);
-							printf("Que Time: \t%ul\n", User[CurrSock].QueTime);
-							printf("Current Time: \t%ul\n", Clock());
-							
-							//operating system statistics
-							User[CurrSock].OS = User[CurrSock].Sock->Data[5];
-							}
-							else //not correct version
-							{ 
-								std::string packet = "0";
-								packet += VERSION_FAIL;
-								packet[0] = packet.length();
-								User[CurrSock].SendPacket(packet);
-								printf ("error, packet code failed on VERSION_CHECK see look:\n");
-				printf(">>>[read values] VERSION_MAJOR: %i VERSION_MINOR: %i VERSION_PATCH: %i\n", 
-					User[CurrSock].Sock->Data[2], User[CurrSock].Sock->Data[3], User[CurrSock].Sock->Data[4]);
-				printf(">>>[expected values] VERSION_MAJOR: %i VERSION_MINOR: %i VERSION_PATCH: %i\n",	
-					VERSION_MAJOR, VERSION_MINOR, VERSION_PATCH);
-								User[CurrSock].Que = false;
-								User[CurrSock].Sock->Close();
-							}
-					}
-					else //not correct packet type...
-					{
-								printf("Here is the back packet! ");
-								
-								for (int i = 0; i < User[CurrSock].Sock->Data.length(); i++)
-								{
-									printf("[%i]", User[CurrSock].Sock->Data[i]);
-								}
-								printf("\n");
-								
-								std::string packet = "0";
-								packet += VERSION_FAIL;
-								packet[0] = packet.length();
-								User[CurrSock].SendPacket(packet);
-								printf ("error, packet code failed on VERSION_CHECK (2)\n");
-								User[CurrSock].Que = false;
-								User[CurrSock].Sock->Close();
-					}
-				}
-					
-			}
-			else  // Recv returned error!
-			{ 
-					User[CurrSock].Que = false;
-					User[CurrSock].Status = false;
-					User[CurrSock].Ident = false;
-					User[CurrSock].Sock->Close();
-					User[CurrSock] = SKO_Player();
-					printf("*\n**\n*\nQUE FAIL! (Recv returned error) IP IS %s*\n**\n*\n\n", User[CurrSock].Sock->IP.c_str());
-			}
-			
-			//didn't recv anything, don't kill unless it's too long
-			if (Clock() - User[CurrSock].QueTime >= 500)
-			{
-				User[CurrSock].Que = false;
-				User[CurrSock].Sock->Close();
-				printf("Closing socket %i for timeout.\n", CurrSock);
-				printf("*\n**\n*\nQUE FAIL! IP IS %s*\n**\n*\n\n", User[CurrSock].Sock->IP.c_str());
-			} 
-        } //end for loop
-         
-        //checking que loop 2 times per second is plenty fast
-        Sleep(500);
-    } //end while loop
-}//end QueLoop
-
-void *ConnectLoop(void *arg)
-{
-     while (!SERVER_QUIT)
-     {     
-		//check for disconnects by too high of ping.
-		for (int i = 0 ; i < MAX_CLIENTS; i++)
-		{
-			if (User[i].Ident)
-			{
-				if (User[i].pingWaiting)
-				{
-					int tempPing = Clock() - User[i].pingTicker;
-				
-					if (tempPing > 60000) 
-					{
-						printf("\e[31;0mClosing socket based on ping greater than one minute.\e[m\n");
-						User[i].Sock->Close();
-					}
-				}//end pingWaiting
-				else
-				{
-					//send ping waiting again if its been more than a second
-					if (Clock() - User[i].pingTicker > 1000)
-					{
-						//time to ping them.
-						std::string pingPacket = "0";
-						pingPacket += PING;
-						pingPacket[0] = pingPacket.length();
-						User[i].SendPacket(pingPacket);
-						User[i].pingWaiting = true;
-						User[i].pingTicker = Clock();
-						
-					}
-				}
-			}//end ident
-		}//end max clients for ping
-
-		// If there is someone trying to connect
-		if ( ListenSock->GetStatus2() & (int)GE_Socket_Read )
-		{
-
-
-			// Declare a temp int
-			int incomingSocket;
-			
-			// Increase i until it finds an empty socket
-			for ( incomingSocket = 0;  incomingSocket < MAX_CLIENTS; incomingSocket++ ) 
-			{
-				if (User[incomingSocket].Save == true || User[incomingSocket].Status == true || User[incomingSocket].Ident == true)
-				{ 
-					continue;
-				}
-				else
-				{
-					break;
-				}
-			}
-	
-		//break
-		if (incomingSocket >= MAX_CLIENTS)
-		{
-			GE_Socket * tempSock = ListenSock->Accept();
-			std::string fullPacket = "0"; 
-			fullPacket += SERVER_FULL;
-			fullPacket[0] = fullPacket.length(); 
-			tempSock->Send(fullPacket);
-			tempSock->Close();	
-		}
-		else
-		{
-			printf("incoming socket is: %i\n", incomingSocket);
-			printf("> User[incomingSocket].Sock->Connected == %s\n", User[incomingSocket].Sock->Connected ? "True" : "False");
-			printf("> User[incomingSocket].Save == %i\n", (int)User[incomingSocket].Save);
-			printf("> User[incomingSocket].Status == %i\n", (int)User[incomingSocket].Status);
-			printf("> User[incomingSocket].Ident == %i\n", (int)User[incomingSocket].Ident);
-
-			//make them mute and such
-			User[incomingSocket] = SKO_Player();
-			User[incomingSocket].Sock = ListenSock->Accept();
-					
-				//error reporting
-				if ( User[incomingSocket].Sock->Socket == 0 )
-					printf("Sock[%i] INVALID_SOCKET\n", incomingSocket);
-				else
-				// Set the status of that socket to taken
-					User[incomingSocket].Sock->Connected = true;
-			   
-					//set the data counting clock
-					User[incomingSocket].Sock->stream_ticker = Clock(); 
-					
-					//set the data_stream to null
-					User[incomingSocket].Sock->byte_counter = 0;
-					
-					//set bandwidth to null
-					User[incomingSocket].Sock->bandwidth = 0;
-					
-				// Output that a client connected
-				printf("[ !!! ] Client %i Connected\n", incomingSocket);
-				
-				//display their i.p.
-				/***/
-					std::string their_ip = User[incomingSocket].Sock->Get_IP();
-					/***/
-					
-					
-					std::string sql = "SELECT * FROM ip_ban WHERE ip like '";
-			printf("db->clean(%s)\n", their_ip.c_str());
-					sql += db->clean(their_ip);
-					sql += "'";
-			printf("db->query(%s)\n", sql.c_str());
-					db->query(sql);
-			
-			printf("if db->count()\n");
-					
-			if (db->count())
-			{
-				//cut them off!
-				printf("SOMEONE BANNED TRIED TO CONNECT FROM [%s]\7\n", their_ip.c_str());
-				User[incomingSocket].Sock->Close();
-			}
-				
-				//put in que
-				User[incomingSocket].Que = true;
-				User[incomingSocket].QueTime = Clock();				
-
-				printf("put socket %i in que\n", incomingSocket);
-			}//server not full
-		}//if connection incoming
-      
-		//checking for incoming connections 3 times per second is plenty fast.
-		Sleep(300);
-    }//end while
-}
 
 
 void *MainLoop(void *arg)

@@ -4,10 +4,7 @@ void SKO_Player::init()
 {
 	Sock = new GE_Socket();
 	Sock->Connected = false;
-	printf("Nick is %s\n", Nick.c_str());
-	
 	Nick = "";
-	printf("=Nick is %s\n", Nick.c_str());
 	
 	Mute = true;
 	Moderator = false;
@@ -17,11 +14,12 @@ void SKO_Player::init()
 	Save = false;
 	QueTime = 0;
 	ground = false;
+	tempClanId = "";
+
+//TODO - move these values to a config file.	
+	//the tutorial map was added later and the id is 2
 	x = 1000;
 	y = 0;
-	tempClanId = "";
-		
-	//the noob map was added later and the id is 2
 	current_map = 2;
 	hp = 0;
 	max_hp = 10;
@@ -29,7 +27,6 @@ void SKO_Player::init()
 	max_xp = 10;
 	level = 1;
 	regen = 0;
-	regen_ticker = Clock();
 	strength = 2;
 	defence = 1;
 	attacking = false;
@@ -37,11 +34,14 @@ void SKO_Player::init()
 	x_speed = 0;
 	que_action = 0;
 	stat_points = 0;
-	pingTicker = Clock();
 	ping = 0;
-	pingWaiting = false;
+
+
 	attack_ticker = Clock();
-		
+	regen_ticker = Clock();
+	pingTicker = Clock();
+	pingWaiting = false;
+	
 	//holds all the worn items
 	equip[0] = -1;
 	equip[1] = -1;
@@ -93,13 +93,19 @@ SKO_Player::SKO_Player()
 	init();
 }
 
+//Cosmetic only, take what the clinet gives and store it for now. Wow, how nice!
 std::string SKO_Player::getInventoryOrder()
 {
  	std::string iorder = "";
+	
+	//initialize list
 	for (int i = 0; i < 48; i++)
 		iorder += (char)0;
+
+	//set values of list
 	for (int i = 0; i < inventory_order.length() && i < 48; i++)
 		iorder[i] = inventory_order[i];
+
 	return iorder;
 }
 
