@@ -5,10 +5,16 @@
 #include "OPI_Clock.h"
 #include "GE_Socket.h"
 
-SKO_Network::SKO_Network(OPI_MYSQL * database, int port)
+SKO_Network::SKO_Network(OPI_MYSQL * database, int port, unsigned long int saveRateSeconds)
 {
     // Bind this port to accept connections
     this->port = port;
+
+	// Lock save to one call at a time
+	sem_init(&this->saveMutex, 0, 1);
+
+	// Properties passed into threads
+	this->threadDTO.saveRateSeconds = saveRateSeconds;
     this->threadDTO.database = database;
     this->threadDTO.listenSocket = new GE_Socket();
 }
@@ -25,13 +31,17 @@ std::string SKO_Network::Startup()
         return "Failed to listen on port " + std::to_string(port);
 
     //start thread that listens for correct version packet
-    if (pthread_create(&queThread, NULL, QueLoop, (void *)&this->threadDTO))
-        return "Could not create thread for que...";
+    if (pthread_create(&queueThread, NULL, QueueLoop, (void *)&this->threadDTO))
+        return "Could not create thread for QueueLoop...";
 
     //start thread that listens for new connections
     if (pthread_create(&connectThread, NULL, ConnectLoop, (void *)&this->threadDTO))
-        return "Could not create thread for connect...";
+        return "Could not create thread for ConnectLoop...";
 
+	//start thread that periodically saves all players to the database
+	if (pthread_create(&autoSaveThread, NULL, SaveLoop, (void *)&this->threadDTO))
+        return "Could not create thread for SaveLoop...";
+      
 	printf(kGreen "[+] listening for connections on port [%i]\n" kNormal, port);
     this->threadDTO.listenSocket->Connected = true;
     return "success";
@@ -42,7 +52,225 @@ void SKO_Network::Cleanup()
     //TODO delete sockets etc
 }
 
-void* SKO_Network::QueLoop(void *threadDTO)
+void SKO_Network::saveProfile(OPI_MYSQL *database, unsigned int CurrSock)
+{   
+	if (User[CurrSock].Nick.length() == 0)
+	{
+		printf("I'm not saving someone without a username.\n");
+		printf("Please investigate why this happened!\n");
+		printf("User[%i].ID is: %i\n", CurrSock, User[CurrSock].ID);
+		return;
+	}
+
+	std::string player_id = User[CurrSock].ID;
+	//save inventory
+	std::ostringstream sql;
+	sql << "UPDATE inventory SET";
+	for (int itm = 0; itm < NUM_ITEMS; itm++)
+	{
+		sql << " ITEM_";
+		sql << itm;
+		sql << "=";
+		sql << (unsigned int)User[CurrSock].inventory[itm];
+		
+		if (itm+1 < NUM_ITEMS)
+		sql << ", ";
+	}
+	sql << " WHERE player_id LIKE '";
+	sql << database->clean(player_id);
+	sql << "'";
+
+	database->query(sql.str());
+	sql.str("");
+	sql.clear();
+
+	//save bank
+	sql << "UPDATE bank SET";
+	
+	for (int itm = 0; itm < NUM_ITEMS; itm++)
+	{
+		sql << " ITEM_";
+		sql << itm;
+		sql << "=";
+		sql << (unsigned int)User[CurrSock].bank[itm];
+		if (itm+1 < NUM_ITEMS)
+			sql << ", ";
+	}
+	
+	sql << " WHERE player_id LIKE '";
+	sql << database->clean(player_id);
+	sql << "'";
+
+	database->query(sql.str());
+    sql.str("");
+	sql.clear();
+
+
+    sql << "UPDATE player SET";
+    sql << " level=";
+    sql << (int)User[CurrSock].level;
+    sql << ", x=";
+    sql << User[CurrSock].x;
+    sql << ", y=";
+    sql << User[CurrSock].y;
+    sql << ", xp=";
+    sql << User[CurrSock].xp;
+    sql << ", hp=";
+    sql << (int)User[CurrSock].hp;  
+    sql << ", str=";
+    sql << (int)User[CurrSock].strength; 
+    sql << ", def=";
+    sql << (int)User[CurrSock].defence;
+    sql << ", xp_max=";
+    sql << User[CurrSock].max_xp;
+    sql << ", hp_max="; 
+    sql << (int)User[CurrSock].max_hp;
+    sql << ", y_speed=";
+    sql << User[CurrSock].y_speed;
+    sql << ", x_speed=";
+    sql << User[CurrSock].x_speed;
+    sql << ", stat_points=";
+    sql << (int)User[CurrSock].stat_points;
+    sql << ", regen=";
+    sql << (int)User[CurrSock].regen;
+    sql << ", facing_right=";
+    sql << (int)User[CurrSock].facing_right;
+    sql << ", EQUIP_0=";
+    sql << (int)User[CurrSock].equip[0];
+    sql << ", EQUIP_1=";
+    sql << (int)User[CurrSock].equip[1];
+	sql << ", EQUIP_2=";
+    sql << (int)User[CurrSock].equip[2];
+    
+    
+    //operating system
+    sql << ", VERSION_OS=";
+    sql << (int)User[CurrSock].OS;
+    
+    //time played
+    unsigned long int total_minutes_played = User[CurrSock].minutesPlayed;
+    double this_session_milli = (Clock() - User[CurrSock].loginTime);
+    //add the milliseconds to total time
+    total_minutes_played += (unsigned long int)(this_session_milli/1000.0/60.0);
+    
+    sql << ", minutes_played=";
+    sql << (int)total_minutes_played;
+   
+     
+    //what map are they on?
+    sql << ", current_map=";
+    sql << (int)User[CurrSock].current_map;
+
+    sql << ", inventory_order='";
+    sql << database->clean(base64_encode(User[CurrSock].getInventoryOrder()));
+
+    sql << "' WHERE id=";
+    sql << database->clean(player_id);
+    sql << ";";
+    
+    database->query(sql.str());       
+    sql.str("");
+	sql.clear();
+
+    printf(database->getError().c_str());
+}
+
+
+void SKO_Network::saveAllProfiles(OPI_MYSQL *database)
+{
+    printf("SAVE ALL PROFILES \n");
+    sem_wait(&this->saveMutex);
+
+    int numSaved = 0;
+    int playersLinux = 0;
+    int playersWindows = 0;
+    int playersMac = 0; 
+    float averagePing = 0;
+
+	
+    //loop all players
+    for (int i = 0; i < MAX_CLIENTS; i++)
+    {
+		//save each player who is marked to save
+        if (User[i].Save)
+        {
+            saveProfile(database, i);
+            printf("\e[35;0m[Saved %s]\e[m\n", User[i].Nick.c_str());
+            numSaved++;
+		}
+		
+		//Count every player who is logged in
+		if (User[i].Ident)
+        {
+			printf("SAVE ALL PROFILES- numSaved: %i \n", numSaved);
+			this->pauseSavingStatus = false;
+			printf("SAVE ALL PROFILES- Ident is true \n");
+			if (User[i].OS == LINUX_OS)
+				playersLinux++;
+			if (User[i].OS == WINDOWS_OS)
+				playersWindows++;
+			if (User[i].OS == MAC_OS)
+				playersMac++;
+			
+			printf("SAVE ALL PROFILES- playersWindows: %i \n", playersWindows);
+			averagePing += User[i].ping; 
+			printf("SAVE ALL PROFILES- averagePing: %i \n", averagePing);
+		}
+    }
+    
+	printf("SAVE ALL PROFILES- numSaved: %i \n", numSaved);
+    if (numSaved) 
+	{
+       printf("Saved %i players.\nsavePaused is %i\n", numSaved, (int)this->pauseSavingStatus);
+    }
+
+    int numPlayers = (playersLinux + playersWindows + playersMac);
+
+	printf("number of players: %i, average ping: %i\n", numPlayers, averagePing);
+
+    if (!this->pauseSavingStatus)
+    {
+    	if (numPlayers > 0)
+			averagePing = (int)(averagePing / numPlayers);
+
+    	std::stringstream statusQuery;
+    	statusQuery << "INSERT INTO status ";
+		statusQuery << "(playersLinux, playersWindows, playersMac, averagePing) ";
+		statusQuery << "VALUES ('";
+    	statusQuery << playersLinux;
+    	statusQuery << "', '";
+		statusQuery << playersWindows; 
+		statusQuery << "', '";
+		statusQuery << playersMac;
+		statusQuery << "', '";
+    	statusQuery << averagePing;
+    	statusQuery <<  "');";
+
+    	database->query(statusQuery.str(), false);
+    }
+
+    if (numPlayers)
+		this->pauseSavingStatus = false;
+    else
+		this->pauseSavingStatus = true;
+     
+    sem_post(&this->saveMutex);
+}
+
+
+
+void* SKO_Network::SaveLoop(void *threadDTO)
+{
+    // Thread data transfer object is a singler function parameter
+    // This holds more than one thing we can use
+    ThreadDTO *dto = (ThreadDTO *)threadDTO;
+    OPI_MYSQL *database = dto->database;
+	unsigned long int saveRateSeconds = dto->saveRateSeconds;
+
+
+}
+
+void* SKO_Network::QueueLoop(void *threadDTO)
 {
     // Thread data transfer object is a singler function parameter
     // This holds more than one thing we can use

@@ -26,7 +26,7 @@
 #include "SKO_PacketTypes.h"
 #include "SKO_Network.h"
 
-
+SKO_Network *network;
 
 /* DEFINES */
 // Maximum number of clients allowed to connect
@@ -57,8 +57,6 @@ int hpBar = 25;
 //gravity
 const float GRAVITY = 0.169;
 
-//operating system
-const char WINDOWS_OS = 1, LINUX_OS = 2, MAC_OS = 3;
 
 //holiday events
 unsigned const char HOLIDAY_NPC_DROP = ITEM_EASTER_EGG, HOLIDAY_BOX_DROP = ITEM_BUNNY_EARS;
@@ -116,7 +114,6 @@ int ipban(int Mod_i, std::string IP, std::string Reason)
     //are you a moderator
     if (User[Mod_i].Moderator)
     {
-        
          //get noob id
          db->nextRow();
          std::string player_id = db->getString(0);
@@ -517,222 +514,6 @@ int load_profile(std::string Username, std::string Password)
     return 0;
 }
 
-int save_profile(int CurrSock)
-{   
-   
-	if (User[CurrSock].Nick.length() == 0)
-  	{
-		printf("dafuq? I'm not saving someone without a username.\n");
-		return 1;
-	}
- 
-        std::string player_id = User[CurrSock].ID;
-        {
-            //save inventory
-            std::ostringstream sql;
-            sql << "UPDATE inventory SET";
-            for (int itm = 0; itm < NUM_ITEMS; itm++)
-			{
-				sql << " ITEM_";
-				sql << itm;
-				sql << "=";
-				sql << (int)User[CurrSock].inventory[itm];
-				
-				if (itm+1 < NUM_ITEMS)
-				sql << ", ";
-			}
-            sql << " WHERE player_id LIKE '";
-            sql << db->clean(player_id);
-            sql << "'";
-        
-            db->query(sql.str());
-        }
-        
-        {
-            //save inventory
-            std::ostringstream sql;
-            sql << "UPDATE bank SET";
-			
-			for (int itm = 0; itm < NUM_ITEMS; itm++)
-			{
-				sql << " ITEM_";
-				sql << itm;
-				sql << "=";
-				sql << (int)User[CurrSock].bank[itm];
-				if (itm+1 < NUM_ITEMS)
-					sql << ", ";
-			}
-            
-            sql << " WHERE player_id LIKE '";
-            sql << db->clean(player_id);
-            sql << "'";
-        
-            db->query(sql.str());
-        }
-
-       
-    std::ostringstream sql;
-    sql << "UPDATE player SET";
-    sql << " level=";
-    sql << (int)User[CurrSock].level;
-    sql << ", x=";
-    sql << User[CurrSock].x;
-    sql << ", y=";
-    sql << User[CurrSock].y;
-    sql << ", xp=";
-    sql << User[CurrSock].xp;
-    sql << ", hp=";
-    sql << (int)User[CurrSock].hp;  
-    sql << ", str=";
-    sql << (int)User[CurrSock].strength; 
-    sql << ", def=";
-    sql << (int)User[CurrSock].defence;
-    sql << ", xp_max=";
-    sql << User[CurrSock].max_xp;
-    sql << ", hp_max="; 
-    sql << (int)User[CurrSock].max_hp;
-    sql << ", y_speed=";
-    sql << User[CurrSock].y_speed;
-    sql << ", x_speed=";
-    sql << User[CurrSock].x_speed;
-    sql << ", stat_points=";
-    sql << (int)User[CurrSock].stat_points;
-    sql << ", regen=";
-    sql << (int)User[CurrSock].regen;
-    sql << ", facing_right=";
-    sql << (int)User[CurrSock].facing_right;
-    sql << ", EQUIP_0=";
-    sql << (int)User[CurrSock].equip[0];
-    sql << ", EQUIP_1=";
-    sql << (int)User[CurrSock].equip[1];
-	sql << ", EQUIP_2=";
-    sql << (int)User[CurrSock].equip[2];
-    
-    
-    //operating system
-    sql << ", VERSION_OS=";
-    sql << (int)User[CurrSock].OS;
-    
-    //time played
-    unsigned long int total_minutes_played = User[CurrSock].minutesPlayed;
-    double this_session_milli = (Clock() - User[CurrSock].loginTime);
-    //add the milliseconds to total time
-    total_minutes_played += (unsigned long int)(this_session_milli/1000.0/60.0);
-    
-    sql << ", minutes_played=";
-    sql << (int)total_minutes_played;
-   
-     
-    //what map are they on?
-    sql << ", current_map=";
-    sql << (int)User[CurrSock].current_map;
-
-    sql << ", inventory_order='";
-    sql << db->clean(base64_encode(User[CurrSock].getInventoryOrder()));
-
-    sql << "' WHERE id=";
-    sql << db->clean(player_id);
-    sql << ";";
-    
-    db->query(sql.str());       
-    
-    printf(db->getError().c_str());
-    
-    return 0;
-}
-
-
-int savePaused = false;
-//TODO
-//if this is true then it will not update status
-
-void saveAllProfiles()
-{
-    printf("SAVE ALL PROFILES \n");
-	
-    //if another thread is saving then hold your horses
-    while (persistLock) Sleep(1000);
- 
-    //dibs   
-    persistLock = true;
-
-    int numSaved = 0;
-    int playersLinux = 0;
-    int playersWindows = 0;
-    int playersMac = 0; 
-    float averagePing = 0;
-
-	
-    //loop all players
-    for (int i = 0; i < MAX_CLIENTS; i++)
-    {
-		//save each player who is marked to save
-        if (User[i].Save)
-        {
-            save_profile(i);
-            printf("\e[35;0m[Saved %s]\e[m\n", User[i].Nick.c_str());
-            numSaved++;
-		}
-		
-		//Count every player who is logged in
-		if (User[i].Ident)
-        {
-			printf("SAVE ALL PROFILES- numSaved: %i \n", numSaved);
-			savePaused = false;
-			printf("SAVE ALL PROFILES- Ident is true \n");
-			if (User[i].OS == LINUX_OS)
-				playersLinux++;
-			if (User[i].OS == WINDOWS_OS)
-				playersWindows++;
-			if (User[i].OS == MAC_OS)
-				playersMac++;
-			
-			printf("SAVE ALL PROFILES- playersWindows: %i \n", playersWindows);
-			averagePing += User[i].ping; 
-			printf("SAVE ALL PROFILES- averagePing: %i \n", averagePing);
-		}
-    }
-    
-	printf("SAVE ALL PROFILES- numSaved: %i \n", numSaved);
-    if (numSaved) 
-	{
-       printf("Saved %i players.\nsavePaused is %i\n", numSaved, (int)savePaused);
-    }
-
-    int numPlayers = (playersLinux + playersWindows + playersMac);
-
-	printf("number of players: %i, average ping: %i\n", numPlayers, averagePing);
-
-    if (!savePaused)
-    {
-    	if (numPlayers > 0)
-			averagePing = (int)(averagePing / numPlayers);
-
-    	std::stringstream statusQuery;
-    	statusQuery << "INSERT INTO status ";
-		statusQuery << "(playersLinux, playersWindows, playersMac, averagePing) ";
-		statusQuery << "VALUES ('";
-    	statusQuery << playersLinux;
-    	statusQuery << "', '";
-		statusQuery << playersWindows; 
-		statusQuery << "', '";
-		statusQuery << playersMac;
-		statusQuery << "', '";
-    	statusQuery << averagePing;
-    	statusQuery <<  "');";
-
-    	db->query(statusQuery.str(), false);
-    }
-
-    if (numPlayers)
-		savePaused = false;
-    else
-		savePaused = true;
-     
-    //someone else can have it
-    persistLock = false;
-}
-
 int load_data(int CurrSock)
 {
 	int returnVals = 0;
@@ -868,7 +649,6 @@ static void *Physics(void *Arg);
 static void *TargetLoop(void *Arg);
 static void *EnemyLoop(void *arg);
 static void *MainLoop(void *arg);
-static void *DbLoop(void *arg);
 
 int snap_distance = 64;
 
@@ -1050,11 +830,11 @@ Item[ITEM_SNOW_BALL]=       SKO_Item(12,    12,    5,    0,    0,    0,     0,  
 	  map[mp].ItemObj[i] = SKO_ItemObject();
    
     
-    SKO_Network network = SKO_Network(db, serverPort);
+    network = new SKO_Network(db, serverPort, 30);
 	printf("Initialized SKO_Network.\n");
 
 	printf("Starting up SKO_Network...\n");
-    std::string networkStatus = network.Startup();
+    std::string networkStatus = network->Startup();
     printf("SKO_Network status is: %s\n", networkStatus);
 
 	if (networkStatus == "success") {
@@ -1062,7 +842,7 @@ Item[ITEM_SNOW_BALL]=       SKO_Item(12,    12,    5,    0,    0,    0,     0,  
 		printf(kGreen "SKO Network initialized successfully.\n" kNormal);
 	} else {
 		printf(kRed "Could not initialize SKO_Network. Here is the status: [%s]\n%s", networkStatus.c_str());
-		network.Cleanup();
+		network->Cleanup();
 		return 1;
 	}
     
@@ -1072,13 +852,9 @@ Item[ITEM_SNOW_BALL]=       SKO_Item(12,    12,    5,    0,    0,    0,     0,  
        
        
    //multi threading
-   pthread_t physicsThread, dbThread, enemyThread, targetThread; 
+   pthread_t physicsThread, enemyThread, targetThread; 
    pthread_t mainThread[MAX_CLIENTS];
     
-    if (pthread_create(&dbThread, NULL, DbLoop, 0)){
-        printf("Could not create thread for db->..\n");
-        return 1;
-    }      
     
     for (unsigned long int i = 0; i < NUM_MAPS; i++)
     {
@@ -1117,29 +893,6 @@ Item[ITEM_SNOW_BALL]=       SKO_Item(12,    12,    5,    0,    0,    0,     0,  
 	return 0;
 }
 
-void *DbLoop(void *arg)
-{
-	//auto saving variables
-	int persistRate = 1000 * 60 * 5;
-     
-    return arg;
- 
-	while (true)
-	{     
-		//auto save
-		if (Clock() - persistTicker >= persistRate)
-		{
-			printf("Auto Save...\n");
-			saveAllProfiles();
-			//reset ticker
-			persistTicker = Clock();
-		}
-		Sleep(1000);
-    }
-}
-
-
-
 void *MainLoop(void *arg)
 {
 	long int CurrSock = (intptr_t)arg;
@@ -1153,7 +906,6 @@ void *MainLoop(void *arg)
 	int code = -1;
 	while (!SERVER_QUIT)
 	{       
-
 		// If this socket is taken
 		if (User[CurrSock].Status)
 		{
@@ -1800,7 +1552,7 @@ void *MainLoop(void *arg)
 						//mark this client to save when they disconnect..since Send/Recv change Ident!!
 						User[CurrSock].Save = true;
 						
-						saveAllProfiles();									
+						network->saveAllProfiles(db);									
 					}
 					else 
 					{//couldn't load, KILL KILL
@@ -3185,8 +2937,7 @@ if (HOLIDAY)
 								 
 								 //don't cheat! save everyone!!
 								 persistTicker = Clock();
-								saveAllProfiles();
-			
+								 network->saveAllProfiles(db);
 							  }                                           
 						  }
 					 break;
@@ -4823,11 +4574,8 @@ if (HOLIDAY)
 						if (User[CurrSock].Save)
 						{	
 							//save data
-							//save_profile(CurrSock);
 							printf("User was marked to be saved.\n");
-							printf("clearing persisit ticker and saving all profiles...\n");
-							persistTicker = Clock();
-							saveAllProfiles();
+							network->saveAllProfiles(db);
 							
 							if (User[CurrSock].Nick.compare("Paladin") != 0)
 							{
