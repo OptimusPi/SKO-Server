@@ -11,7 +11,6 @@
 #include "SKO_ItemObject.h"
 #include "SKO_Enemy.h"
 #include "OPI_MYSQL.h"
-#include "md5.h"
 #include "KE_Timestep.h"
 #include "SKO_Stall.h"
 #include "SKO_Shop.h"
@@ -32,14 +31,11 @@ SKO_Network *network;
 // Maximum number of clients allowed to connect
 #include "KE_Timestep.h"
 
-
 //HIT_LOOP is how many for loop iterations to follow during collisions
 #define HIT_LOOP 3
 
-
 //quit server by logging in as SHUTDOWN
 bool SERVER_QUIT = false;
-
 
 //players
 SKO_Player User[MAX_CLIENTS];
@@ -56,7 +52,6 @@ int hpBar = 25;
 
 //gravity
 const float GRAVITY = 0.169;
-
 
 //holiday events
 unsigned const char HOLIDAY_NPC_DROP = ITEM_EASTER_EGG, HOLIDAY_BOX_DROP = ITEM_BUNNY_EARS;
@@ -117,8 +112,7 @@ int ipban(int Mod_i, std::string IP, std::string Reason)
          //get noob id
          db->nextRow();
          std::string player_id = db->getString(0);
-         
-                
+              
          std::string sql = "INSERT INTO ip_ban (ip, banned_by, ban_reason) VALUES('";
          sql += db->clean(IP);
          sql += "', '";
@@ -131,14 +125,12 @@ int ipban(int Mod_i, std::string IP, std::string Reason)
          db->query(sql);
 
          printf(db->getError().c_str());
-
     }
     else
     {
         //not moderator
         return 1;
     }
-	
     
     return 0;
 }
@@ -333,7 +325,6 @@ int ban(int Mod_i, std::string Username, std::string Reason, int flag)
     return 0;
 }
 
-
 int create_profile(std::string Username, std::string Password, std::string IP)
 {    
        
@@ -438,8 +429,6 @@ int load_profile(std::string Username, std::string Password)
     //go through and see if you are logged in already     
     for ( int i = 0; i < MAX_CLIENTS; i++ )
     {
-		//printf("Looping all players and i is %i and Nick is %s Ident is %i Connected is %i", i ,User[i].Nick.c_str(), User[i].Ident, User[i].Sock->Connected);
-		
         //tell the client if you are logged in already
         if (lower(User[i].Nick).compare(lower(Username)) == 0){
 			printf("User that is you already is: %s x is %i i is %i\n", User[i].Nick.c_str(), (int)User[i].x, i); 
@@ -790,44 +779,42 @@ int main()
     Item[ITEM_ICECREAM]   =     SKO_Item(9,     16,    5,    0,    0,    0,     0,    4, 0);
     Item[ITEM_SUNGLASSES] =     SKO_Item(21,    13,    3,    0,    0,    0,     0,    8, 0);
 
-   
+	Item[ITEM_SWORD_RUSTED] =     	SKO_Item(11,  37,  2, 1, 2,  0, 32, 3, 6);
+	Item[ITEM_SWORD_STEEL] =       	SKO_Item(11,  37,  2, 2, 4,  0, 32, 4, 80);
+	Item[ITEM_SWORD_GOLD] =       	SKO_Item(11,  42,  2, 3, 11, 0, 40, 5, 6030);
+	Item[ITEM_SWORD_CRYSTAL] =    	SKO_Item(15,  43,  2, 5, 22, 0, 42, 6, 100300);
+													
+	Item[ITEM_AXE_RUSTED] =       	SKO_Item(12,  31,  2, 1, 3,  0, 28, 7, 8);
+	Item[ITEM_AXE_STEEL] =         	SKO_Item(12,  31,  2, 1, 5,  0, 28, 8, 85);
+	Item[ITEM_AXE_GOLD] =         	SKO_Item(21,  36,  2, 2, 13, 0, 37, 9, 6100);
+	Item[ITEM_AXE_CRYSTAL] =      	SKO_Item(21,  38,  2, 3, 24, 0, 40, 10, 98525);
+													
+	Item[ITEM_HAMMER_RUSTED] =    	SKO_Item(17,  33,  2, 0, 4,  0, 22, 11, 10);
+	Item[ITEM_HAMMER_STEEL] =      	SKO_Item(17,  33,  2, 0, 7,  0, 22, 12, 90);
+	Item[ITEM_HAMMER_GOLD] =      	SKO_Item(17,  33,  2, 2, 16, 0, 22, 13, 6120);
+	Item[ITEM_HAMMER_CRYSTAL] =  	SKO_Item(27,  33,  2, 3, 25, 0, 32, 14, 99085);
 
-Item[ITEM_SWORD_RUSTED] =     	SKO_Item(11,  37,  2, 1, 2,  0, 32, 3, 6);
-Item[ITEM_SWORD_STEEL] =       	SKO_Item(11,  37,  2, 2, 4,  0, 32, 4, 80);
-Item[ITEM_SWORD_GOLD] =       	SKO_Item(11,  42,  2, 3, 11, 0, 40, 5, 6030);
-Item[ITEM_SWORD_CRYSTAL] =    	SKO_Item(15,  43,  2, 5, 22, 0, 42, 6, 100300);
-                                                   
-Item[ITEM_AXE_RUSTED] =       	SKO_Item(12,  31,  2, 1, 3,  0, 28, 7, 8);
-Item[ITEM_AXE_STEEL] =         	SKO_Item(12,  31,  2, 1, 5,  0, 28, 8, 85);
-Item[ITEM_AXE_GOLD] =         	SKO_Item(21,  36,  2, 2, 13, 0, 37, 9, 6100);
-Item[ITEM_AXE_CRYSTAL] =      	SKO_Item(21,  38,  2, 3, 24, 0, 40, 10, 98525);
-                                                   
-Item[ITEM_HAMMER_RUSTED] =    	SKO_Item(17,  33,  2, 0, 4,  0, 22, 11, 10);
-Item[ITEM_HAMMER_STEEL] =      	SKO_Item(17,  33,  2, 0, 7,  0, 22, 12, 90);
-Item[ITEM_HAMMER_GOLD] =      	SKO_Item(17,  33,  2, 2, 16, 0, 22, 13, 6120);
-Item[ITEM_HAMMER_CRYSTAL] =  	SKO_Item(27,  33,  2, 3, 25, 0, 32, 14, 99085);
-
-Item[ITEM_SCYTHE] = 		   	SKO_Item(23,  25,  2, 3, 3, 0, 22, 15, 7120);
-Item[ITEM_SCYTHE_REAPER] =	   	SKO_Item(27,  32,  2, 10, 10, 10, 32, 16, 19085);
-Item[ITEM_CANDY_CANE]=       	SKO_Item(10,  13,  3,    3,   3,    3,     0,    17, 0);
+	Item[ITEM_SCYTHE] = 		   	SKO_Item(23,  25,  2, 3, 3, 0, 22, 15, 7120);
+	Item[ITEM_SCYTHE_REAPER] =	   	SKO_Item(27,  32,  2, 10, 10, 10, 32, 16, 19085);
+	Item[ITEM_CANDY_CANE]=       	SKO_Item(10,  13,  3,    3,   3,    3,     0,    17, 0);
 
 
 
-///halloween event items
-Item[ITEM_HALLOWEEN_MASK] = SKO_Item(18, 21, 3, 0, 0, 0,  0,  10, 0); 
-Item[ITEM_GUARD_HELM] =     SKO_Item(18, 21, 3, 5, 1, 10, 0,  11, 2500);
-Item[ITEM_JACK_OLANTERN] =  SKO_Item(21, 23, 5, 0, 0, 0, 0, 5, 0);
+	///halloween event items
+	Item[ITEM_HALLOWEEN_MASK] = SKO_Item(18, 21, 3, 0, 0, 0,  0,  10, 0); 
+	Item[ITEM_GUARD_HELM] =     SKO_Item(18, 21, 3, 5, 1, 10, 0,  11, 2500);
+	Item[ITEM_JACK_OLANTERN] =  SKO_Item(21, 23, 5, 0, 0, 0, 0, 5, 0);
 
-Item[ITEM_WHITE_PHAT]=     	SKO_Item(10,    13,    3,    0,    0,    0,     0,    12, 0);
-Item[ITEM_SKELETON_HELM] =     SKO_Item(18, 21, 3, 1, 2, 1, 0, 13, 9000);
-Item[ITEM_TRAINING_HELM] =     SKO_Item(18, 21, 3, 1, 2, 1, 0, 14, 75);
+	Item[ITEM_WHITE_PHAT]=     	SKO_Item(10,    13,    3,    0,    0,    0,     0,    12, 0);
+	Item[ITEM_SKELETON_HELM] =     SKO_Item(18, 21, 3, 1, 2, 1, 0, 13, 9000);
+	Item[ITEM_TRAINING_HELM] =     SKO_Item(18, 21, 3, 1, 2, 1, 0, 14, 75);
 
-Item[ITEM_PURPLE_PHAT]=       SKO_Item(10,    13,    3,    0,    0,    0,     0,    15, 0); 
-Item[ITEM_SNOW_BALL]=       SKO_Item(12,    12,    5,    0,    0,    0,     0,    6, 0); 
+	Item[ITEM_PURPLE_PHAT]=       SKO_Item(10,    13,    3,    0,    0,    0,     0,    15, 0); 
+	Item[ITEM_SNOW_BALL]=       SKO_Item(12,    12,    5,    0,    0,    0,     0,    6, 0); 
 
     for (int mp = 0; mp < NUM_MAPS; mp++)
       for (int i = 0; i < 256; i++)
-	  map[mp].ItemObj[i] = SKO_ItemObject();
+	  	map[mp].ItemObj[i] = SKO_ItemObject();
    
     
     network = new SKO_Network(db, serverPort, 30);
@@ -846,16 +833,13 @@ Item[ITEM_SNOW_BALL]=       SKO_Item(12,    12,    5,    0,    0,    0,     0,  
 		return 1;
 	}
     
-   
    /* initialize random seed: */
    srand ( Clock() );
-       
        
    //multi threading
    pthread_t physicsThread, enemyThread, targetThread; 
    pthread_t mainThread[MAX_CLIENTS];
-    
-    
+ 
     for (unsigned long int i = 0; i < NUM_MAPS; i++)
     {
         if (pthread_create(&physicsThread, NULL, Physics, (void *) i))
@@ -909,7 +893,6 @@ void *MainLoop(void *arg)
 		// If this socket is taken
 		if (User[CurrSock].Status)
 		{
-				
 			if (User[CurrSock].Sock->GetStatus() & GE_Socket_OK)
 			{
                     
@@ -921,976 +904,968 @@ void *MainLoop(void *arg)
 		    	data_len = 0;
 		    	pack_len = 0;
                     
-                    	data_len = User[CurrSock].Sock->Data.length();
-                    
-                    	if (data_len > 0)
-                       		pack_len = (int)(unsigned char)User[CurrSock].Sock->Data[0];
-                       
-			if( data_len >= pack_len && data_len > 0)
-			{
-                       // printf("\ndata_len=(%i)\npack_len=(%i)\n", data_len, pack_len);
-                      //     for (int i = 0; i < data_len; i++)
-                      //         printf("[%i]", User[CurrSock].Sock->Data[i]);
-                      //     printf("\n");
-                        
-                        	std::string newPacket = "";
-                        	if (data_len > pack_len){
-                           		newPacket = User[CurrSock].Sock->Data.substr(pack_len, data_len-pack_len);
-                        }
-                        
-                        User[CurrSock].Sock->Data = User[CurrSock].Sock->Data.substr(0, pack_len);
-                        
-                        //rip the command
-                        code = User[CurrSock].Sock->Data[1];
-                        
-                        
-                        //printf("[Code(%i)]\n", code);
-                        //check ping first
+				data_len = User[CurrSock].Sock->Data.length();
 			
-			if ( code == PONG )
-			{
-				User[CurrSock].ping = Clock() - User[CurrSock].pingTicker;
-				User[CurrSock].pingTicker = Clock();	
-				User[CurrSock].pingWaiting = false;
-			}
-			else if ( code == PING)
-			{
-				 User[CurrSock].SendPacket(pongPacket);
-			}//end "ping"
-			else if( code == LOGIN)
-			{	
-				printf("LOGIN\n");
-
-				// Declare message string
-				std::string Message = "";
-				std::string Username = "";
-				std::string Password = "";
-				
-				// Declare temp string
-				std::string Temp;
-
-				//fill message with username and password
-				Message += User[CurrSock].Sock->Data.substr(2,pack_len-2);
-				
-				//strip the appropriate data
-				Username += Message.substr(0,Message.find_first_of(" "));
-				Password += Message.substr(Message.find_first_of(" ")+1, pack_len - Message.find_first_of(" ")+1);
-				
-				//printf("DATA:%s\n", User[CurrSock].Sock->Data.c_str());
-				printf("\n::LOGIN::\nUsername[%s]\nPassword[%s]\n", Username.c_str(), Password.c_str());
-				
-				//try to load account
-				int result = load_profile(Username, Password);
-				
-				printf("load_profile() Result: %i\n", result);
-				
-				if (result == 1)//wrong password
+				if (data_len > 0)
+					pack_len = (int)(unsigned char)User[CurrSock].Sock->Data[0];
+                       
+				if( data_len >= pack_len && data_len > 0)
 				{
-				   Message = "0";
-				   Message += LOGIN_FAIL_NONE;
-				   Message[0] = Message.length();   
-						
-
-				   //warn the server, possible bruteforce hack attempt                   
-				   printf("%s has entered the wrong password!\n", Username.c_str());
-				}
-				else if(result == 2)//character already logged in
-				{
-					 Message = "0";
-					 Message += LOGIN_FAIL_DOUBLE;
-					 Message[0] = Message.length();
-					 
-					 printf("%s tried to double-log!\n", Username.c_str());
-				}   
-				else if(result == 3)//character is banned
-				{
-					 Message = "0";
-					 Message += LOGIN_FAIL_BANNED;
-					 Message[0] = Message.length();
-					 
-					 printf("%s is banned and tried to login!\n", Username.c_str());
-				}  
-				else if (result == 4)
-				{
-					 Message = "0";
-					 Message += LOGIN_FAIL_NONE;
-					 Message[0] = Message.length();
-					 
-					 printf("%s tried to login but doesn't exist!\n", Username.c_str());
-				}
-				if (result == 0 || result == 5) //login with no problems or with 1 problem: user is mute
-				{//login success
-				
-					printf("(login success) User %i %s socket status: %i\n", CurrSock, Username.c_str(), User[CurrSock].Sock->GetStatus());
-					
-					if (result == 0)
-					   User[CurrSock].Mute = false;
-					
-					Message = "0";
-					Message += LOGIN_SUCCESS; 
-					Message += CurrSock;
-					Message += User[CurrSock].current_map;
-					Message[0] = Message.length();
-						  
-					//successful login
-					// Send data
-					User[CurrSock].SendPacket(Message);
-							
-							//set display name
-					User[CurrSock].Nick = Username;
-
-
-
-					std::string str_SQL = "SELECT clan.name FROM player INNER JOIN clan ON clan.id = player.clan_id WHERE player.username LIKE '";
-					str_SQL += db->clean(Username);
-					str_SQL += "'";
-
-					db->query(str_SQL);
-
-					std::string clanTag = "(noob)";
-					if (db->count())
+					std::string newPacket = "";
+					if (data_len > pack_len)
 					{
-						db->nextRow();
-						clanTag = "[";
-						clanTag += db->getString(0);
-						clanTag += "]";
+							newPacket = User[CurrSock].Sock->Data.substr(pack_len, data_len-pack_len);
 					}
 					
-					printf("Clan: %s\n", clanTag.c_str());
-					User[CurrSock].Clan = clanTag;
+					User[CurrSock].Sock->Data = User[CurrSock].Sock->Data.substr(0, pack_len);
 					
-					printf(">>>about to load data.\n");
-					if (load_data(CurrSock) == 0)
+					//rip the command
+					code = User[CurrSock].Sock->Data[1];
+			
+					if ( code == PONG )
 					{
-						//set identified
-						User[CurrSock].Ident = true;
+						User[CurrSock].ping = Clock() - User[CurrSock].pingTicker;
+						User[CurrSock].pingTicker = Clock();	
+						User[CurrSock].pingWaiting = false;
+					}
+					else if ( code == PING)
+					{
+						User[CurrSock].SendPacket(pongPacket);
+					}//end "ping"
+					else if( code == LOGIN)
+					{	
+						printf("LOGIN\n");
+
+						// Declare message string
+						std::string Message = "";
+						std::string Username = "";
+						std::string Password = "";
 						
-						/* */
-						//log ip
-						printf("i.p. logging...\n");
-						std::string player_ip = User[CurrSock].Sock->Get_IP();
-						std::string player_id = User[CurrSock].ID;
-					
-						//log the i.p.
-						std::string sql = "INSERT INTO ip_log (player_id, ip) VALUES('";
-						sql += db->clean(player_id);
-						sql += "', '";
-						sql += db->clean(player_ip);
-						sql += "')";
-				
-						printf(sql.c_str());
-						db->query(sql, true);
+						// Declare temp string
+						std::string Temp;
 
-						printf(db->getError().c_str());
+						//fill message with username and password
+						Message += User[CurrSock].Sock->Data.substr(2,pack_len-2);
 						
-						//the current map of this user
-						int current_map = User[CurrSock].current_map;
-
-						printf("Logged i.p. [%s]\n", player_ip.c_str());
-						printf ("going to tell client stats\n");
-							  
-						// HP                
-						std::string Packet = "0";
-						Packet += STAT_HP;
-						Packet += User[CurrSock].hp;
-						Packet[0] = Packet.length();
-						User[CurrSock].SendPacket(Packet);
-
-						Packet = "0";
-						Packet += STATMAX_HP;
-						Packet += User[CurrSock].max_hp;
-						Packet[0] = Packet.length();
-						User[CurrSock].SendPacket(Packet);
-
-						Packet = "0";
-						Packet += STAT_REGEN;
-						Packet += User[CurrSock].regen;
-						Packet[0] = Packet.length();
-						User[CurrSock].SendPacket(Packet);
-						User[CurrSock].regen_ticker = Clock();
-
-
-						char *p;
-						char b1, b2, b3, b4;
-
-
-						// XP        
-						Packet = "0";
-						Packet += STAT_XP;
-						p=(char*)&User[CurrSock].xp;
-						b1=p[0]; b2=p[1]; b3=p[2]; b4=p[3];
-						Packet += b1;
-						Packet += b2;
-						Packet += b3;
-						Packet += b4;
-						Packet[0] = Packet.length();
-						User[CurrSock].SendPacket(Packet);
-
-						Packet = "0";
-						Packet += STATMAX_XP;
-						p=(char*)&User[CurrSock].max_xp;
-						b1=p[0]; b2=p[1]; b3=p[2]; b4=p[3];
-						Packet += b1;
-						Packet += b2;
-						Packet += b3;
-						Packet += b4;
-						Packet[0] = Packet.length();
-						User[CurrSock].SendPacket(Packet);
-
-						//STATS
-						Packet = "0";
-						Packet += STAT_LEVEL;
-						Packet += User[CurrSock].level;
-						Packet[0] = Packet.length();
-						User[CurrSock].SendPacket(Packet);
-
-						Packet = "0";
-						Packet += STAT_STR;
-						Packet += User[CurrSock].strength;
-						Packet[0] = Packet.length();
-						User[CurrSock].SendPacket(Packet);
-
-						Packet = "0";
-						Packet += STAT_DEF;
-						Packet += User[CurrSock].defence;
-						Packet[0] = Packet.length();
-						User[CurrSock].SendPacket(Packet);
-
-						Packet = "0";
-						Packet += STAT_POINTS;
-						Packet += User[CurrSock].stat_points;
-						Packet[0] = Packet.length();
-						User[CurrSock].SendPacket(Packet);
-
-						//equipment
-						Packet = "0";
-						Packet += EQUIP;
-						Packet += CurrSock;
-						Packet += (char)0;
-						Packet += Item[User[CurrSock].equip[0]].equipID;
-						Packet += User[CurrSock].equip[0];
-						Packet[0] = Packet.length();
-						User[CurrSock].SendPacket(Packet);
-
-						Packet = "0";
-						Packet += EQUIP;
-						Packet += CurrSock;
-						Packet += (char)1;
-						Packet += Item[User[CurrSock].equip[1]].equipID;
-						Packet += User[CurrSock].equip[1];
-						Packet[0] = Packet.length();
-						User[CurrSock].SendPacket(Packet);
-
-						Packet = "0";
-						Packet += EQUIP;
-						Packet += CurrSock;
-						Packet += (char)2;
-						Packet += Item[User[CurrSock].equip[2]].equipID;
-						Packet += User[CurrSock].equip[2];
-						Packet[0] = Packet.length();
-						User[CurrSock].SendPacket(Packet);
-								
-						printf("sending inventory order\n");	
-						Packet = "0";
-						Packet += INVENTORY;
+						//strip the appropriate data
+						Username += Message.substr(0,Message.find_first_of(" "));
+						Password += Message.substr(Message.find_first_of(" ")+1, pack_len - Message.find_first_of(" ")+1);
 						
-						Packet += User[CurrSock].getInventoryOrder();
-						Packet[0] = Packet.length();
+						//printf("DATA:%s\n", User[CurrSock].Sock->Data.c_str());
+						printf("\n::LOGIN::\nUsername[%s]\nPassword[%s]\n", Username.c_str(), Password.c_str());
 						
-						User[CurrSock].SendPacket(Packet);
-				
-						printf ("going to load all items\n");
-							
-						for (int i = 0; i < NUM_ITEMS; i++)
+						//try to load account
+						int result = load_profile(Username, Password);
+						
+						printf("load_profile() Result: %i\n", result);
+						
+						if (result == 1)//wrong password
 						{
-							//if they own this item, tell them how many they own.
-							unsigned int amt = User[CurrSock].inventory[i];
-							//prevents them from holding more than 24 items
-							if (amt > 0)
-							{ 
-								//put in players inventory
-								Packet = "0";
-								Packet += POCKET_ITEM;
-								Packet += i;
-								char *p;
-								char b1, b2, b3, b4;
+						Message = "0";
+						Message += LOGIN_FAIL_NONE;
+						Message[0] = Message.length();   
 								
-								//break up the int as 4 bytes
-								p=(char*)&amt;
-								b1=p[0]; b2=p[1]; b3=p[2]; b4=p[3];
-								Packet += b1;
-								Packet += b2;
-								Packet += b3;
-								Packet += b4;
+
+						//warn the server, possible bruteforce hack attempt                   
+						printf("%s has entered the wrong password!\n", Username.c_str());
+						}
+						else if(result == 2)//character already logged in
+						{
+							Message = "0";
+							Message += LOGIN_FAIL_DOUBLE;
+							Message[0] = Message.length();
+							
+							printf("%s tried to double-log!\n", Username.c_str());
+						}   
+						else if(result == 3)//character is banned
+						{
+							Message = "0";
+							Message += LOGIN_FAIL_BANNED;
+							Message[0] = Message.length();
+							
+							printf("%s is banned and tried to login!\n", Username.c_str());
+						}  
+						else if (result == 4)
+						{
+							Message = "0";
+							Message += LOGIN_FAIL_NONE;
+							Message[0] = Message.length();
+							
+							printf("%s tried to login but doesn't exist!\n", Username.c_str());
+						}
+						if (result == 0 || result == 5) //login with no problems or with 1 problem: user is mute
+						{//login success
+						
+							printf("(login success) User %i %s socket status: %i\n", CurrSock, Username.c_str(), User[CurrSock].Sock->GetStatus());
+							
+							if (result == 0)
+							User[CurrSock].Mute = false;
+							
+							Message = "0";
+							Message += LOGIN_SUCCESS; 
+							Message += CurrSock;
+							Message += User[CurrSock].current_map;
+							Message[0] = Message.length();
 								
-								Packet[0] = Packet.length();
-								User[CurrSock].SendPacket(Packet);
-							}
-							amt = User[CurrSock].bank[i];
-							//printf("this player owns [%i] of item %i\n", amt, i);
-							if (amt != 0)
+							//successful login
+							// Send data
+							User[CurrSock].SendPacket(Message);
+									
+									//set display name
+							User[CurrSock].Nick = Username;
+
+
+
+							std::string str_SQL = "SELECT clan.name FROM player INNER JOIN clan ON clan.id = player.clan_id WHERE player.username LIKE '";
+							str_SQL += db->clean(Username);
+							str_SQL += "'";
+
+							db->query(str_SQL);
+
+							std::string clanTag = "(noob)";
+							if (db->count())
 							{
-								//printf("the user has %i of Item[%i]", amt, i );
-								//prevents them from holding more than 24 items
-								User[CurrSock].bank_index++;
-								
-								//put in players inventory
-								Packet = "0";
-								Packet += BANK_ITEM;
-								Packet += i;
-								char *p;
-								char b1, b2, b3, b4;
-								
-								//break up the int as 4 bytes
-								p=(char*)&amt;
-								b1=p[0]; b2=p[1]; b3=p[2]; b4=p[3];
-								Packet += b1;
-								Packet += b2;
-								Packet += b3;
-								Packet += b4;
-								
-								Packet[0] = Packet.length();
-								User[CurrSock].SendPacket(Packet);
+								db->nextRow();
+								clanTag = "[";
+								clanTag += db->getString(0);
+								clanTag += "]";
 							}
 							
-						   //end ItemObj
-						}//end loop 256S for items in inventory and map
-
-						printf("loading all ItemObjs..\n");
-						for (int i = 0; i < 256; i++) 
-						{
-							printf("map[%i].ItemObj[%i].status\n", current_map, i);
-							//go through all the ItemObjects since we're already looping
-							if (map[current_map].ItemObj[i].status)
+							printf("Clan: %s\n", clanTag.c_str());
+							User[CurrSock].Clan = clanTag;
+							
+							printf(">>>about to load data.\n");
+							if (load_data(CurrSock) == 0)
 							{
-								printf("itemObj %i is a go!\n", i);
-								std::string Packet;
-								char *p;
-								char b1,b2,b3,b4;
+								//set identified
+								User[CurrSock].Ident = true;
+								
+								/* */
+								//log ip
+								printf("i.p. logging...\n");
+								std::string player_ip = User[CurrSock].Sock->Get_IP();
+								std::string player_id = User[CurrSock].ID;
+							
+								//log the i.p.
+								std::string sql = "INSERT INTO ip_log (player_id, ip) VALUES('";
+								sql += db->clean(player_id);
+								sql += "', '";
+								sql += db->clean(player_ip);
+								sql += "')";
+						
+								printf(sql.c_str());
+								db->query(sql, true);
+
+								printf(db->getError().c_str());
+								
+								//the current map of this user
+								int current_map = User[CurrSock].current_map;
+
+								printf("Logged i.p. [%s]\n", player_ip.c_str());
+								printf ("going to tell client stats\n");
+									
+								// HP                
+								std::string Packet = "0";
+								Packet += STAT_HP;
+								Packet += User[CurrSock].hp;
+								Packet[0] = Packet.length();
+								User[CurrSock].SendPacket(Packet);
+
 								Packet = "0";
-								Packet += SPAWN_ITEM;
-								Packet += i;
-								Packet += current_map;
-								Packet += map[current_map].ItemObj[i].itemID;
-								
-								float numx = map[current_map].ItemObj[i].x;
-								p=(char*)&numx;
+								Packet += STATMAX_HP;
+								Packet += User[CurrSock].max_hp;
+								Packet[0] = Packet.length();
+								User[CurrSock].SendPacket(Packet);
+
+								Packet = "0";
+								Packet += STAT_REGEN;
+								Packet += User[CurrSock].regen;
+								Packet[0] = Packet.length();
+								User[CurrSock].SendPacket(Packet);
+								User[CurrSock].regen_ticker = Clock();
+
+
+								char *p;
+								char b1, b2, b3, b4;
+
+
+								// XP        
+								Packet = "0";
+								Packet += STAT_XP;
+								p=(char*)&User[CurrSock].xp;
 								b1=p[0]; b2=p[1]; b3=p[2]; b4=p[3];
 								Packet += b1;
 								Packet += b2;
 								Packet += b3;
 								Packet += b4;
-								
-								float numy = map[current_map].ItemObj[i].y;
-								p=(char*)&numy;
+								Packet[0] = Packet.length();
+								User[CurrSock].SendPacket(Packet);
+
+								Packet = "0";
+								Packet += STATMAX_XP;
+								p=(char*)&User[CurrSock].max_xp;
 								b1=p[0]; b2=p[1]; b3=p[2]; b4=p[3];
 								Packet += b1;
 								Packet += b2;
 								Packet += b3;
 								Packet += b4;
+								Packet[0] = Packet.length();
+								User[CurrSock].SendPacket(Packet);
+
+								//STATS
+								Packet = "0";
+								Packet += STAT_LEVEL;
+								Packet += User[CurrSock].level;
+								Packet[0] = Packet.length();
+								User[CurrSock].SendPacket(Packet);
+
+								Packet = "0";
+								Packet += STAT_STR;
+								Packet += User[CurrSock].strength;
+								Packet[0] = Packet.length();
+								User[CurrSock].SendPacket(Packet);
+
+								Packet = "0";
+								Packet += STAT_DEF;
+								Packet += User[CurrSock].defence;
+								Packet[0] = Packet.length();
+								User[CurrSock].SendPacket(Packet);
+
+								Packet = "0";
+								Packet += STAT_POINTS;
+								Packet += User[CurrSock].stat_points;
+								Packet[0] = Packet.length();
+								User[CurrSock].SendPacket(Packet);
+
+								//equipment
+								Packet = "0";
+								Packet += EQUIP;
+								Packet += CurrSock;
+								Packet += (char)0;
+								Packet += Item[User[CurrSock].equip[0]].equipID;
+								Packet += User[CurrSock].equip[0];
+								Packet[0] = Packet.length();
+								User[CurrSock].SendPacket(Packet);
+
+								Packet = "0";
+								Packet += EQUIP;
+								Packet += CurrSock;
+								Packet += (char)1;
+								Packet += Item[User[CurrSock].equip[1]].equipID;
+								Packet += User[CurrSock].equip[1];
+								Packet[0] = Packet.length();
+								User[CurrSock].SendPacket(Packet);
+
+								Packet = "0";
+								Packet += EQUIP;
+								Packet += CurrSock;
+								Packet += (char)2;
+								Packet += Item[User[CurrSock].equip[2]].equipID;
+								Packet += User[CurrSock].equip[2];
+								Packet[0] = Packet.length();
+								User[CurrSock].SendPacket(Packet);
+										
+								printf("sending inventory order\n");	
+								Packet = "0";
+								Packet += INVENTORY;
 								
-								float numxs = map[current_map].ItemObj[i].x_speed;
-								p=(char*)&numxs;
-								b1=p[0]; b2=p[1]; b3=p[2]; b4=p[3];
-								Packet += b1;
-								Packet += b2;
-								Packet += b3;
-								Packet += b4;
-								// printf("added xs %.2f\n", numxs);
-								
-								float numys = map[current_map].ItemObj[i].y_speed;
-								p=(char*)&numys;
-								b1=p[0]; b2=p[1]; b3=p[2]; b4=p[3];
-								Packet += b1;
-								Packet += b2;
-								Packet += b3;
-								Packet += b4; 
-							   // printf("added ys %.2f\n", numys);
-								
+								Packet += User[CurrSock].getInventoryOrder();
 								Packet[0] = Packet.length();
 								
 								User[CurrSock].SendPacket(Packet);
-							}
-						}
-
-						printf("loading all targets..\n");
-						for (int i = 0; i < map[current_map].num_targets; i++)
-						{	
-							printf("%i of %i targets on this map loading...\n", i, map[current_map].num_targets);
-							if (map[current_map].Target[i].active){
-								printf("target[%i] is active, so trying to spawn...\n", i);
-								spawnTarget(i, current_map);
-							} else {
-								printf("target[%i] is not active, so not spawning...\n", i);
-							}
-						}
-
-
-						//npcs
-						for (int i = 0; i < map[current_map].num_npcs; i++)
-						{
-						char *p;
-
-						std::string Packet = "0";
-
-						if (map[current_map].NPC[i]->x_speed == 0){
-						Packet += NPC_MOVE_STOP;
-						printf("NPC_MOVE_STOP A\n");
-						}
-						if (map[current_map].NPC[i]->x_speed < 0)
-						Packet += NPC_MOVE_LEFT;
-						if (map[current_map].NPC[i]->x_speed > 0)
-						Packet += NPC_MOVE_RIGHT;
-
-						Packet += i;
-						Packet += current_map;
-
-						//break up the int as 4 bytes
-						p=(char*)&map[current_map].NPC[i]->x;
-						Packet += p[0];
-						Packet += p[1];
-						Packet += p[2];
-						Packet += p[3];
-						p=(char*)&map[current_map].NPC[i]->y;
-						Packet += p[0];
-						Packet += p[1];
-						Packet += p[2];
-						Packet += p[3];
-
-						Packet[0] = Packet.length();
-						User[CurrSock].SendPacket(Packet);
-
-						}
-
-
-						// load all enemies
-						for (int i = 0; i < map[current_map].num_enemies; i++)
-						{
-							char *p;
-
-							std::string Packet = "0";
-
-							if (map[current_map].Enemy[i]->x_speed == 0)
-							{
-								Packet += ENEMY_MOVE_STOP;
-								printf("ENEMY_MOVE_STOP A\n");
-							}
-							if (map[current_map].Enemy[i]->x_speed < 0)
-								Packet += ENEMY_MOVE_LEFT;
-							if (map[current_map].Enemy[i]->x_speed > 0)
-								Packet += ENEMY_MOVE_RIGHT;
-
-							Packet += i;
-							Packet += current_map;
-
-							//break up the int as 4 bytes
-							p=(char*)&map[current_map].Enemy[i]->x;
-							Packet += p[0];
-							Packet += p[1];
-							Packet += p[2];
-							Packet += p[3];
-							p=(char*)&map[current_map].Enemy[i]->y;
-							Packet += p[0];
-							Packet += p[1];
-							Packet += p[2];
-							Packet += p[3];
-
-							Packet[0] = Packet.length();
-							User[CurrSock].SendPacket(Packet);
-
-							//enemy health bars
-							int hp = (unsigned char)((float)map[current_map].Enemy[i]->hp / map[current_map].Enemy[i]->hp_max*hpBar);
-
-							//packet
-							std::string hpPacket = "0";
-							hpPacket += ENEMY_HP;
-							hpPacket += i;
-							hpPacket += current_map;
-							hpPacket += hp;
-							hpPacket[0] = hpPacket.length();
-							User[CurrSock].SendPacket(hpPacket);
-						}
-
-						// inform all players
-						for (int i = 0; i < MAX_CLIENTS; i++)
-						{
-							//tell everyone new has joined
-							if (User[i].Ident || i == CurrSock)
-							{
-								std::string Message1 = "0";	
-
-								if (User[i].Nick.compare("Paladin") != 0)
+						
+								printf ("going to load all items\n");
+									
+								for (int i = 0; i < NUM_ITEMS; i++)
 								{
-									//tell newbie about everyone
-									Message1 += JOIN;
-									Message1 += i;
-									p=(char*)&User[i].x;
-									b1=p[0]; b2=p[1]; b3=p[2]; b4=p[3];
-									Message1 += b1;
-									Message1 += b2;
-									Message1 += b3;
-									Message1 += b4;
-									p=(char*)&User[i].y;
-									b1=p[0]; b2=p[1]; b3=p[2]; b4=p[3];
-									Message1 += b1;
-									Message1 += b2;
-									Message1 += b3;
-									Message1 += b4;
-									p=(char*)&User[i].x_speed;
-									b1=p[0]; b2=p[1]; b3=p[2]; b4=p[3];
-									Message1 += b1;
-									Message1 += b2;
-									Message1 += b3;
-									Message1 += b4;
-									p=(char*)&User[i].y_speed;
-									b1=p[0]; b2=p[1]; b3=p[2]; b4=p[3];
-									Message1 += b1;
-									Message1 += b2;
-									Message1 += b3;
-									Message1 += b4;
-									Message1 += User[i].facing_right ? 1 : 0;
-									Message1 += User[i].current_map;
-									Message1 += User[i].Nick;
-									Message1 += "|";
-									Message1 += User[i].Clan; 
+									//if they own this item, tell them how many they own.
+									unsigned int amt = User[CurrSock].inventory[i];
+									//prevents them from holding more than 24 items
+									if (amt > 0)
+									{ 
+										//put in players inventory
+										Packet = "0";
+										Packet += POCKET_ITEM;
+										Packet += i;
+										char *p;
+										char b1, b2, b3, b4;
+										
+										//break up the int as 4 bytes
+										p=(char*)&amt;
+										b1=p[0]; b2=p[1]; b3=p[2]; b4=p[3];
+										Packet += b1;
+										Packet += b2;
+										Packet += b3;
+										Packet += b4;
+										
+										Packet[0] = Packet.length();
+										User[CurrSock].SendPacket(Packet);
+									}
+									amt = User[CurrSock].bank[i];
+									//printf("this player owns [%i] of item %i\n", amt, i);
+									if (amt != 0)
+									{
+										//printf("the user has %i of Item[%i]", amt, i );
+										//prevents them from holding more than 24 items
+										User[CurrSock].bank_index++;
+										
+										//put in players inventory
+										Packet = "0";
+										Packet += BANK_ITEM;
+										Packet += i;
+										char *p;
+										char b1, b2, b3, b4;
+										
+										//break up the int as 4 bytes
+										p=(char*)&amt;
+										b1=p[0]; b2=p[1]; b3=p[2]; b4=p[3];
+										Packet += b1;
+										Packet += b2;
+										Packet += b3;
+										Packet += b4;
+										
+										Packet[0] = Packet.length();
+										User[CurrSock].SendPacket(Packet);
+									}
+									
+								//end ItemObj
+								}//end loop 256S for items in inventory and map
 
-									Message1[0] = Message1.length();
-									User[CurrSock].SendPacket(Message1);
-
-									printf("JOIN + [%s]\n", User[i].Nick.c_str());
-									printf("JOIN: %s\n", Message1.substr(17).c_str());
-
-									//equipment
-									Message1 = "0";
-									Message1 += EQUIP;
-									Message1 += i;
-									Message1 += (char)0;
-									Message1 += Item[User[i].equip[0]].equipID;
-									Message1 += User[i].equip[0];
-									Message1[0] = Message1.length();
-									User[CurrSock].SendPacket(Message1);
-
-									Message1 = "0";
-									Message1 += EQUIP;
-									Message1 += i;
-									Message1 += (char)1;
-									Message1 += Item[User[i].equip[1]].equipID;
-									Message1 += User[i].equip[1];
-									Message1[0] = Message1.length();
-									User[CurrSock].SendPacket(Message1);
+								printf("loading all ItemObjs..\n");
+								for (int i = 0; i < 256; i++) 
+								{
+									printf("map[%i].ItemObj[%i].status\n", current_map, i);
+									//go through all the ItemObjects since we're already looping
+									if (map[current_map].ItemObj[i].status)
+									{
+										printf("itemObj %i is a go!\n", i);
+										std::string Packet;
+										char *p;
+										char b1,b2,b3,b4;
+										Packet = "0";
+										Packet += SPAWN_ITEM;
+										Packet += i;
+										Packet += current_map;
+										Packet += map[current_map].ItemObj[i].itemID;
+										
+										float numx = map[current_map].ItemObj[i].x;
+										p=(char*)&numx;
+										b1=p[0]; b2=p[1]; b3=p[2]; b4=p[3];
+										Packet += b1;
+										Packet += b2;
+										Packet += b3;
+										Packet += b4;
+										
+										float numy = map[current_map].ItemObj[i].y;
+										p=(char*)&numy;
+										b1=p[0]; b2=p[1]; b3=p[2]; b4=p[3];
+										Packet += b1;
+										Packet += b2;
+										Packet += b3;
+										Packet += b4;
+										
+										float numxs = map[current_map].ItemObj[i].x_speed;
+										p=(char*)&numxs;
+										b1=p[0]; b2=p[1]; b3=p[2]; b4=p[3];
+										Packet += b1;
+										Packet += b2;
+										Packet += b3;
+										Packet += b4;
+										// printf("added xs %.2f\n", numxs);
+										
+										float numys = map[current_map].ItemObj[i].y_speed;
+										p=(char*)&numys;
+										b1=p[0]; b2=p[1]; b3=p[2]; b4=p[3];
+										Packet += b1;
+										Packet += b2;
+										Packet += b3;
+										Packet += b4; 
+									// printf("added ys %.2f\n", numys);
+										
+										Packet[0] = Packet.length();
+										
+										User[CurrSock].SendPacket(Packet);
+									}
 								}
 
-								//tell everyone about newbie
-								if (i != CurrSock && User[CurrSock].Nick.compare("Paladin") != 0)
+								printf("loading all targets..\n");
+								for (int i = 0; i < map[current_map].num_targets; i++)
+								{	
+									printf("%i of %i targets on this map loading...\n", i, map[current_map].num_targets);
+									if (map[current_map].Target[i].active){
+										printf("target[%i] is active, so trying to spawn...\n", i);
+										spawnTarget(i, current_map);
+									} else {
+										printf("target[%i] is not active, so not spawning...\n", i);
+									}
+								}
+
+
+								//npcs
+								for (int i = 0; i < map[current_map].num_npcs; i++)
 								{
-									Message1 = "0";
-									Message1 += JOIN;
-									Message1 += CurrSock;
-									p=(char*)&User[CurrSock].x;
-									b1=p[0]; b2=p[1]; b3=p[2]; b4=p[3];
-									Message1 += b1;
-									Message1 += b2;
-									Message1 += b3;
-									Message1 += b4;
-									p=(char*)&User[CurrSock].y;
-									b1=p[0]; b2=p[1]; b3=p[2]; b4=p[3];
-									Message1 += b1;
-									Message1 += b2;
-									Message1 += b3;
-									Message1 += b4;
-									p=(char*)&User[CurrSock].x_speed;
-									b1=p[0]; b2=p[1]; b3=p[2]; b4=p[3];
-									Message1 += b1;
-									Message1 += b2;
-									Message1 += b3;
-									Message1 += b4;
-									p=(char*)&User[CurrSock].y_speed;
-									b1=p[0]; b2=p[1]; b3=p[2]; b4=p[3];
-									Message1 += b1;
-									Message1 += b2;
-									Message1 += b3;
-									Message1 += b4;
-									Message1 += User[CurrSock].facing_right ? 1 : 0;
-									Message1 += User[CurrSock].current_map;
-									Message1 += User[CurrSock].Nick;
-									Message1 += "|";
-									Message1 += User[CurrSock].Clan;
-									Message1[0] = Message1.length();
+								char *p;
 
-									// Send data
-									User[i].SendPacket(Message1);
+								std::string Packet = "0";
 
-									//equipment
-									Message1 = "0";
-									Message1 += EQUIP;
-									Message1 += CurrSock;
-									Message1 += (char)0;
-									Message1 += Item[User[CurrSock].equip[0]].equipID;
-									Message1 += User[CurrSock].equip[0];
-									Message1[0] = Message1.length();
-									User[i].SendPacket(Message1);
-									Message1 = "0";
-									Message1 += EQUIP;
-									Message1 += CurrSock;
-									Message1 += (char)1;
-									Message1 += Item[User[CurrSock].equip[1]].equipID;
-									Message1 += User[CurrSock].equip[1];
-									Message1[0] = Message1.length();
-									User[i].SendPacket(Message1);
-								} //if user != curr
-							}//ident	
-						}//for users
-												
-						//done loading!!!
-						Packet = "0";
-						Packet += LOADED;
-						Packet[0] = Packet.length();
-						User[CurrSock].SendPacket(Packet);
-						
-						printf("Sent done loading to %s!\n", User[CurrSock].Nick.c_str());		   
-										
-						//mark this client to save when they disconnect..since Send/Recv change Ident!!
-						User[CurrSock].Save = true;
-						
-						network->saveAllProfiles(db);									
-					}
-					else 
-					{//couldn't load, KILL KILL
-					   printf("couldn't load data. KILL!\n");
-					   
-					   User[CurrSock].Save = false;
-					   User[CurrSock].Sock->Close();  
-					}
-				}//end login success
-				else 
-				{
-					//register or login failed
-					printf("register or login failed\n");
-					  
-					// Send data
-					User[CurrSock].SendPacket(Message);
-				}		
-			}//end "login"
-			else if( code == REGISTER )
-			{	           
-			    // Declare message string
-			    std::string Message = "";
-				std::string Username = "";
-				std::string Password = "";
+								if (map[current_map].NPC[i]->x_speed == 0){
+								Packet += NPC_MOVE_STOP;
+								printf("NPC_MOVE_STOP A\n");
+								}
+								if (map[current_map].NPC[i]->x_speed < 0)
+								Packet += NPC_MOVE_LEFT;
+								if (map[current_map].NPC[i]->x_speed > 0)
+								Packet += NPC_MOVE_RIGHT;
 
-			    //fill message with username and password
-			    Message += User[CurrSock].Sock->Data.substr(2,pack_len-2);
-							
-				//strip the appropriate data
-				Username += Message.substr(0,Message.find_first_of(" "));
-				Password += Message.substr(Message.find_first_of(" ")+1, pack_len-Message.find_first_of(" ")+1);
+								Packet += i;
+								Packet += current_map;
 
-				//check for account
-				int result = create_profile(Username, Password, User[CurrSock].Sock->IP);
-
-				if (result == 1)
-				{
-					Message = "0";
-					Message += REGISTER_FAIL_DOUBLE;
-					Message[0] = Message.length();
-					printf("%s tried to double-register!\n", Username.c_str());        
-				}
-				else if (result == 0)
-				{
-				   Message = "0";
-				   Message += REGISTER_SUCCESS;
-				   Message[0] = Message.length();
-				   printf("%s has been registered!\n", Username.c_str());   
-				}
-				else if (result == 2 || result == 3)
-				{
-					Message = "0";
-					Message += REGISTER_FAIL_DOUBLE;
-					Message[0] = Message.length();
-					printf("REGISTER: result is 2 or 3, closing...\n");
-					User[CurrSock].Sock->Close();
-				}
-
-
-				//register or login failed
-				printf("register message\n");
-				for (int m = 0; m < Message.length(); m++)
-					printf("[%i]", Message[m]);
-							  
-				// Send data
-				User[CurrSock].SendPacket(Message);
-
-
-			}//end "register"        
-			else if (code == ATTACK)
-			{ 
-				float numx, numy;
-				((char*)&numx)[0] = User[CurrSock].Sock->Data[2];
-				((char*)&numx)[1] = User[CurrSock].Sock->Data[3];
-				((char*)&numx)[2] = User[CurrSock].Sock->Data[4];
-				((char*)&numx)[3] = User[CurrSock].Sock->Data[5];
-				((char*)&numy)[0] = User[CurrSock].Sock->Data[6];
-				((char*)&numy)[1] = User[CurrSock].Sock->Data[7];
-				((char*)&numy)[2] = User[CurrSock].Sock->Data[8];
-				((char*)&numy)[3] = User[CurrSock].Sock->Data[9];
-			    Attack(CurrSock, numx, numy);
-			}                  //end enemy loop
-			else if (code == MOVE_RIGHT)
-			{    
-                             
-  				 float numx, numy;
-					 ((char*)&numx)[0] = User[CurrSock].Sock->Data[2];
-					 ((char*)&numx)[1] = User[CurrSock].Sock->Data[3];
-					 ((char*)&numx)[2] = User[CurrSock].Sock->Data[4];
-					 ((char*)&numx)[3] = User[CurrSock].Sock->Data[5];
-					 ((char*)&numy)[0] = User[CurrSock].Sock->Data[6];
-					 ((char*)&numy)[1] = User[CurrSock].Sock->Data[7];
-					 ((char*)&numy)[2] = User[CurrSock].Sock->Data[8];
-					 ((char*)&numy)[3] = User[CurrSock].Sock->Data[9];
-				  Right(CurrSock, numx, numy);
-		  
-								   
-			}
-			else if (code == MOVE_LEFT)                        
-			{
-				  float numx, numy;
-					 ((char*)&numx)[0] = User[CurrSock].Sock->Data[2];
-					 ((char*)&numx)[1] = User[CurrSock].Sock->Data[3];
-					 ((char*)&numx)[2] = User[CurrSock].Sock->Data[4];
-					 ((char*)&numx)[3] = User[CurrSock].Sock->Data[5];
-					 ((char*)&numy)[0] = User[CurrSock].Sock->Data[6];
-					 ((char*)&numy)[1] = User[CurrSock].Sock->Data[7];
-					 ((char*)&numy)[2] = User[CurrSock].Sock->Data[8];
-					 ((char*)&numy)[3] = User[CurrSock].Sock->Data[9];
-				  Left(CurrSock, numx, numy);
-
-				
-				 
-				 
-			}
-			else if (code == MOVE_STOP)
-			{
-					 float numx, numy;
-					 ((char*)&numx)[0] = User[CurrSock].Sock->Data[2];
-					 ((char*)&numx)[1] = User[CurrSock].Sock->Data[3];
-					 ((char*)&numx)[2] = User[CurrSock].Sock->Data[4];
-					 ((char*)&numx)[3] = User[CurrSock].Sock->Data[5];
-					 ((char*)&numy)[0] = User[CurrSock].Sock->Data[6];
-					 ((char*)&numy)[1] = User[CurrSock].Sock->Data[7];
-					 ((char*)&numy)[2] = User[CurrSock].Sock->Data[8];
-					 ((char*)&numy)[3] = User[CurrSock].Sock->Data[9];
-					Stop(CurrSock, numx, numy);
-
-
-			}//end MOVE_STOP
-			else if (code == STAT_STR)
-			{
-				 if (User[CurrSock].stat_points > 0)
-				 {
-					User[CurrSock].stat_points--;
-					User[CurrSock].strength++;
-					
-					std::string Packet = "0";
-					Packet += STAT_STR;
-					Packet += User[CurrSock].strength;
-					Packet[0] = Packet.length();
-					User[CurrSock].SendPacket(Packet);
-					
-					Packet = "0";
-					Packet += STAT_POINTS;
-					Packet += User[CurrSock].stat_points;
-					Packet[0] = Packet.length();
-					User[CurrSock].SendPacket(Packet);
-				 }
-			}
-			else if (code == STAT_HP)
-			{
-				 if (User[CurrSock].stat_points > 0)
-				 {
-					User[CurrSock].stat_points--;
-					User[CurrSock].regen+=1;
-					
-					
-					
-					std::string Packet = "0";
-					Packet += STAT_REGEN;
-					Packet += User[CurrSock].regen;
-					Packet[0] = Packet.length();
-					User[CurrSock].SendPacket(Packet);
-					
-					Packet = "0";
-					Packet += STAT_POINTS;
-					Packet += User[CurrSock].stat_points;
-					Packet[0] = Packet.length();
-					User[CurrSock].SendPacket(Packet);
-				 }
-			}
-			else if (code == STAT_DEF)
-			{
-				 if (User[CurrSock].stat_points > 0)
-				 {
-					User[CurrSock].stat_points--;
-					User[CurrSock].defence++;
-					
-					std::string Packet = "0";
-					Packet += STAT_DEF;
-					Packet += User[CurrSock].defence;
-					Packet[0] = Packet.length();
-					User[CurrSock].SendPacket(Packet);
-					
-					Packet = "0";
-					Packet += STAT_POINTS;
-					Packet += User[CurrSock].stat_points;
-					Packet[0] = Packet.length();
-					User[CurrSock].SendPacket(Packet);
-				 }
-			}
-			else if (code == MOVE_JUMP)
-			{
-				float numx, numy;
-				((char*)&numx)[0] = User[CurrSock].Sock->Data[2];
-				((char*)&numx)[1] = User[CurrSock].Sock->Data[3];
-				((char*)&numx)[2] = User[CurrSock].Sock->Data[4];
-				((char*)&numx)[3] = User[CurrSock].Sock->Data[5];
-				((char*)&numy)[0] = User[CurrSock].Sock->Data[6];
-				((char*)&numy)[1] = User[CurrSock].Sock->Data[7];
-				((char*)&numy)[2] = User[CurrSock].Sock->Data[8];
-				((char*)&numy)[3] = User[CurrSock].Sock->Data[9];
-				Jump(CurrSock, numx, numy);
-			}//end jump
-			else if (code == EQUIP)
-			{
-				int slot = User[CurrSock].Sock->Data[2];
-				int item = User[CurrSock].equip[slot];
-
-				if (item > 0)
-				{	                 
-					//un-wear it
-					User[CurrSock].equip[slot] = 0; 
-					std::string packet = "0";
-					packet += EQUIP;
-					packet += CurrSock;
-					packet += (char)slot; 
-					packet += (char)0;
-					packet += (char)0;
-					packet[0] = packet.length();
-						   
-					//tell everyone
-					for (int uc = 0; uc < MAX_CLIENTS; uc++) 
-					{
-					    if (User[uc].Ident)
-					       User[uc].SendPacket(packet);
-					}
-                                          
-					//put it in the player's inventory
-					User[CurrSock].inventory[item]++;
-				
-					//update the player's inventory
-					packet = "0";
-					packet += POCKET_ITEM;
-					packet += item;
-
-					int amt = User[CurrSock].inventory[item];
-					//break up the int as 4 bytes
-					char * p=(char*)&amt;
-					char b1=p[0], b2=p[1], b3=p[2], b4=p[3];
-					packet += b1;
-					packet += b2;
-					packet += b3;
-					packet += b4;
-
-				    packet[0] = packet.length();
-					User[CurrSock].SendPacket(packet);
-				}
-			}//end EQUIP
-			else if (code == USE_ITEM)
-			{
-				printf("USE_ITEM\n");
-				int item = User[CurrSock].Sock->Data[2];
-				int type = Item[item].type;
-				printf("type is %i\n", type);
-				int current_map = User[CurrSock].current_map;
-				
-				if (User[CurrSock].inventory[item] > 0)
-				{      
-					printf("has item\n");
-					
-					unsigned int amt = 0;
-					std::string Packet = "0";
-					std::string Message = "0";
-					std::string hpPacket = "0";
-					char *p;
-					char b1, b2, b3, b4;
-					float numy, numx, numys, numxs,
-						  rand_xs, rand_ys,
-						  rand_x, rand_y;
-					int rand_i, rand_item;
-							 
-							 
-					switch (type)
-					{
-						case 0:break; //cosmetic
-						
-						case 1: //food 
-							
-								if (User[CurrSock].hp ==  User[CurrSock].max_hp)
-									break;
-									
-							   User[CurrSock].hp += Item[item].hp;
-							   if (User[CurrSock].hp > User[CurrSock].max_hp)
-								  User[CurrSock].hp = User[CurrSock].max_hp;
-							   //tell this client
-							   Packet += STAT_HP;
-							   Packet += User[CurrSock].hp;
-							   Packet[0] = Packet.length();
-							   User[CurrSock].SendPacket(Packet);
-							   
-							   //remove item
-							   User[CurrSock].inventory[item]--;
-							   
-							   //tell them how many items they have
-							   amt = User[CurrSock].inventory[item];
-								if (amt == 0)
-									User[CurrSock].inventory_index--;
-								
-			//party hp notification
-							 hpPacket = "0";
-							 hpPacket += BUDDY_HP;
-							 hpPacket += CurrSock;
-							 hpPacket += (int)((User[CurrSock].hp / (float)User[CurrSock].max_hp) * 80);
-							 hpPacket[0] = hpPacket.length();
-
-							 for (int pl = 0; pl < MAX_CLIENTS; pl++)
-							 {
-								if (pl != CurrSock && User[pl].Ident && User[pl].partyStatus == PARTY && User[pl].party == User[CurrSock].party)
-										User[pl].SendPacket(hpPacket);
-							}
-
-								//put in players inventory
-								Packet = "0";
-								Packet += POCKET_ITEM;
-								Packet += item;
-								
 								//break up the int as 4 bytes
-								p=(char*)&amt;
-								b1=p[0]; b2=p[1]; b3=p[2]; b4=p[3];
-								Packet += b1;
-								Packet += b2;
-								Packet += b3;
-								Packet += b4;
-								
+								p=(char*)&map[current_map].NPC[i]->x;
+								Packet += p[0];
+								Packet += p[1];
+								Packet += p[2];
+								Packet += p[3];
+								p=(char*)&map[current_map].NPC[i]->y;
+								Packet += p[0];
+								Packet += p[1];
+								Packet += p[2];
+								Packet += p[3];
+
+								Packet[0] = Packet.length();
+								User[CurrSock].SendPacket(Packet);
+
+								}
+
+
+								// load all enemies
+								for (int i = 0; i < map[current_map].num_enemies; i++)
+								{
+									char *p;
+
+									std::string Packet = "0";
+
+									if (map[current_map].Enemy[i]->x_speed == 0)
+									{
+										Packet += ENEMY_MOVE_STOP;
+										printf("ENEMY_MOVE_STOP A\n");
+									}
+									if (map[current_map].Enemy[i]->x_speed < 0)
+										Packet += ENEMY_MOVE_LEFT;
+									if (map[current_map].Enemy[i]->x_speed > 0)
+										Packet += ENEMY_MOVE_RIGHT;
+
+									Packet += i;
+									Packet += current_map;
+
+									//break up the int as 4 bytes
+									p=(char*)&map[current_map].Enemy[i]->x;
+									Packet += p[0];
+									Packet += p[1];
+									Packet += p[2];
+									Packet += p[3];
+									p=(char*)&map[current_map].Enemy[i]->y;
+									Packet += p[0];
+									Packet += p[1];
+									Packet += p[2];
+									Packet += p[3];
+
+									Packet[0] = Packet.length();
+									User[CurrSock].SendPacket(Packet);
+
+									//enemy health bars
+									int hp = (unsigned char)((float)map[current_map].Enemy[i]->hp / map[current_map].Enemy[i]->hp_max*hpBar);
+
+									//packet
+									std::string hpPacket = "0";
+									hpPacket += ENEMY_HP;
+									hpPacket += i;
+									hpPacket += current_map;
+									hpPacket += hp;
+									hpPacket[0] = hpPacket.length();
+									User[CurrSock].SendPacket(hpPacket);
+								}
+
+								// inform all players
+								for (int i = 0; i < MAX_CLIENTS; i++)
+								{
+									//tell everyone new has joined
+									if (User[i].Ident || i == CurrSock)
+									{
+										std::string Message1 = "0";	
+
+										if (User[i].Nick.compare("Paladin") != 0)
+										{
+											//tell newbie about everyone
+											Message1 += JOIN;
+											Message1 += i;
+											p=(char*)&User[i].x;
+											b1=p[0]; b2=p[1]; b3=p[2]; b4=p[3];
+											Message1 += b1;
+											Message1 += b2;
+											Message1 += b3;
+											Message1 += b4;
+											p=(char*)&User[i].y;
+											b1=p[0]; b2=p[1]; b3=p[2]; b4=p[3];
+											Message1 += b1;
+											Message1 += b2;
+											Message1 += b3;
+											Message1 += b4;
+											p=(char*)&User[i].x_speed;
+											b1=p[0]; b2=p[1]; b3=p[2]; b4=p[3];
+											Message1 += b1;
+											Message1 += b2;
+											Message1 += b3;
+											Message1 += b4;
+											p=(char*)&User[i].y_speed;
+											b1=p[0]; b2=p[1]; b3=p[2]; b4=p[3];
+											Message1 += b1;
+											Message1 += b2;
+											Message1 += b3;
+											Message1 += b4;
+											Message1 += User[i].facing_right ? 1 : 0;
+											Message1 += User[i].current_map;
+											Message1 += User[i].Nick;
+											Message1 += "|";
+											Message1 += User[i].Clan; 
+
+											Message1[0] = Message1.length();
+											User[CurrSock].SendPacket(Message1);
+
+											printf("JOIN + [%s]\n", User[i].Nick.c_str());
+											printf("JOIN: %s\n", Message1.substr(17).c_str());
+
+											//equipment
+											Message1 = "0";
+											Message1 += EQUIP;
+											Message1 += i;
+											Message1 += (char)0;
+											Message1 += Item[User[i].equip[0]].equipID;
+											Message1 += User[i].equip[0];
+											Message1[0] = Message1.length();
+											User[CurrSock].SendPacket(Message1);
+
+											Message1 = "0";
+											Message1 += EQUIP;
+											Message1 += i;
+											Message1 += (char)1;
+											Message1 += Item[User[i].equip[1]].equipID;
+											Message1 += User[i].equip[1];
+											Message1[0] = Message1.length();
+											User[CurrSock].SendPacket(Message1);
+										}
+
+										//tell everyone about newbie
+										if (i != CurrSock && User[CurrSock].Nick.compare("Paladin") != 0)
+										{
+											Message1 = "0";
+											Message1 += JOIN;
+											Message1 += CurrSock;
+											p=(char*)&User[CurrSock].x;
+											b1=p[0]; b2=p[1]; b3=p[2]; b4=p[3];
+											Message1 += b1;
+											Message1 += b2;
+											Message1 += b3;
+											Message1 += b4;
+											p=(char*)&User[CurrSock].y;
+											b1=p[0]; b2=p[1]; b3=p[2]; b4=p[3];
+											Message1 += b1;
+											Message1 += b2;
+											Message1 += b3;
+											Message1 += b4;
+											p=(char*)&User[CurrSock].x_speed;
+											b1=p[0]; b2=p[1]; b3=p[2]; b4=p[3];
+											Message1 += b1;
+											Message1 += b2;
+											Message1 += b3;
+											Message1 += b4;
+											p=(char*)&User[CurrSock].y_speed;
+											b1=p[0]; b2=p[1]; b3=p[2]; b4=p[3];
+											Message1 += b1;
+											Message1 += b2;
+											Message1 += b3;
+											Message1 += b4;
+											Message1 += User[CurrSock].facing_right ? 1 : 0;
+											Message1 += User[CurrSock].current_map;
+											Message1 += User[CurrSock].Nick;
+											Message1 += "|";
+											Message1 += User[CurrSock].Clan;
+											Message1[0] = Message1.length();
+
+											// Send data
+											User[i].SendPacket(Message1);
+
+											//equipment
+											Message1 = "0";
+											Message1 += EQUIP;
+											Message1 += CurrSock;
+											Message1 += (char)0;
+											Message1 += Item[User[CurrSock].equip[0]].equipID;
+											Message1 += User[CurrSock].equip[0];
+											Message1[0] = Message1.length();
+											User[i].SendPacket(Message1);
+											Message1 = "0";
+											Message1 += EQUIP;
+											Message1 += CurrSock;
+											Message1 += (char)1;
+											Message1 += Item[User[CurrSock].equip[1]].equipID;
+											Message1 += User[CurrSock].equip[1];
+											Message1[0] = Message1.length();
+											User[i].SendPacket(Message1);
+										} //if user != curr
+									}//ident	
+								}//for users
+														
+								//done loading!!!
+								Packet = "0";
+								Packet += LOADED;
 								Packet[0] = Packet.length();
 								User[CurrSock].SendPacket(Packet);
 								
-							   
-						   
-						break;
-						
-						case 2: //weapon
+								printf("Sent done loading to %s!\n", User[CurrSock].Nick.c_str());		   
+												
+								//mark this client to save when they disconnect..since Send/Recv change Ident!!
+								User[CurrSock].Save = true;
+								
+								network->saveAllProfiles();									
+							}
+							else 
+							{//couldn't load, KILL KILL
+							printf("couldn't load data. KILL!\n");
 							
-							Message += EQUIP;
-							Message += CurrSock;
-							Message += (char)0; // slot
+							User[CurrSock].Save = false;
+							User[CurrSock].Sock->Close();  
+							}
+						}//end login success
+						else 
+						{
+							//register or login failed
+							printf("register or login failed\n");
+							
+							// Send data
+							User[CurrSock].SendPacket(Message);
+						}		
+					}//end "login"
+					else if( code == REGISTER )
+					{	           
+						// Declare message string
+						std::string Message = "";
+						std::string Username = "";
+						std::string Password = "";
+
+						//fill message with username and password
+						Message += User[CurrSock].Sock->Data.substr(2,pack_len-2);
+									
+						//strip the appropriate data
+						Username += Message.substr(0,Message.find_first_of(" "));
+						Password += Message.substr(Message.find_first_of(" ")+1, pack_len-Message.find_first_of(" ")+1);
+
+						//check for account
+						int result = create_profile(Username, Password, User[CurrSock].Sock->IP);
+
+						if (result == 1)
+						{
+							Message = "0";
+							Message += REGISTER_FAIL_DOUBLE;
+							Message[0] = Message.length();
+							printf("%s tried to double-register!\n", Username.c_str());        
+						}
+						else if (result == 0)
+						{
+						Message = "0";
+						Message += REGISTER_SUCCESS;
+						Message[0] = Message.length();
+						printf("%s has been registered!\n", Username.c_str());   
+						}
+						else if (result == 2 || result == 3)
+						{
+							Message = "0";
+							Message += REGISTER_FAIL_DOUBLE;
+							Message[0] = Message.length();
+							printf("REGISTER: result is 2 or 3, closing...\n");
+							User[CurrSock].Sock->Close();
+						}
+
+
+						//register or login failed
+						printf("register message\n");
+						for (int m = 0; m < Message.length(); m++)
+							printf("[%i]", Message[m]);
+									
+						// Send data
+						User[CurrSock].SendPacket(Message);
+
+
+					}//end "register"        
+					else if (code == ATTACK)
+					{ 
+						float numx, numy;
+						((char*)&numx)[0] = User[CurrSock].Sock->Data[2];
+						((char*)&numx)[1] = User[CurrSock].Sock->Data[3];
+						((char*)&numx)[2] = User[CurrSock].Sock->Data[4];
+						((char*)&numx)[3] = User[CurrSock].Sock->Data[5];
+						((char*)&numy)[0] = User[CurrSock].Sock->Data[6];
+						((char*)&numy)[1] = User[CurrSock].Sock->Data[7];
+						((char*)&numy)[2] = User[CurrSock].Sock->Data[8];
+						((char*)&numy)[3] = User[CurrSock].Sock->Data[9];
+						Attack(CurrSock, numx, numy);
+					}                  //end enemy loop
+					else if (code == MOVE_RIGHT)
+					{    
+									
+						float numx, numy;
+							((char*)&numx)[0] = User[CurrSock].Sock->Data[2];
+							((char*)&numx)[1] = User[CurrSock].Sock->Data[3];
+							((char*)&numx)[2] = User[CurrSock].Sock->Data[4];
+							((char*)&numx)[3] = User[CurrSock].Sock->Data[5];
+							((char*)&numy)[0] = User[CurrSock].Sock->Data[6];
+							((char*)&numy)[1] = User[CurrSock].Sock->Data[7];
+							((char*)&numy)[2] = User[CurrSock].Sock->Data[8];
+							((char*)&numy)[3] = User[CurrSock].Sock->Data[9];
+						Right(CurrSock, numx, numy);
+				
+										
+					}
+					else if (code == MOVE_LEFT)                        
+					{
+						float numx, numy;
+							((char*)&numx)[0] = User[CurrSock].Sock->Data[2];
+							((char*)&numx)[1] = User[CurrSock].Sock->Data[3];
+							((char*)&numx)[2] = User[CurrSock].Sock->Data[4];
+							((char*)&numx)[3] = User[CurrSock].Sock->Data[5];
+							((char*)&numy)[0] = User[CurrSock].Sock->Data[6];
+							((char*)&numy)[1] = User[CurrSock].Sock->Data[7];
+							((char*)&numy)[2] = User[CurrSock].Sock->Data[8];
+							((char*)&numy)[3] = User[CurrSock].Sock->Data[9];
+						Left(CurrSock, numx, numy);
+
+						
+						
+						
+					}
+					else if (code == MOVE_STOP)
+					{
+							float numx, numy;
+							((char*)&numx)[0] = User[CurrSock].Sock->Data[2];
+							((char*)&numx)[1] = User[CurrSock].Sock->Data[3];
+							((char*)&numx)[2] = User[CurrSock].Sock->Data[4];
+							((char*)&numx)[3] = User[CurrSock].Sock->Data[5];
+							((char*)&numy)[0] = User[CurrSock].Sock->Data[6];
+							((char*)&numy)[1] = User[CurrSock].Sock->Data[7];
+							((char*)&numy)[2] = User[CurrSock].Sock->Data[8];
+							((char*)&numy)[3] = User[CurrSock].Sock->Data[9];
+							Stop(CurrSock, numx, numy);
+
+
+					}//end MOVE_STOP
+					else if (code == STAT_STR)
+					{
+						if (User[CurrSock].stat_points > 0)
+						{
+							User[CurrSock].stat_points--;
+							User[CurrSock].strength++;
+							
+							std::string Packet = "0";
+							Packet += STAT_STR;
+							Packet += User[CurrSock].strength;
+							Packet[0] = Packet.length();
+							User[CurrSock].SendPacket(Packet);
+							
+							Packet = "0";
+							Packet += STAT_POINTS;
+							Packet += User[CurrSock].stat_points;
+							Packet[0] = Packet.length();
+							User[CurrSock].SendPacket(Packet);
+						}
+					}
+					else if (code == STAT_HP)
+					{
+						if (User[CurrSock].stat_points > 0)
+						{
+							User[CurrSock].stat_points--;
+							User[CurrSock].regen+=1;
+							
+							
+							
+							std::string Packet = "0";
+							Packet += STAT_REGEN;
+							Packet += User[CurrSock].regen;
+							Packet[0] = Packet.length();
+							User[CurrSock].SendPacket(Packet);
+							
+							Packet = "0";
+							Packet += STAT_POINTS;
+							Packet += User[CurrSock].stat_points;
+							Packet[0] = Packet.length();
+							User[CurrSock].SendPacket(Packet);
+						}
+					}
+					else if (code == STAT_DEF)
+					{
+						if (User[CurrSock].stat_points > 0)
+						{
+							User[CurrSock].stat_points--;
+							User[CurrSock].defence++;
+							
+							std::string Packet = "0";
+							Packet += STAT_DEF;
+							Packet += User[CurrSock].defence;
+							Packet[0] = Packet.length();
+							User[CurrSock].SendPacket(Packet);
+							
+							Packet = "0";
+							Packet += STAT_POINTS;
+							Packet += User[CurrSock].stat_points;
+							Packet[0] = Packet.length();
+							User[CurrSock].SendPacket(Packet);
+						}
+					}
+					else if (code == MOVE_JUMP)
+					{
+						float numx, numy;
+						((char*)&numx)[0] = User[CurrSock].Sock->Data[2];
+						((char*)&numx)[1] = User[CurrSock].Sock->Data[3];
+						((char*)&numx)[2] = User[CurrSock].Sock->Data[4];
+						((char*)&numx)[3] = User[CurrSock].Sock->Data[5];
+						((char*)&numy)[0] = User[CurrSock].Sock->Data[6];
+						((char*)&numy)[1] = User[CurrSock].Sock->Data[7];
+						((char*)&numy)[2] = User[CurrSock].Sock->Data[8];
+						((char*)&numy)[3] = User[CurrSock].Sock->Data[9];
+						Jump(CurrSock, numx, numy);
+					}//end jump
+					else if (code == EQUIP)
+					{
+						int slot = User[CurrSock].Sock->Data[2];
+						int item = User[CurrSock].equip[slot];
+
+						if (item > 0)
+						{	                 
+							//un-wear it
+							User[CurrSock].equip[slot] = 0; 
+							std::string packet = "0";
+							packet += EQUIP;
+							packet += CurrSock;
+							packet += (char)slot; 
+							packet += (char)0;
+							packet += (char)0;
+							packet[0] = packet.length();
+								
+							//tell everyone
+							for (int uc = 0; uc < MAX_CLIENTS; uc++) 
+							{
+								if (User[uc].Ident)
+								User[uc].SendPacket(packet);
+							}
+												
+							//put it in the player's inventory
+							User[CurrSock].inventory[item]++;
+						
+							//update the player's inventory
+							packet = "0";
+							packet += POCKET_ITEM;
+							packet += item;
+
+							int amt = User[CurrSock].inventory[item];
+							//break up the int as 4 bytes
+							char * p=(char*)&amt;
+							char b1=p[0], b2=p[1], b3=p[2], b4=p[3];
+							packet += b1;
+							packet += b2;
+							packet += b3;
+							packet += b4;
+
+							packet[0] = packet.length();
+							User[CurrSock].SendPacket(packet);
+						}
+					}//end EQUIP
+					else if (code == USE_ITEM)
+					{
+						printf("USE_ITEM\n");
+						int item = User[CurrSock].Sock->Data[2];
+						int type = Item[item].type;
+						printf("type is %i\n", type);
+						int current_map = User[CurrSock].current_map;
+						
+						if (User[CurrSock].inventory[item] > 0)
+						{      
+							printf("has item\n");
+							
+							unsigned int amt = 0;
+							std::string Packet = "0";
+							std::string Message = "0";
+							std::string hpPacket = "0";
+							char *p;
+							char b1, b2, b3, b4;
+							float numy, numx, numys, numxs,
+								rand_xs, rand_ys,
+								rand_x, rand_y;
+							int rand_i, rand_item;
+									
+									
+							switch (type)
+							{
+								case 0:break; //cosmetic
+								
+								case 1: //food 
+									
+										if (User[CurrSock].hp ==  User[CurrSock].max_hp)
+											break;
+											
+									User[CurrSock].hp += Item[item].hp;
+									if (User[CurrSock].hp > User[CurrSock].max_hp)
+										User[CurrSock].hp = User[CurrSock].max_hp;
+									//tell this client
+									Packet += STAT_HP;
+									Packet += User[CurrSock].hp;
+									Packet[0] = Packet.length();
+									User[CurrSock].SendPacket(Packet);
+									
+									//remove item
+									User[CurrSock].inventory[item]--;
+									
+									//tell them how many items they have
+									amt = User[CurrSock].inventory[item];
+										if (amt == 0)
+											User[CurrSock].inventory_index--;
+										
+					//party hp notification
+									hpPacket = "0";
+									hpPacket += BUDDY_HP;
+									hpPacket += CurrSock;
+									hpPacket += (int)((User[CurrSock].hp / (float)User[CurrSock].max_hp) * 80);
+									hpPacket[0] = hpPacket.length();
+
+									for (int pl = 0; pl < MAX_CLIENTS; pl++)
+									{
+										if (pl != CurrSock && User[pl].Ident && User[pl].partyStatus == PARTY && User[pl].party == User[CurrSock].party)
+												User[pl].SendPacket(hpPacket);
+									}
+
+										//put in players inventory
+										Packet = "0";
+										Packet += POCKET_ITEM;
+										Packet += item;
+										
+										//break up the int as 4 bytes
+										p=(char*)&amt;
+										b1=p[0]; b2=p[1]; b3=p[2]; b4=p[3];
+										Packet += b1;
+										Packet += b2;
+										Packet += b3;
+										Packet += b4;
+										
+										Packet[0] = Packet.length();
+										User[CurrSock].SendPacket(Packet);
+										
+									
+								
+								break;
+								
+								case 2: //weapon
+									
+									Message += EQUIP;
+									Message += CurrSock;
+									Message += (char)0; // slot
 							
 							//equip it
 							//if (User[CurrSock].equip[0] != item)
@@ -1952,60 +1927,6 @@ void *MainLoop(void *arg)
 																   }
 
 																}
-																/*else //unequip it!
-																{
-																   
-											   int otherItem = User[CurrSock].equip[0];
-											
-											   //un-wear it
-											   User[CurrSock].equip[0] = 0; 
-											   Message += (char)0; 
-											   Message += (char)0;
-											   //put it BACK INTO your inventory
-											   User[CurrSock].inventory[item] ++;
-											   {
-																		//put in players inventory
-																	std::string Packet = "0";
-																	Packet += POCKET_ITEM;
-																	Packet += item;
-
-																	int amt = User[CurrSock].inventory[item];
-																	//break up the int as 4 bytes
-																	p=(char*)&amt;
-																	b1=p[0]; b2=p[1]; b3=p[2]; b4=p[3];
-																	Packet += b1;
-																	Packet += b2;
-																	Packet += b3;
-																	Packet += b4;
-
-																	Packet[0] = Packet.length();
-																	User[CurrSock].SendPacket(Packet);
-
-																   
-											   }
-											   if (otherItem > 0){
-																		//put in players inventory
-																	std::string Packet = "0";
-																	Packet += POCKET_ITEM;
-																	Packet += otherItem;
-
-																	int amt = User[CurrSock].inventory[otherItem];
-																	//break up the int as 4 bytes
-																	p=(char*)&amt;
-																	b1=p[0]; b2=p[1]; b3=p[2]; b4=p[3];
-																	Packet += b1;
-																	Packet += b2;
-																	Packet += b3;
-																	Packet += b4;
-
-																	Packet[0] = Packet.length();
-																	User[CurrSock].SendPacket(Packet);
-
-																   }
-						  
-											 
-											}                          
-																*/
 																
 																Message[0] = Message.length();
 																
@@ -2077,60 +1998,6 @@ void *MainLoop(void *arg)
 																	User[CurrSock].SendPacket(Packet);
 
 																   }
-																/*else
-																{
-											   int otherItem = User[CurrSock].equip[1];
-											   //un-wear it
-																   User[CurrSock].equip[1] = 0; 
-																   Message += (char)0; 
-											   
-											   //put it BACK INTO your inventory
-											   User[CurrSock].inventory[item] ++;
-																
-												
-													   {
-																		//put in players inventory
-																	std::string Packet = "0";
-																	Packet += POCKET_ITEM;
-																	Packet += item;
-
-																	int amt = User[CurrSock].inventory[item];
-																	//break up the int as 4 bytes
-																	p=(char*)&amt;
-																	b1=p[0]; b2=p[1]; b3=p[2]; b4=p[3];
-																	Packet += b1;
-																	Packet += b2;
-																	Packet += b3;
-																	Packet += b4;
-
-																	Packet[0] = Packet.length();
-																	User[CurrSock].SendPacket(Packet);
-
-																   
-											  }
-												if (otherItem > 0){
-																		//put in players inventory
-																	std::string Packet = "0";
-																	Packet += POCKET_ITEM;
-																	Packet += otherItem;
-
-																	int amt = User[CurrSock].inventory[otherItem];
-																	//break up the int as 4 bytes
-																	p=(char*)&amt;
-																	b1=p[0]; b2=p[1]; b3=p[2]; b4=p[3];
-																	Packet += b1;
-																	Packet += b2;
-																	Packet += b3;
-																	Packet += b4;
-
-																	fPacket[0] = Packet.length();
-																	User[CurrSock].SendPacket(Packet);
-
-																   }
-
-											} */                         
-																
-																
 																
 																Message[0] = Message.length();
 																
@@ -2145,148 +2012,147 @@ void *MainLoop(void *arg)
 						
 						
 						
-///////////////////////////////////////////                                    
+                              
 						
 						case 4: // mystery box
-//// holiday event                                    
-if (HOLIDAY)
-{
-							////get rid of the box
-		int numUsed = 10;
+							// holiday event                                    
+							if (HOLIDAY)
+							{
+								////get rid of the box
+								int numUsed = 0;
 
-							if (User[CurrSock].inventory[item] >= 10){
-			User[CurrSock].inventory[item] -=10;
-		}else{
-			numUsed = User[CurrSock].inventory[item];
-			User[CurrSock].inventory[item] = 0;
-		}	
-							   
-		//tell them how many items they have
-			amt = User[CurrSock].inventory[item];
-
-							if (amt == 0)
-								User[CurrSock].inventory_index--;
-								
-							//put in players inventory
-							Packet = "0";
-							Packet += POCKET_ITEM;
-							Packet += item;
-							
-							//break up the int as 4 bytes
-							p=(char*)&amt;
-							b1=p[0]; b2=p[1]; b3=p[2]; b4=p[3];
-							Packet += b1;
-							Packet += b2;
-							Packet += b3;
-							Packet += b4;
-							
-							Packet[0] = Packet.length();
-							User[CurrSock].SendPacket(Packet);
-								
-							 
-	for (int it = 0; it < numUsed;it++)
-	{
-							 //spawn a hat or nothing
-							 rand_xs = 0;
-							 rand_ys = -5;
-							 
-							 // 1:100 chance of item
-							 rand_item = rand() % 100;
-							 if (rand_item != 1)
-								 rand_item = ITEM_GOLD;
-							 else
-								 rand_item = HOLIDAY_BOX_DROP;
-							 
-							 int rand_i;
-							 rand_x = User[CurrSock].x + 32;
-							 rand_y = User[CurrSock].y - 32;
-							 
-							 
-							 for (rand_i = 0; rand_i < 255; rand_i++){
-								 if (map[current_map].ItemObj[rand_i].status == false)
-									break;
-							 }
-							 
-							 if (rand_i == 255)
-							 {
-								if (map[current_map].currentItem == 255)
-								   map[current_map].currentItem = 0;
-								   
-								rand_i = map[current_map].currentItem;
-								
-								map[current_map].currentItem++;
-							 }
-							 
-							 
-							 
-							 map[current_map].ItemObj[rand_i] = SKO_ItemObject(rand_item, rand_x, rand_y, rand_xs, rand_ys, 1);
-							 
-							 
-							 {
-								int i = rand_i;
-								//dont let them get stuck
-								if(blocked(current_map, map[current_map].ItemObj[i].x + map[current_map].ItemObj[i].x_speed, map[current_map].ItemObj[i].y+map[current_map].ItemObj[i].y_speed + 0.15, map[current_map].ItemObj[i].x + Item[map[current_map].ItemObj[i].itemID].w, map[current_map].ItemObj[i].y+map[current_map].ItemObj[i].y_speed + Item[map[current_map].ItemObj[i].itemID].h, false))
+								if (User[CurrSock].inventory[item] >= 10)
 								{
-								  //move it down a bit
-								  rand_y = User[CurrSock].y + 1;
-								  map[current_map].ItemObj[i].y = rand_y;
-								}
-							 }
-							 
-							 char *p;
-							 char b1,b2,b3,b4;
-							 Packet = "0";
-							 Packet += SPAWN_ITEM;
-							 Packet += rand_i;
-							 Packet += current_map; 
-		 Packet += rand_item;
-							 //
+									numUsed = 10;
+									User[CurrSock].inventory[item] -= 10;
+								} 
+								else 
+								{
+									numUsed = User[CurrSock].inventory[item];
+									User[CurrSock].inventory[item] = 0;
+									User[CurrSock].inventory_index--;
+								}	
+							   
+								//tell them how many items they have
+								amt = User[CurrSock].inventory[item];
 								
-							 numx = rand_x;
-							 p=(char*)&numx;
-							 b1=p[0]; b2=p[1]; b3=p[2]; b4=p[3];
-							 Packet += b1;
-							 Packet += b2;
-							 Packet += b3;
-							 Packet += b4;
+								//put in players inventory
+								Packet = "0";
+								Packet += POCKET_ITEM;
+								Packet += item;
+								
+								//break up the int as 4 bytes
+								p=(char*)&amt;
+								b1=p[0]; b2=p[1]; b3=p[2]; b4=p[3];
+								Packet += b1;
+								Packet += b2;
+								Packet += b3;
+								Packet += b4;
+								
+								Packet[0] = Packet.length();
+								User[CurrSock].SendPacket(Packet);
+								
+								for (int it = 0; it < numUsed; it++)
+								{
+									//spawn a hat or nothing
+									rand_xs = 0;
+									rand_ys = -5;
+									
+									// 1:100 chance of item
+									rand_item = rand() % 100;
+									if (rand_item != 1)
+										rand_item = ITEM_GOLD;
+									else
+										rand_item = HOLIDAY_BOX_DROP;
+									
+									int rand_i;
+									rand_x = User[CurrSock].x + 32;
+									rand_y = User[CurrSock].y - 32;
+									
+									
+									for (rand_i = 0; rand_i < 256; rand_i++){
+										if (rand_i == 255 || map[current_map].ItemObj[rand_i].status == false)
+											break;
+									}
+									
+									//TODO change this limit to 2 bytes (32K)
+									if (rand_i == 255)
+									{
+										//If we traversed the whole item list already, start over.
+										if (map[current_map].currentItem == 255)
+											map[current_map].currentItem = 0;
+										
+										//use the currentItem to traverse the list whenever it overflows, so the "oldest" item gets deleted. 
+										rand_i = map[current_map].currentItem;
+										map[current_map].currentItem++;
+									}
+									
+									map[current_map].ItemObj[rand_i] = SKO_ItemObject(rand_item, rand_x, rand_y, rand_xs, rand_ys, 1);
+									
+									
+									{
+										int i = rand_i;
+										//dont let them get stuck
+										if(blocked(current_map, map[current_map].ItemObj[i].x + map[current_map].ItemObj[i].x_speed, map[current_map].ItemObj[i].y+map[current_map].ItemObj[i].y_speed + 0.15, map[current_map].ItemObj[i].x + Item[map[current_map].ItemObj[i].itemID].w, map[current_map].ItemObj[i].y+map[current_map].ItemObj[i].y_speed + Item[map[current_map].ItemObj[i].itemID].h, false))
+										{
+											//move it down a bit
+											rand_y = User[CurrSock].y + 1;
+											map[current_map].ItemObj[i].y = rand_y;
+										}
+									}
 							 
-							 numy = rand_y;
-							 p=(char*)&numy;
-							 b1=p[0]; b2=p[1]; b3=p[2]; b4=p[3];
-							 Packet += b1;
-							 Packet += b2;
-							 Packet += b3;
-							 Packet += b4;
-							 
-							 numxs = rand_xs;
-							 p=(char*)&numxs;
-							 b1=p[0]; b2=p[1]; b3=p[2]; b4=p[3];
-							 Packet += b1;
-							 Packet += b2;
-							 Packet += b3;
-							 Packet += b4;
-							 
-							 
-							 numys = rand_ys;
-							 p=(char*)&numys;
-							 b1=p[0]; b2=p[1]; b3=p[2]; b4=p[3];                                                                         
-							 Packet += b1;
-							 Packet += b2;
-							 Packet += b3;
-							 Packet += b4;
-							 
-							 Packet[0] = Packet.length();
-							 
-							 for (int iii = 0; iii < MAX_CLIENTS; iii++)
-							 {
-								 if (User[iii].Ident && User[iii].current_map == current_map)
-									User[iii].SendPacket(Packet);
-							 }
-	}
-}                                                 
+									char *p;
+									char b1,b2,b3,b4;
+									Packet = "0";
+									Packet += SPAWN_ITEM;
+									Packet += rand_i;
+									Packet += current_map; 
+									Packet += rand_item;
+									//
+										
+									numx = rand_x;
+									p=(char*)&numx;
+									b1=p[0]; b2=p[1]; b3=p[2]; b4=p[3];
+									Packet += b1;
+									Packet += b2;
+									Packet += b3;
+									Packet += b4;
+									
+									numy = rand_y;
+									p=(char*)&numy;
+									b1=p[0]; b2=p[1]; b3=p[2]; b4=p[3];
+									Packet += b1;
+									Packet += b2;
+									Packet += b3;
+									Packet += b4;
+									
+									numxs = rand_xs;
+									p=(char*)&numxs;
+									b1=p[0]; b2=p[1]; b3=p[2]; b4=p[3];
+									Packet += b1;
+									Packet += b2;
+									Packet += b3;
+									Packet += b4;
+									
+									
+									numys = rand_ys;
+									p=(char*)&numys;
+									b1=p[0]; b2=p[1]; b3=p[2]; b4=p[3];                                                                         
+									Packet += b1;
+									Packet += b2;
+									Packet += b3;
+									Packet += b4;
+									
+									Packet[0] = Packet.length();
+									
+									for (int iii = 0; iii < MAX_CLIENTS; iii++)
+									{
+										if (User[iii].Ident && User[iii].current_map == current_map)
+											User[iii].SendPacket(Packet);
+									}
+								}
+							}                                                 
 						break;
-							 
-						
 
 
 						case 5: // trophy / spell
@@ -2350,80 +2216,21 @@ if (HOLIDAY)
 									
 									Packet[0] = Packet.length();
 									User[CurrSock].SendPacket(Packet);
-							   }
-							/*else
-							{
-		   int otherItem = User[CurrSock].equip[1];
-		   //un-wear it
-							   User[CurrSock].equip[1] = 0; 
-							   Message += (char)0; 
-		   
-		   //put it BACK INTO your inventory
-		   User[CurrSock].inventory[item] ++;
-							
-			
-				   {
-									//put in players inventory
-								std::string Packet = "0";
-								Packet += POCKET_ITEM;
-								Packet += item;
-
-								int amt = User[CurrSock].inventory[item];
-								//break up the int as 4 bytes
-								p=(char*)&amt;
-								b1=p[0]; b2=p[1]; b3=p[2]; b4=p[3];
-								Packet += b1;
-								Packet += b2;
-								Packet += b3;
-								Packet += b4;
-
-								Packet[0] = Packet.length();
-								User[CurrSock].SendPacket(Packet);
-
-							   
-		  }
-			if (otherItem > 0){
-									//put in players inventory
-								std::string Packet = "0";
-								Packet += POCKET_ITEM;
-								Packet += otherItem;
-
-								int amt = User[CurrSock].inventory[otherItem];
-								//break up the int as 4 bytes
-								p=(char*)&amt;
-								b1=p[0]; b2=p[1]; b3=p[2]; b4=p[3];
-								Packet += b1;
-								Packet += b2;
-								Packet += b3;
-								Packet += b4;
-
-								fPacket[0] = Packet.length();
-								User[CurrSock].SendPacket(Packet);
-
-							   }
-
-		} */                         
+							    }
 							
 							
-							
-							Message[0] = Message.length();
-							
-							//tell everyone
-							for (int i1 = 0; i1 < MAX_CLIENTS; i1++)
-							{
-								if (User[i1].Ident)
-								   User[i1].SendPacket(Message);
+								Message[0] = Message.length();
+								
+								//tell everyone
+								for (int i1 = 0; i1 < MAX_CLIENTS; i1++)
+								{
+									if (User[i1].Ident)
+									User[i1].SendPacket(Message);
+								}
 							}
-}
 						break;
-						
 
-
-
-
-
-
-	   default:
+	   					default:
 						break;
 					} //end switch
 				} //end if you have the item
@@ -2937,7 +2744,7 @@ if (HOLIDAY)
 								 
 								 //don't cheat! save everyone!!
 								 persistTicker = Clock();
-								 network->saveAllProfiles(db);
+								 network->saveAllProfiles();
 							  }                                           
 						  }
 					 break;
@@ -3541,41 +3348,41 @@ if (HOLIDAY)
                                               User[CurrSock].inventory[item] += amount;
                                               
 					      //send packets to user
-                                              std::string packet = "0";
-                                              packet += BANK_ITEM;
-                                              packet += item;
-                                              //break up the int as 4 bytes
-                                              char* p=(char*)&User[CurrSock].bank[item];
-                                              char b1, b2, b3, b4;
-                                              b1=p[0]; b2=p[1]; b3=p[2]; b4=p[3];
-                                              packet += b1;
-                                              packet += b2;
-                                              packet += b3;
-                                              packet += b4;
-                                              packet[0] = packet.length();
-                                              User[CurrSock].SendPacket(packet);
+									std::string packet = "0";
+									packet += BANK_ITEM;
+									packet += item;
+									//break up the int as 4 bytes
+									char* p=(char*)&User[CurrSock].bank[item];
+									char b1, b2, b3, b4;
+									b1=p[0]; b2=p[1]; b3=p[2]; b4=p[3];
+									packet += b1;
+									packet += b2;
+									packet += b3;
+									packet += b4;
+									packet[0] = packet.length();
+									User[CurrSock].SendPacket(packet);
 
-                                              packet = "0";
-                                              packet += POCKET_ITEM;
-                                              packet += item;
-                                              //break up the int as 4 bytes
-                                              p=(char*)&User[CurrSock].inventory[item];
-                                              b1=p[0]; b2=p[1]; b3=p[2]; b4=p[3];
-                                              packet += b1;
-                                              packet += b2;
-                                              packet += b3;
-                                              packet += b4;
-                                              packet[0] = packet.length();
-                                              User[CurrSock].SendPacket(packet);
-                                           }
-                                       }
-                                  break;
-                                  
-                                  //shouldn't happen
-                                  default:
-                                  break;  
-                             }
-                        }//end bank
+									packet = "0";
+									packet += POCKET_ITEM;
+									packet += item;
+									//break up the int as 4 bytes
+									p=(char*)&User[CurrSock].inventory[item];
+									b1=p[0]; b2=p[1]; b3=p[2]; b4=p[3];
+									packet += b1;
+									packet += b2;
+									packet += b3;
+									packet += b4;
+									packet[0] = packet.length();
+									User[CurrSock].SendPacket(packet);
+								}
+							}
+						break;
+						
+						//shouldn't happen
+						default:
+						break;  
+					}
+			}//end bank
 			else if (code == INVENTORY)
 			{
 				printf("inventory order!\n");
@@ -3614,8 +3421,6 @@ if (HOLIDAY)
 					std::string clanTag = User[CurrSock].Sock->Data.substr(2);
 					trim (clanTag);
 
-
-
 					//find out if it exists already...
 					std::string sql = "SELECT COUNT(*) FROM clan WHERE clan.name LIKE '";
 					sql += db->clean(clanTag); 
@@ -3651,8 +3456,6 @@ if (HOLIDAY)
 								//get the id for loading purposes
 								std::string player_id = db->getString(0);
 
-
-
 								//update the clan tables!!!!
 								sql = "";
 								sql += "INSERT INTO clan (name, owner_id) VALUES ('";
@@ -3670,12 +3473,10 @@ if (HOLIDAY)
 									creator_id = db->getString(0);
 								}
 
-
 								sql += creator_id;
 								sql += ")";
 
 								db->query(sql, true);
-
 
 								std::string Message = "0";
 								Message += CHAT;
@@ -3693,7 +3494,6 @@ if (HOLIDAY)
 
 
 								//set player clan id
-
 								sql = "";
 								sql += "UPDATE player SET player.clan_id = (SELECT clan.id FROM clan WHERE clan.name LIKE '";
 								sql += db->clean(clanTag);
@@ -4575,7 +4375,7 @@ if (HOLIDAY)
 						{	
 							//save data
 							printf("User was marked to be saved.\n");
-							network->saveAllProfiles(db);
+							network->saveAllProfiles();
 							
 							if (User[CurrSock].Nick.compare("Paladin") != 0)
 							{
@@ -5180,17 +4980,11 @@ void *EnemyLoop(void *arg)
      }
 }
 
-
-
-
-
-
 void *Physics(void *arg)
 {
 
     //initialize the timestep
 	KE_Timestep *timestep = new KE_Timestep(60);
-
 
     long int current_map = (intptr_t)arg;
      
@@ -5729,7 +5523,8 @@ void *Physics(void *arg)
                 }
             }
         } //end timestep
-        Sleep(1);
+        
+		Sleep(1);
     }//end while true
 }
 
@@ -5765,7 +5560,7 @@ void spawnTarget(int target, int current_map)
 }
 
 
-/* perform attack actions */
+/* perform player actions */
 void Attack(int CurrSock, float numx, float numy)
 {
 	//set the current map
@@ -7089,8 +6884,6 @@ void Respawn(int current_map, int i)
 		}
 	} 
 }
-
-
 
 void quitParty(int CurrSock)
 {

@@ -10,16 +10,12 @@
 #define kCyan       "\x1B[36m"
 #define kWhite      "\x1B[37m"
 
-
 #define MAX_CLIENTS 16
-
 
 #include "SKO_Player.h"
 
 //Quit all threads global flag
 extern bool SERVER_QUIT;
 
-
 //Shared objects
 extern SKO_Player User[];
-

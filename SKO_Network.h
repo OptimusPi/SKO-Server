@@ -9,6 +9,7 @@
 
 #include <semaphore.h>
 #include <string>
+#include <thread>
 
 #include "SKO_item_defs.h"
 #include "OPI_MYSQL.h"
@@ -24,7 +25,9 @@ public:
 	SKO_Network(OPI_MYSQL * database, int port, unsigned long int saveRateSeconds);
 	std::string Startup();
 	void Cleanup();
-	void saveAllProfiles(OPI_MYSQL * database);
+
+	// Traverse list of players and save all profiles that are valid.
+	void saveAllProfiles();
 	
  private:
 	
@@ -34,27 +37,31 @@ public:
 	// Allow only one save call at a time.
 	sem_t saveMutex;
 
-	// Traverse list of players and save all profiles that are valid.
+	// How often to save all valid players.
+	unsigned long int saveRateSeconds;
 
-	void saveProfile(OPI_MYSQL *database, unsigned int userId);
 	// Do not spam the database status table if there have been 0 players online for some time.
 	bool pauseSavingStatus = false;
 
-	// Threads can only take one argument when starting up.
-    // Add all the things we need before starting threads.
-	struct ThreadDTO {
-		OPI_MYSQL* 	database; //TODO: implement SKO_REPOSITORY
-		GE_Socket*	listenSocket;
-		unsigned long int saveRateSeconds;
-	} threadDTO;
+	//TODO: implement SKO_REPOSITORY
+	OPI_MYSQL* 	database; 
 
-	// POSIX threads for running the below functions.
-	pthread_t queueThread, connectThread, autoSaveThread; 
+	//Listen for incoming connections
+	GE_Socket*	listenSocket;		
+
+	// threads for running the below functions.
+	std::thread queueThread, connectThread, saveThread; 
 	
 	// Endless loop functions that are to be assigned into threads.
-	static void *QueueLoop(void *threadDTO);
-	static void *ConnectLoop(void *threadDTO);
-	static void *SaveLoop(void *threadDTO);
+	void QueueLoop();
+	void ConnectLoop();
+	void SaveLoop();
+
+	//Save a single profile
+	void saveProfile(unsigned int userId);
+
+	template<typename First, typename ... Rest>
+	void send(GE_Socket* Socket, First const& first, Rest const& ... rest);
 };
 
 #endif
