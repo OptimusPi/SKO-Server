@@ -15,7 +15,8 @@
 #include "OPI_MYSQL.h"
 #include "GE_Socket.h"
 #include "base64.h"
-
+#include "Global.h"
+#include "hasher.h"
 
 class SKO_Network
 {
@@ -26,9 +27,8 @@ public:
 	std::string Startup();
 	void Cleanup();
 
-	// Traverse list of players and save all profiles that are valid.
-	void saveAllProfiles();
-	
+	// Handle all network functions of a client
+	void SKO_Network::HandleClient(unsigned int userId);
  private:
 	
 	// Bind to this port and accept incoming connections.
@@ -57,8 +57,15 @@ public:
 	void ConnectLoop();
 	void SaveLoop();
 
-	//Save a single profile
+	// Profile functions for the database
 	void saveProfile(unsigned int userId);
+	void saveAllProfiles();
+	int loadProfile(std::string Username, std::string Password); //todo return std::String helpful return message
+	int SKO_Network::load_data(int userId);
+
+	// Client socket functions
+	void SKO_Network::RecvPacket(GE_Socket* socket);
+	void SKO_Network::DisconnectClient(unsigned int userId);
 
 	template<typename First, typename ... Rest>
 	void send(GE_Socket* Socket, First const& first, Rest const& ... rest);

@@ -8,59 +8,55 @@
 
 class SKO_Player
 {
-    
-private:
-public:
-	void init();
 
-           
-	/* FUNCTIONS */
-	SKO_Player();
+      private:
+      public:
+        void init();
+
+        /* FUNCTIONS */
+        SKO_Player();
         ~SKO_Player();
 
-	void Init();
+        void Init();
         void Clear();
-	void SendPacket(std::string Packet);
-        void RecvPacket();
-    	std::string getInventoryOrder();
-    
+        std::string getInventoryOrder();
+
         //stats
         bool addXP(int xp_in);
 
-	/* VARIABLES */
-		// Socket pointer
-		GE_Socket	*Sock = NULL;
-		bool Status;
-		bool Que;
-		bool Ident;
-		bool Save;
-		unsigned long int QueTime;
-		unsigned int ping;
-		unsigned long int pingTicker;
-		bool pingWaiting;
-			
-		
-		// Name
-		std::string	Nick, Clan;
+        /* VARIABLES */
+        // Socket pointer
+        GE_Socket *Sock = NULL;
+        bool Status;
+        bool Que;
+        bool Ident;
+        bool Save;
+        unsigned long int QueTime;
+        unsigned int ping;
+        unsigned long int pingTicker;
+        bool pingWaiting;
 
-		// Status
-		bool Mute;
-		bool Moderator;
-		
-		//player id in database
-		std::string ID;
-		std::string tempClanId; 
-	    std::string inventory_order;	
-		
-    /* GAME STUFF */
-    //physics
+        // Name
+        std::string Nick, Clan;
+
+        // Status
+        bool Mute;
+        bool Moderator;
+
+        //player id in database
+        std::string ID;
+        std::string tempClanId;
+        std::string inventory_order;
+
+        /* GAME STUFF */
+        //physics
         bool attacking;
         bool ground;
         bool facing_right;
         unsigned long int attack_ticker;
         unsigned long int regen_ticker;
-        int que_action; 
-        
+        int que_action;
+
         void setX();
         void addToX();
         void setY();
@@ -68,8 +64,7 @@ public:
         void setXSpeed();
         void setYSpeed();
 
-
-    //stats
+        //stats
         //health
         unsigned char hp;
         unsigned char max_hp;
@@ -82,46 +77,41 @@ public:
         //strength and defence
         unsigned char strength;
         unsigned char defence;
-        
-        
-   //items
+
+        //items
         unsigned int inventory[256];
         unsigned int bank[256];
         char inventory_index;
         char bank_index;
-        
-   //equip
+
+        //equip
         unsigned int equip[3];
-        
-        
+
         //coords
         float x;
         float y;
         float y_speed;
         float x_speed;
         int current_map;
-        
+
         //trading
         int tradeStatus;
         int tradePlayer;
         unsigned int localTrade[256];
-        
-        
-	//clan
-	int clanStatus;
-	int clanPlayer;
-	//party
-	int party;
-	int partyStatus;
 
+        //clan
+        int clanStatus;
+        int clanPlayer;
+        //party
+        int party;
+        int partyStatus;
 
-   //fun server stuff
-   unsigned long int loginTime;
-   unsigned long int minutesPlayed;
-   unsigned short int OS;     
-   unsigned long int mobKills;
-   unsigned long int pvpKills;	
-	
+        //fun server stuff
+        unsigned long int loginTime;
+        unsigned long int minutesPlayed;
+        unsigned short int OS;
+        unsigned long int mobKills;
+        unsigned long int pvpKills;
 };
 
 #endif

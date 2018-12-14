@@ -5,7 +5,6 @@ void SKO_Player::init()
 	Sock = new GE_Socket();
 	Sock->Connected = false;
 	Nick = "";
-	
 	Mute = true;
 	Moderator = false;
 	Ident = false;
@@ -77,7 +76,7 @@ void SKO_Player::init()
 void SKO_Player::Clear()
 {
 	if (Sock)
-	{
+	{ 
 		delete Sock;
 	}
 	init();
@@ -108,79 +107,6 @@ std::string SKO_Player::getInventoryOrder()
 
 	return iorder;
 }
-
-void SKO_Player::RecvPacket()
-{
-    bool error = false;
-     
-    //socket status
-	if (Sock->Connected)
-	{
-		if (Sock->GetStatus() & GE_Socket_Error)
-		{
-			printf("I can't Recv. My socket status is GE_Socket_Error!\n"); 
-			error = true;
-		}
-		else
-		{
-			if (Sock->Recv() == GE_Socket_Error)
-			{
-				printf("Recv() failed and returned GE_Socket_Error!\n"); 
-				printf("ABCD\n");
-				error = false;                  
-			}
-		}
-	}
-	else
-	{
-		printf("I can't Recv. My socket is not connected!\n"); 
-		error = true;
-	} 
-
-	if (error)
-	{
-		printf("***\n***\n");
-		printf("SKO_Player::RecvPacket calling SKO_Player::Clear();\n");
-
-		Clear();
-	}
-}
-
-void SKO_Player::SendPacket(std::string Packet)
-{
-	bool error = false;
-
-	//socket status
-	if (Sock->Connected)
-	{
-		if (Sock->GetStatus() & GE_Socket_Error)
-		{
-			printf("I can't send that packet. My socket status is GE_Socket_Error!\n"); 
-			error = true;
-		}
-		else
-		{
-			if (Sock->Send(Packet) == GE_Socket_Error)
-			{
-				printf("Send() failed and returned GE_Socket_Error!\n"); 
-				error = true;                  
-			}
-		}
-	}
-	else
-	{
-		printf("I can't send that packet. My socket is not connected!\n"); 
-		error = true;
-	} 
-
-	if (error)
-	{
-		printf("***\n***\n");
-		printf("Clear();\n");
-		Clear();
-	}
-}
-
 
 bool SKO_Player::addXP(int xp_in)
 {
