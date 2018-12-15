@@ -16,14 +16,33 @@
 #include "SKO_Player.h"
 #include "SKO_Portal.h"
 #include "SKO_ItemObject.h"
-
+#include "SKO_Item.h"
+#include "SKO_Map.h"
 
 //Quit all threads global flag
 extern bool SERVER_QUIT;
 
 //Shared objects
 extern SKO_Player User[];
+extern SKO_Item Item[];
+extern SKO_Map map[];
+extern unsigned char hpBar; 
+extern const bool HOLIDAY;
+extern unsigned const char HOLIDAY_NPC_DROP, HOLIDAY_BOX_DROP;
+extern const char NUM_MAPS;
 
+//TODO move to game logic
+extern bool blocked(int current_map, float box1_x1, float box1_y1, float box1_x2, float box1_y2, bool npc);
+extern void GiveLoot(int enemy, int player);
+extern void Attack(int CurrSock, float x, float y);
+extern void Jump(int CurrSock, float x, float y);
+extern void Left(int CurrSock, float x, float y);
+extern void Right(int CurrSock, float x, float y);
+extern void Stop(int CurrSock, float x, float y);
+extern void GiveXP(int CurrSock, int xp);
+extern void quitParty(int CurrSock);
+
+// TODO move to Utilities
 void trim(std::string s)
 {
 	std::stringstream ss;
@@ -42,20 +61,3 @@ std::string lower(std::string myString)
 	return myString;
 }
 
-
-extern void despawnTarget(int target, int current_map);
-extern void spawnTarget(int target, int current_map);
-extern void Respawn(int current_map, int i);
-extern void Warp(int i, SKO_Portal portal);
-extern void DivideLoot(int enemy, int party);
-extern void KillEnemy(int current_map, int enemy);
-extern void SpawnLoot(int current_map, SKO_ItemObject loot);
-extern void GiveLoot(int enemy, int player);
-extern void EnemyAttack(int i, int current_map);
-extern void Attack(int CurrSock, float x, float y);
-extern void Jump(int CurrSock, float x, float y);
-extern void Left(int CurrSock, float x, float y);
-extern void Right(int CurrSock, float x, float y);
-extern void Stop(int CurrSock, float x, float y);
-extern void GiveXP(int CurrSock, int xp);
-extern void quitParty(int CurrSock);

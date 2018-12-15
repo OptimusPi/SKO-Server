@@ -47,12 +47,12 @@ SKO_Map map[NUM_MAPS];
 SKO_Item Item[256];
 
 //cosmetic hp bars
-int hpBar = 25;
+unsigned char hpBar = 25;
 
 //gravity
 const float GRAVITY = 0.169;
 
-//holiday events
+//holiday events TODO use a config not hard coded magic 
 unsigned const char HOLIDAY_NPC_DROP = ITEM_EASTER_EGG, HOLIDAY_BOX_DROP = ITEM_BUNNY_EARS;
 const bool HOLIDAY = false;
 
@@ -69,307 +69,14 @@ unsigned int persistTicker;
 bool persistLock = false;
 
 
-int ipban(int Mod_i, std::string IP, std::string Reason)
-{
-	//are you a moderator
-	if (User[Mod_i].Moderator)
-	{
-		//get noob id
-		db->nextRow();
-		std::string player_id = db->getString(0);
-
-		std::string sql = "INSERT INTO ip_ban (ip, banned_by, ban_reason) VALUES('";
-		sql += db->clean(IP);
-		sql += "', '";
-		sql += db->clean(User[Mod_i].Nick);
-		sql += "', '";
-		sql += db->clean(Reason);
-		sql += "')";
-
-		printf(sql.c_str());
-		db->query(sql);
-
-		printf(db->getError().c_str());
-	}
-	else
-	{
-		//not moderator
-		return 1;
-	}
-
-	return 0;
-}
-
-int kick(int Mod_i, std::string Username)
-{
-
-	if (!User[Mod_i].Moderator)
-	{
-		//not a moderator!
-		return 2;
-	}
-
-	//check if they are online
-	//find the sock of the username
-	for (int i = 0; i < MAX_CLIENTS; i++)
-	{
-		//well are they online
-		if (lower(User[i].Nick).compare(lower(Username)) == 0)
-		{
-			return 0;
-		}
-	}
-
-	return 1;
-}
-
-int mute(int Mod_i, std::string Username, int flag)
-{
-	std::string sql = "SELECT * FROM player WHERE username LIKE '";
-	sql += db->clean(Username);
-	sql += "'";
-	printf(sql.c_str());
-	db->query(sql);
-
-	//see if the noob exists
-	if (db->count())
-	{
-
-		//get noob id
-		db->nextRow();
-		std::string player_id = db->getString(0);
-
-		if (!User[Mod_i].Moderator)
-		{
-			//fool, you aren't even a moderator.
-			return 3;
-		}
-
-		//see if the noob is a mod
-		sql = "SELECT * FROM moderator WHERE player_id like '";
-		sql += db->clean(player_id);
-		sql += "'";
-		printf(sql.c_str());
-		db->query(sql);
-
-		if (db->count())
-		{
-
-			//printf("\n::DEBUG::\n::ERROR::\nSomeone tried to mute [%s]!!\7\n\n", Username.c_str());
-			return 2;
-		}
-		else //the person is not a mod, mute/unmute them
-		{
-
-			//mute
-			if (flag == 1)
-			{
-
-				sql = "INSERT INTO mute (player_id, muted_by) VALUES('";
-				sql += db->clean(player_id);
-				sql += "', '";
-				sql += db->clean(User[Mod_i].Nick);
-				sql += "')";
-
-				printf(sql.c_str());
-				db->query(sql);
-
-				return 0;
-			}
-			//unmute
-			if (flag == 0)
-			{
-
-				sql = "DELETE FROM mute WHERE player_id LIKE '";
-				sql += db->clean(player_id);
-				sql += "'";
-				db->query(sql);
-
-				return 0;
-			}
-		}
-
-		printf(db->getError().c_str());
-	}
-	else //the account does not exist
-	{
-		return 1;
-	}
-
-	return 0;
-}
-
-int ban(int Mod_i, std::string Username, std::string Reason, int flag)
-{
-	std::string sql = "SELECT * FROM player WHERE username LIKE '";
-	sql += db->clean(Username);
-	sql += "'";
-	printf(sql.c_str());
-	db->query(sql);
-
-	//see if the noob exists
-	if (db->count())
-	{
-
-		//get noob id
-		db->nextRow();
-		std::string player_id = db->getString(0);
-
-		if (!User[Mod_i].Moderator)
-		{
-			//fool, you aren't even a moderator.
-			return 3;
-		}
-
-		//see if the noob is a mod
-		sql = "SELECT * FROM moderator WHERE player_id like '";
-		sql += db->clean(player_id);
-		sql += "'";
-		printf(sql.c_str());
-		db->query(sql);
-
-		if (db->count())
-		{
-
-			//printf("\n::DEBUG::\n::ERROR::\nSomeone tried to ban [%s]!!\7\n\n", Username.c_str());
-			return 2;
-		}
-		else //the person is not a mod, ban/unban them
-		{
-
-			//BAN
-			if (flag == 1)
-			{
-
-				sql = "INSERT INTO ban (player_id, banned_by, ban_reason) VALUES('";
-				sql += db->clean(player_id);
-				sql += "', '";
-				sql += db->clean(User[Mod_i].Nick);
-				sql += "', '";
-				sql += db->clean(Reason);
-				sql += "')";
-
-				printf(sql.c_str());
-				db->query(sql);
-
-				return 0;
-			}
-			//unban
-			if (flag == 0)
-			{
-
-				sql = "DELETE FROM ban WHERE player_id LIKE '";
-				sql += db->clean(player_id);
-				sql += "'";
-				db->query(sql);
-
-				return 0;
-			}
-		}
-
-		printf(db->getError().c_str());
-	}
-	else //the account does not exist
-	{
-		return 1;
-	}
-
-	return 0;
-}
-
-int create_profile(std::string Username, std::string Password, std::string IP)
-{
-
-	printf("create_profile()\n");
-	std::string sql = "SELECT * FROM player WHERE username LIKE '";
-	sql += db->clean(Username);
-	sql += "'";
-	printf(sql.c_str());
-	db->query(sql);
-
-	if (db->count())
-	{
-		printf("already exists.\n");
-		//already exists
-		return 1;
-	}
-	else
-	{
-		printf("doesn't already exist. good.\n");
-	}
-
-	sql = "SELECT * FROM ip_ban WHERE ip like '";
-	sql += db->clean(IP);
-	sql += "'";
-	printf(sql.c_str());
-	db->query(sql);
-
-	if (db->count())
-	{
-		printf("ip banned. geez.\n");
-		//you are banned
-		return 2;
-	}
-	else
-	{
-		printf("not ip banned. good.\n");
-	}
-
-	//create unique salt for user password
-	sql = "SELECT REPLACE(UUID(), '-', '');";
-	db->query(sql);
-	db->nextRow();
-	std::string player_salt = db->getString(0);
-
-	sql = "INSERT INTO player (username, password, level, facing_right, x, y, hp, str, def, xp_max, hp_max, current_map, salt) VALUES('";
-	sql += db->clean(Username);
-	sql += "', '";
-	sql += db->clean(Hash(Password, player_salt));
-	sql += "', '1', b'1', '314', '300', '10', '2', '1', '10', '10', '2', '";
-	sql += db->clean(player_salt);
-	sql += "')";
-	printf(sql.c_str());
-	db->query(sql);
-	printf("inserted. Well, tried anyway.\n");
-
-	//make sure it worked
-	sql = "SELECT * FROM player WHERE username LIKE '";
-	sql += db->clean(Username);
-	sql += "'";
-	printf(sql.c_str());
-	db->query(sql);
-
-	if (db->count())
-	{
-		printf("well, user exists. good.\n");
-		//get results form the query. Save id.
-		db->nextRow();
-		std::string player_id = db->getString(0);
-
-		//make inventory blank for them.
-		sql = "INSERT INTO inventory (player_id) VALUES('";
-		sql += db->clean(player_id);
-		sql += "')";
-		printf(sql.c_str());
-		db->query(sql);
-
-		//make inventory blank for them.
-		printf(sql.c_str());
-		sql = "INSERT INTO bank (player_id) VALUES('";
-		sql += db->clean(player_id);
-		sql += "')";
-		db->query(sql);
-	}
-	else
-	{
-		printf("ahhh, damn. user doesn't exist? Retrying whole process.\n");
-		return create_profile(Username, Password, IP);
-	}
-
-	printf(db->getError().c_str());
-
-	return 0;
-}
+void GiveLoot(int enemy, int player);
+void Attack(int CurrSock, float x, float y);
+void Jump(int CurrSock, float x, float y);
+void Left(int CurrSock, float x, float y);
+void Right(int CurrSock, float x, float y);
+void Stop(int CurrSock, float x, float y);
+void GiveXP(int CurrSock, int xp);
+void quitParty(int CurrSock);
 
 static void *Physics(void *Arg);
 static void *TargetLoop(void *Arg);
@@ -1319,7 +1026,7 @@ void *Physics(void *arg)
 
 							case MOVE_JUMP:
 								Packet += MOVE_JUMP;
-								Jump(i, numx, numy);
+								network.SendJump(i, numx, numy);
 								printf("\e[0;32mCorrection! que action being sent NOW: JUMP\e[m\n");
 								break;
 
@@ -1328,7 +1035,7 @@ void *Physics(void *arg)
 								printf("\e[0;32mCorrection! que action being sent NOW: ATTACK\e[m\n");
 
 								//do attack actions
-								Attack(i, numx, numy);
+								network.SendAttack(i, numx, numy);
 								break;
 
 							case MOVE_STOP:
@@ -1657,35 +1364,6 @@ void *Physics(void *arg)
 	} //end while true
 }
 
-void despawnTarget(unsigned int target, unsigned int current_map)
-{
-	std::string packet = "0";
-	packet += DESPAWN_TARGET;
-	packet += target;
-	packet += current_map;
-	packet[0] = packet.length();
-
-	for (int i = 0; i < MAX_CLIENTS; i++)
-	{
-		if (User[i].Ident)
-			User[i].SendPacket(packet);
-	}
-}
-
-void spawnTarget(int target, int current_map)
-{
-	std::string packet = "0";
-	packet += SPAWN_TARGET;
-	packet += target;
-	packet += current_map;
-	packet[0] = packet.length();
-
-	for (int i = 0; i < MAX_CLIENTS; i++)
-	{
-		if (User[i].Ident)
-			User[i].SendPacket(packet);
-	}
-}
 
 /* perform player actions */
 void Attack(int CurrSock, float numx, float numy)

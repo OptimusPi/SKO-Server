@@ -28,7 +28,8 @@ public:
 	void Cleanup();
 
 	// Handle all network functions of a client
-	void SKO_Network::HandleClient(unsigned int userId);
+	void SKO_Network::HandleClient(unsigned char userId);
+
  private:
 	
 	// Bind to this port and accept incoming connections.
@@ -67,6 +68,30 @@ public:
 	void SKO_Network::RecvPacket(GE_Socket* socket);
 	void SKO_Network::DisconnectClient(unsigned int userId);
 
+	// Helper functions
+	void despawnTarget(int target, int current_map);
+	void spawnTarget(int target, int current_map);
+	void Respawn(int current_map, int i);
+	void Warp(int i, SKO_Portal portal);
+	void DivideLoot(int enemy, int party);
+	void KillEnemy(int current_map, int enemy);
+	void SpawnLoot(int current_map, SKO_ItemObject loot);
+	void GiveLoot(int enemy, int player);
+	void EnemyAttack(int i, int current_map);
+	void SendAttack(int CurrSock, float x, float y);
+	void SendJump(int CurrSock, float x, float y);
+	void SendLeft(int CurrSock, float x, float y);
+	void SendRight(int CurrSock, float x, float y);
+	void SendStop(int CurrSock, float x, float y);
+	void GiveXP(int CurrSock, int xp);
+	void quitParty(int CurrSock);
+	int createPlayer(std::string Username, std::string Password, std::string IP);
+	int banIP(int Mod_i, std::string IP, std::string Reason);
+	int banPlayer(int Mod_i, std::string Username, std::string Reason, int flag);
+	int kickPlayer(int Mod_i, std::string Username);
+	int mutePlayer(int Mod_i, std::string Username, int flag);
+
+    // Socket send (variadic arguments)
 	template<typename First, typename ... Rest>
 	void send(GE_Socket* Socket, First const& first, Rest const& ... rest);
 };
