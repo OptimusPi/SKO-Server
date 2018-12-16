@@ -310,7 +310,7 @@ void SKO_Network::QueueLoop()
 							printf(">>>[expected values] VERSION_MAJOR: %i VERSION_MINOR: %i VERSION_PATCH: %i\n",
 								   VERSION_MAJOR, VERSION_MINOR, VERSION_PATCH);
 							User[userId].Que = false;
-							User[userId].Sock->Close();
+							User[userId].Sock->Close(); 
 							User[userId] = SKO_Player();
 						}
 					}
@@ -776,12 +776,29 @@ int SKO_Network::loadProfile(std::string Username, std::string Password)
 	return 0;
 }
 
-void SKO_Network::spawnTarget(int target, int current_map)
+void SKO_Network::SendSpawnTarget(unsigned char targetId, unsigned char current_map)
 {
 	for (int i = 0; i < MAX_CLIENTS; i++)
 	{
 		if (User[i].Ident)
-			send(User[i].Sock, SPAWN_TARGET, target, current_map);
+			send(User[i].Sock, SPAWN_TARGET, targetId, current_map);
+	}
+}
+
+void SKO_Network::SendPlayerHit(unsigned char userId)
+{
+	std::string hpPacket = "0";
+	hpPacket += TARGET_HIT;
+	hpPacket += (char)1; // player
+	hpPacket += userId;
+	hpPacket[0] = hpPacket.length();
+
+	for (int c = 0; c < MAX_CLIENTS; c++)
+	{
+		if (User[c].Ident)
+		{
+			send(User[c].Sock, TARGET_HIT, (char)1, userId);
+		}
 	}
 }
 
@@ -818,7 +835,6 @@ int SKO_Network::banIP(int Mod_i, std::string IP, std::string Reason)
 
 int SKO_Network::kickPlayer(int Mod_i, std::string Username)
 {
-
 	if (!User[Mod_i].Moderator)
 	{
 		//not a moderator!
@@ -1309,8 +1325,7 @@ void SKO_Network::HandleClient(unsigned char userId)
 							float numy = map[current_map].ItemObj[i].y;
 							float numxs = map[current_map].ItemObj[i].x_speed;
 							float numys = map[current_map].ItemObj[i].y_speed;
-
-							send(User[userId].Sock, SPAWN_ITEM, i, current_map, itemId, numx, numy, numxs, numys);
+							SendSpawnItem(userId, i, current_map, itemId, numx, numy, numxs, numys);
 						}
 					}
 
@@ -1590,11 +1605,6 @@ void SKO_Network::HandleClient(unsigned char userId)
 			if (User[userId].inventory[item] > 0)
 			{
 				unsigned int amt = 0;
-				std::string Packet = "0";
-				std::string Message = "0";
-				std::string hpPacket = "0";
-				char *p;
-				char b1, b2, b3, b4;
 				float numy, numx, numys, numxs,
 					rand_xs, rand_ys,
 					rand_x, rand_y;
@@ -1619,7 +1629,7 @@ void SKO_Network::HandleClient(unsigned char userId)
 						User[userId].hp = User[userId].max_hp;
 
 					//tell this client
-					send(User[userId].Sock, STAT_HP, User[userId].hp);
+					SendStatHp(userId, User[userId].hp);
 
 					//remove item
 					User[userId].inventory[item]--;
@@ -1632,12 +1642,11 @@ void SKO_Network::HandleClient(unsigned char userId)
 					// party hp notification
 					// TODO - change magic number 80 to use a config value
 					unsigned char displayHp = (int)((User[userId].hp / (float)User[userId].max_hp) * 80);
-					hpPacket[0] = hpPacket.length();
 
 					for (int pl = 0; pl < MAX_CLIENTS; pl++)
 					{
 						if (pl != userId && User[pl].Ident && User[pl].partyStatus == PARTY && User[pl].party == User[userId].party)
-							send(User[pl].Sock, BUDDY_HP, userId, displayHp);
+							SendBuddyStatHp(pl, userId, displayHp);
 					}
 
 					//put in client players inventory
@@ -1727,10 +1736,6 @@ void SKO_Network::HandleClient(unsigned char userId)
 						unsigned int amount = User[userId].inventory[item];
 
 						//put in players inventory
-						Packet = "0";
-						Packet += POCKET_ITEM;
-						Packet += item;
-
 						send(User[userId].Sock, POCKET_ITEM, item, amount);
 
 						for (int it = 0; it < numUsed; it++)
@@ -1788,7 +1793,7 @@ void SKO_Network::HandleClient(unsigned char userId)
 							for (int iii = 0; iii < MAX_CLIENTS; iii++)
 							{
 								if (User[iii].Ident && User[iii].current_map == current_map)
-									send(User[iii].Sock, SPAWN_ITEM, rand_i, current_map, rand_item, x, y, x_speed, y_speed);
+									SendSpawnItem(iii, rand_i, current_map, rand_item, x, y, x_speed, y_speed);
 							}
 						}
 					}
@@ -1913,7 +1918,7 @@ void SKO_Network::HandleClient(unsigned char userId)
 				for (int iii = 0; iii < MAX_CLIENTS; iii++)
 				{
 					if (User[iii].Ident && User[iii].current_map == current_map)
-						send(User[iii].Sock, SPAWN_ITEM, rand_i, current_map, item, x, y, x_speed, y_speed);
+						SendSpawnItem(iii, rand_i, current_map, item, x, y, x_speed, x_speed);
 				}
 			}
 		} // end DROP_ITEM
@@ -2208,7 +2213,6 @@ void SKO_Network::HandleClient(unsigned char userId)
 				{
 					//tell everyone in the party that player has joined
 					for (int pl = 0; pl < MAX_CLIENTS; pl++)
-
 						//tell the user about all the players in the party
 						if (User[pl].Ident && pl != userId && User[pl].partyStatus == PARTY && User[pl].party == User[userId].party)
 						{
@@ -2220,9 +2224,10 @@ void SKO_Network::HandleClient(unsigned char userId)
 							unsigned char hp = (int)((User[userId].hp / (float)User[userId].max_hp) * 80);
 							unsigned char xp = (int)((User[userId].xp / (float)User[userId].max_xp) * 80);
 							unsigned char level = User[userId].level;
-							send(User[pl].Sock, BUDDY_HP, userId, hp);
-							send(User[pl].Sock, BUDDY_XP, userId, xp);
-							send(User[pl].Sock, BUDDY_LEVEL, userId, level);
+
+							SendBuddyStatHp(pl, userId, hp);
+							SendBuddyStatXp(pl, userId, xp);
+							SendBuddyStatLevel(pl, userId, level);
 
 							//
 							// Notify player of each existing party member
@@ -2232,9 +2237,11 @@ void SKO_Network::HandleClient(unsigned char userId)
 							hp = (int)((User[pl].hp / (float)User[pl].max_hp) * 80);
 							xp = (int)((User[pl].xp / (float)User[pl].max_xp) * 80);
 							level = User[pl].level;
-							send(User[userId].Sock, BUDDY_HP, pl, hp);
-							send(User[userId].Sock, BUDDY_XP, pl, xp);
-							send(User[userId].Sock, BUDDY_LEVEL, pl, level);
+
+							// Update party stats for client party player list
+							SendBuddyStatHp(userId, pl, hp);
+							SendBuddyStatXp(userId, pl, xp);
+							SendBuddyStatLevel(userId, pl, level);
 						}
 				}
 				break;
@@ -2501,7 +2508,7 @@ void SKO_Network::HandleClient(unsigned char userId)
 
 			case BANK_ITEM:
 				if (User[userId].tradeStatus == BANK)
-				{//TODO sanity check for packet length
+				{ //TODO sanity check for packet length
 					//get item type and amount
 					unsigned char item = User[userId].Sock->Data[3];
 					unsigned int amount = 0;
@@ -2528,7 +2535,7 @@ void SKO_Network::HandleClient(unsigned char userId)
 
 			case DEBANK_ITEM:
 				if (User[userId].tradeStatus == BANK)
-				{//TODO sanity check on packet length
+				{ //TODO sanity check on packet length
 					unsigned char item = User[userId].Sock->Data[3];
 					unsigned int amount = 0;
 					((char *)&amount)[0] = User[userId].Sock->Data[4];
@@ -2636,7 +2643,7 @@ void SKO_Network::HandleClient(unsigned char userId)
 							sql += "'";
 
 							database->query(sql);
-							
+
 							User[userId].inventory[ITEM_GOLD] -= 100000;
 
 							// TODO - when below fix is complete, notify player their gold has decreased by 100K
@@ -2664,7 +2671,6 @@ void SKO_Network::HandleClient(unsigned char userId)
 					User[userId].inventory[spell]--;
 					if (User[userId].inventory[spell] == 0)
 						User[userId].inventory_index--;
-					
 
 					//notify user the item was thrown
 					unsigned int amount = User[userId].inventory[spell];
@@ -2677,7 +2683,7 @@ void SKO_Network::HandleClient(unsigned char userId)
 					//send packet that says you arent holding anything!
 					for (int c = 0; c < MAX_CLIENTS; c++)
 						if (User[c].Ident)
-							send(User[c].Sock, EQUIP,  userId, (char)2, (char)0, (char)0);
+							send(User[c].Sock, EQUIP, userId, (char)2, (char)0, (char)0);
 				}
 
 				//tell all the users that an item has been thrown...
@@ -3098,7 +3104,7 @@ void SKO_Network::HandleClient(unsigned char userId)
 							}
 						}
 					}
-					else 
+					else
 					{
 						send(User[userId].Sock, "You are not authorized to warp players.");
 					}
@@ -3173,7 +3179,7 @@ void SKO_Network::HandleClient(unsigned char userId)
 					{
 						for (int i = 0; i < MAX_CLIENTS; i++)
 						{
-							if (User[i].Ident) 
+							if (User[i].Ident)
 								send(User[i].Sock, CHAT, chatMessage, chatFull);
 						}
 						doneWrapping = true;
@@ -3215,15 +3221,15 @@ void SKO_Network::HandleClient(unsigned char userId)
 						else
 						{
 							cPacket += chatChunk;
-							doneWrapping = true;
+							doneWrapping = true; 
 						}
 						cPacket[0] = cPacket.length();
 
 						for (int i = 0; i < MAX_CLIENTS; i++)
 						{
-							if (User[i].Ident) 
+							if (User[i].Ident)
 								send(User[i].Sock, CHAT, cPacket);
-						}						
+						}
 					}
 					printf("\e[0;33m[Chat]%s: %s\e[m\n", User[userId].Nick.c_str(), chatFull.c_str());
 				} //end just chat
@@ -3238,7 +3244,7 @@ void SKO_Network::HandleClient(unsigned char userId)
 			printf(kRed "(%s) ERR_BAD_PACKET_WAS: ", User[userId].Nick.c_str());
 			for (int l = 0; l < User[userId].Sock->Data.length(); l++)
 				printf("[%i]", (int)User[userId].Sock->Data[l]);
-			
+
 			printf("\n" kNormal);
 
 			User[userId].Sock->Data = "";
@@ -3251,3 +3257,103 @@ void SKO_Network::HandleClient(unsigned char userId)
 
 	} //end execute packet
 };
+
+// Other public functions called from main
+void SKO_Network::SendSpawnEnemy(SKO_Enemy *enemy, unsigned char enemyId, unsigned char current_map)
+{
+	//enemy health bars
+	unsigned char hp = (int)((float)enemy->hp / enemy->hp_max * hpBar);
+
+	//tell everyone they spawned
+	for (int c = 0; c < MAX_CLIENTS; c++)
+	{
+		if (User[c].Ident)
+		{
+			send(User[c].Sock, ENEMY_MOVE_STOP, enemyId, current_map, enemy->x, enemy->y);
+			send(User[c].Sock, ENEMY_HP, enemyId, current_map, hp);
+		}
+	}
+}
+
+void SKO_Network::SendEnemyAction(SKO_Enemy* enemy, unsigned char action, unsigned char enemyId, unsigned char current_map)
+{
+	//tell everyone they spawned
+	for (int c = 0; c < MAX_CLIENTS; c++)
+	{
+		if (User[c].Ident && User[c].current_map == current_map)
+			send(User[c].Sock, action, enemyId, current_map, enemy->x, enemy->y);
+	}
+}
+
+void SKO_Network::SendNpcAction(SKO_NPC* npc, unsigned char action, unsigned char npcId, unsigned char current_map)
+{
+	//tell everyone they spawned
+	for (int c = 0; c < MAX_CLIENTS; c++)
+	{
+		if (User[c].Ident && User[c].current_map == current_map)
+			send(User[c].Sock, action, npcId, current_map, npc->x, npc->y);
+	}
+}
+
+void SKO_Network::SendPlayerAction(bool isCorrection, unsigned char action, unsigned char userId, float x, float y)
+{
+	// Do not send action to the client who is performing a player action,
+	// sue to client predictive physics.
+	for (int c = 0; c < MAX_CLIENTS; c++)
+		if (c != userId && User[c].Ident && User[c].current_map == User[userId].current_map)
+			send(User[c].Sock, action, userId, x, y);
+
+	// However, when the client needs correcting due to lag, 
+	// send the correction packet to the given userId.
+	if (isCorrection)
+		send(User[userId].Sock, action, userId, x, y);
+}
+
+void SKO_Network::SendStatHp(unsigned char userId, unsigned char hp)
+{
+	send(User[userId].Sock, STAT_HP, hp);
+}
+void SKO_Network::SendStatHpMax(unsigned char userId, unsigned char hp_max)
+{
+	send(User[userId].Sock, STATMAX_HP, hp_max);
+}
+void SKO_Network::SendStatStr(unsigned char userId, unsigned char str)
+{
+	send(User[userId].Sock, STAT_STR, str);
+}
+void SKO_Network::SendStatDef(unsigned char userId, unsigned char def)
+{
+	send(User[userId].Sock, STAT_DEF, def);
+}
+void SKO_Network::SendStatPoints(unsigned char userId, unsigned char points)
+{
+	send(User[userId].Sock, STAT_POINTS, points);
+}
+void SKO_Network::SendStatXp(unsigned char userId, unsigned int xp)
+{
+	send(User[userId].Sock, STAT_XP, xp);
+}
+void SKO_Network::SendStatXpMax(unsigned char userId, unsigned int xp_max)
+{
+	send(User[userId].Sock, STATMAX_HP, xp_max);
+}
+void SKO_Network::SendBuddyStatXp(unsigned char userId, unsigned char partyMemberId, unsigned char displayXp)
+{
+	send(User[userId].Sock, BUDDY_XP, partyMemberId, displayXp);
+}
+void SKO_Network::SendBuddyStatHp(unsigned char userId, unsigned char partyMemberId, unsigned char displayHp)
+{
+	send(User[userId].Sock, BUDDY_HP, partyMemberId, displayHp);
+}
+void SKO_Network::SendBuddyStatLevel(unsigned char userId, unsigned char partyMemberId, unsigned char displayLevel)
+{
+	send(User[userId].Sock, BUDDY_LEVEL, partyMemberId, displayLevel);
+}
+void SKO_Network::SendSpawnItem(unsigned char userId, unsigned char itemObjId, unsigned char current_map, unsigned char itemType, float x, float y, float x_speed, float y_speed)
+{
+	send(User[userId].Sock, SPAWN_ITEM, itemObjId, current_map, itemType, x, y, x_speed, y_speed);  
+}
+void SKO_Network::SendDespawnItem(unsigned char userId, unsigned char itemObjId, unsigned char current_map)
+{
+	send(User[userId].Sock, DESPAWN_ITEM, itemObjId, current_map);
+}

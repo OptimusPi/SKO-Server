@@ -28,12 +28,36 @@ public:
 	void Cleanup();
 
 	// Handle all network functions of a client
-	void SKO_Network::HandleClient(unsigned char userId);
+	void HandleClient(unsigned char userId);
+	void SendSpawnEnemy(SKO_Enemy *enemy, unsigned char enemyId, unsigned char current_map);
+	void SendEnemyAction(SKO_Enemy* enemy, unsigned char action, unsigned char enemyId, unsigned char current_map);
+	void SendNpcAction(SKO_NPC* npc, unsigned char action, unsigned char npcId, unsigned char current_map);
+	void SendPlayerAction(bool isCorrection, unsigned char action, unsigned char userId, float x, float y);
+	void SendSpawnTarget(unsigned char targetId, unsigned char current_map);
+	void SendPlayerHit(unsigned char userId);
+	
+	// Item related functions
+	void SendSpawnItem(unsigned char userId, unsigned char itemObjId, unsigned char current_map, unsigned char itemType, float x, float y, float x_speed, float y_speed);
+	void SendDespawnItem(unsigned char userId, unsigned char itemObjId, unsigned char current_map);
+
+	// Update client player's own stat points 
+	void SendStatHp(unsigned char userId, unsigned char hp);
+	void SendStatHpMax(unsigned char userId, unsigned char hp_max);
+	void SendStatStr(unsigned char userId, unsigned char str);
+	void SendStatDef(unsigned char userId, unsigned char def);
+	void SendStatPoints(unsigned char userId, unsigned char points);
+	void SendStatXp(unsigned char userId, unsigned int xp);
+	void SendStatXpMax(unsigned char userId, unsigned int xp_max);
+
+	// Update party stats for client party player list
+	void SendBuddyStatXp(unsigned char userId, unsigned char partyMemberId, unsigned char displayXp); 
+	void SendBuddyStatHp(unsigned char userId, unsigned char partyMemberId, unsigned char displayHp); 
+	void SendBuddyStatLevel(unsigned char userId, unsigned char partyMemberId, unsigned char displayLevel); 
 
  private:
 	
 	// Bind to this port and accept incoming connections.
-	int port = 0;
+	unsigned int port = 0;
 
 	// Allow only one save call at a time.
 	sem_t saveMutex;
@@ -70,21 +94,14 @@ public:
 
 	// Helper functions
 	void despawnTarget(int target, int current_map);
-	void spawnTarget(int target, int current_map);
 	void Respawn(int current_map, int i);
 	void Warp(int i, SKO_Portal portal);
 	void DivideLoot(int enemy, int party);
 	void KillEnemy(int current_map, int enemy);
 	void SpawnLoot(int current_map, SKO_ItemObject loot);
 	void GiveLoot(int enemy, int player);
-	void EnemyAttack(int i, int current_map);
-	void SendAttack(int CurrSock, float x, float y);
-	void SendJump(int CurrSock, float x, float y);
-	void SendLeft(int CurrSock, float x, float y);
-	void SendRight(int CurrSock, float x, float y);
-	void SendStop(int CurrSock, float x, float y);
-	void GiveXP(int CurrSock, int xp);
-	void quitParty(int CurrSock);
+	void GiveXP(unsigned char userId, int xp);
+	void quitParty(unsigned char userId);
 	int createPlayer(std::string Username, std::string Password, std::string IP);
 	int banIP(int Mod_i, std::string IP, std::string Reason);
 	int banPlayer(int Mod_i, std::string Username, std::string Reason, int flag);

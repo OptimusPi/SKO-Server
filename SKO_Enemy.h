@@ -37,11 +37,11 @@ class SKO_Enemy
 		//spawn
 		int sx, sy;
 
-		int defence;
-		int strength;
-		int hp;
-		int xp;
-		int hp_max;
+		unsigned int defence;
+		unsigned int strength;
+		unsigned int hp;
+		unsigned int xp;
+		unsigned int hp_max;
 		int hp_draw;
 
 		bool facing_right; 

@@ -34,13 +34,13 @@ extern const char NUM_MAPS;
 //TODO move to game logic
 extern bool blocked(int current_map, float box1_x1, float box1_y1, float box1_x2, float box1_y2, bool npc);
 extern void GiveLoot(int enemy, int player);
-extern void Attack(int CurrSock, float x, float y);
-extern void Jump(int CurrSock, float x, float y);
-extern void Left(int CurrSock, float x, float y);
-extern void Right(int CurrSock, float x, float y);
-extern void Stop(int CurrSock, float x, float y);
-extern void GiveXP(int CurrSock, int xp);
-extern void quitParty(int CurrSock);
+extern void Attack(unsigned char userId, float x, float y);
+extern void Jump(unsigned char userId, float x, float y);
+extern void Left(unsigned char userId, float x, float y);
+extern void Right(unsigned char userId, float x, float y);
+extern void Stop(unsigned char userId, float x, float y);
+extern void GiveXP(unsigned char userId, int xp);
+extern void quitParty(unsigned char userId);
 
 // TODO move to Utilities
 void trim(std::string s)
