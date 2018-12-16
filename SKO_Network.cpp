@@ -24,7 +24,7 @@ SKO_Network::SKO_Network(OPI_MYSQL *database, int port, unsigned long int saveRa
 std::string SKO_Network::Startup()
 {
 	// Test password hasher
-	std::string hashTestResult = Hash("password", "2616e26e9c5a4decb08353c1bcb2cf7e");
+	std::string hashTestResult = OPI_Hasher::Hash("password", "2616e26e9c5a4decb08353c1bcb2cf7e");
 	if (hashTestResult != "Quq6He1Ku8vXTw4hd0cXeEZAw0nqbpwPxZn50NcOVbk=")
 		return "The password hasher does not seem to be working properly. Check argon2 version.\n";
 
@@ -495,7 +495,7 @@ void SKO_Network::send(GE_Socket *socket, First const &first, Rest const &... re
 {
 	// Check socket health.
 	// If it's not healthy, the receive loop will clean it up.
-	if (!socket->Connected || (socket->GetStatus() & GE_Socket_Error)
+	if (!socket->Connected || (socket->GetStatus() & GE_Socket_Error))
 	{
 		printf("I can't send that packet. My socket is not connected!\n");
 		return;
@@ -505,7 +505,7 @@ void SKO_Network::send(GE_Socket *socket, First const &first, Rest const &... re
 	std::string packet = SKO_PacketFactory::getPacket(first, rest...);
 
 	// Send to the given socket but log errors.
-	if (socket->Send(Packet) == GE_Socket_Error)
+	if (socket->Send(packet) == GE_Socket_Error)
 	{
 		printf("Send() failed and returned GE_Socket_Error!\n");
 		return;
@@ -753,7 +753,7 @@ int SKO_Network::loadProfile(std::string Username, std::string Password)
 	sql = "SELECT * FROM player WHERE username like '";
 	sql += database->clean(Username);
 	sql += "' AND password like '";
-	sql += database->clean(Hash(Password, player_salt));
+	sql += database->clean(OPI_Hasher::Hash(Password, player_salt));
 	sql += "'";
 	database->query(sql);
 
@@ -785,21 +785,23 @@ void SKO_Network::SendSpawnTarget(unsigned char targetId, unsigned char current_
 	}
 }
 
-void SKO_Network::SendPlayerHit(unsigned char userId)
+void SKO_Network::SendDespawnTarget(unsigned char targetId, unsigned char current_map)
 {
-	std::string hpPacket = "0";
-	hpPacket += TARGET_HIT;
-	hpPacket += (char)1; // player
-	hpPacket += userId;
-	hpPacket[0] = hpPacket.length();
-
-	for (int c = 0; c < MAX_CLIENTS; c++)
-	{
-		if (User[c].Ident)
-		{
-			send(User[c].Sock, TARGET_HIT, (char)1, userId);
-		}
+	for (int i = 0; i < MAX_CLIENTS; i++)
+	{  
+		if (User[i].Ident)
+			send(User[i].Sock, DESPAWN_TARGET, targetId, current_map);
 	}
+}
+
+void SKO_Network::SendPlayerHit(unsigned char userId, unsigned char hitUserId) 
+{
+	send(User[userId].Sock, TARGET_HIT, (char)1, hitUserId);		
+}
+
+void SKO_Network::SendEnemyHit(unsigned char userId, unsigned char enemyId)
+{
+	send(User[userId].Sock, TARGET_HIT, (char)0, enemyId);
 }
 
 int SKO_Network::banIP(int Mod_i, std::string IP, std::string Reason)
@@ -1056,7 +1058,7 @@ int SKO_Network::createPlayer(std::string Username, std::string Password, std::s
 	sql = "INSERT INTO player (username, password, level, facing_right, x, y, hp, str, def, xp_max, hp_max, current_map, salt) VALUES('";
 	sql += database->clean(Username);
 	sql += "', '";
-	sql += database->clean(Hash(Password, player_salt));
+	sql += database->clean(OPI_Hasher::Hash(Password, player_salt));
 	sql += "', '1', b'1', '314', '300', '10', '2', '1', '10', '10', '2', '";
 	sql += database->clean(player_salt);
 	sql += "')";
@@ -1617,7 +1619,7 @@ void SKO_Network::HandleClient(unsigned char userId)
 					break; //cosmetic
 
 				case 1: //food
-
+				{
 					// Do not eat food if player is full health.
 					if (User[userId].hp == User[userId].max_hp)
 						break;
@@ -1653,8 +1655,9 @@ void SKO_Network::HandleClient(unsigned char userId)
 					send(User[userId].Sock, POCKET_ITEM, item, amount);
 
 					break;
-
+				}
 				case 2: //weapon
+				{
 					// Does the other player have another WEAPON equipped?
 					// If so, transfer it to inventory
 					unsigned char otherItem = User[userId].equip[0];
@@ -1683,8 +1686,9 @@ void SKO_Network::HandleClient(unsigned char userId)
 							send(User[i1].Sock, EQUIP, userId, (char)0, Item[item].equipID, item);
 					}
 					break;
-
+				}
 				case 3: //hat
+				{
 					// Does the other player have another HAT equipped?
 					// If so, transfer it to inventory
 					unsigned char otherItem = User[userId].equip[1];
@@ -1713,7 +1717,9 @@ void SKO_Network::HandleClient(unsigned char userId)
 							send(User[i1].Sock, EQUIP, userId, (char)1, Item[item].equipID, item);
 					}
 					break;
+				}
 				case 4: // mystery box
+				{
 					// holiday event
 					if (HOLIDAY)
 					{
@@ -1798,8 +1804,9 @@ void SKO_Network::HandleClient(unsigned char userId)
 						}
 					}
 					break;
-
+				}
 				case 5: // trophy / spell
+				{
 					// Does the other player have another TROPHY equipped?
 					// If so, transfer it to inventory
 					unsigned char otherItem = User[userId].equip[2];
@@ -1828,7 +1835,7 @@ void SKO_Network::HandleClient(unsigned char userId)
 							send(User[i1].Sock, EQUIP, userId, (char)2, Item[item].equipID, item);
 					}
 					break;
-
+				}
 				default:
 					break;
 				} //end switch
@@ -3275,6 +3282,11 @@ void SKO_Network::SendSpawnEnemy(SKO_Enemy *enemy, unsigned char enemyId, unsign
 	}
 }
 
+void SKO_Network::SendEnemyHp(unsigned char userId, unsigned char enemyId, unsigned char current_map, unsigned char displayHp)
+{ 
+	send(User[userId].Sock, ENEMY_HP, enemyId, current_map, displayHp);
+}
+
 void SKO_Network::SendEnemyAction(SKO_Enemy* enemy, unsigned char action, unsigned char enemyId, unsigned char current_map)
 {
 	//tell everyone they spawned
@@ -3309,6 +3321,10 @@ void SKO_Network::SendPlayerAction(bool isCorrection, unsigned char action, unsi
 		send(User[userId].Sock, action, userId, x, y);
 }
 
+void SKO_Network::SendStatLevel(unsigned char userId, unsigned char level)
+{	
+	send(User[userId].Sock, STAT_LEVEL, level);
+}
 void SKO_Network::SendStatHp(unsigned char userId, unsigned char hp)
 {
 	send(User[userId].Sock, STAT_HP, hp);
@@ -3356,4 +3372,20 @@ void SKO_Network::SendSpawnItem(unsigned char userId, unsigned char itemObjId, u
 void SKO_Network::SendDespawnItem(unsigned char userId, unsigned char itemObjId, unsigned char current_map)
 {
 	send(User[userId].Sock, DESPAWN_ITEM, itemObjId, current_map);
+}
+void SKO_Network::SendPocketItem(unsigned char userId, unsigned char itemId, unsigned int amount)
+{
+	send(User[userId].Sock, POCKET_ITEM, itemId, amount);
+}
+void SKO_Network::SendWarpPlayer(unsigned char userId, unsigned char warpUserId, unsigned char current_map, float x, float y)
+{ 
+	send(User[userId].Sock, WARP, warpUserId, current_map, x, y);
+}
+void SKO_Network::SendPlayerRespawn(unsigned char userId, unsigned char deadUserId, float x, float y)
+{
+	send(User[userId].Sock, RESPAWN, deadUserId, x, y);
+}
+void SKO_Network::SendQuitParty(unsigned char userId, unsigned char quitUserId)
+{
+	send(User[userId].Sock, PARTY, ACCEPT, quitUserId, (char)-1);
 }

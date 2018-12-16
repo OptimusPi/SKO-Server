@@ -20,7 +20,7 @@
 
 class SKO_Network
 {
-
+ 
 public:
 
 	SKO_Network(OPI_MYSQL * database, int port, unsigned long int saveRateSeconds);
@@ -33,12 +33,20 @@ public:
 	void SendEnemyAction(SKO_Enemy* enemy, unsigned char action, unsigned char enemyId, unsigned char current_map);
 	void SendNpcAction(SKO_NPC* npc, unsigned char action, unsigned char npcId, unsigned char current_map);
 	void SendPlayerAction(bool isCorrection, unsigned char action, unsigned char userId, float x, float y);
+	void SendPlayerRespawn(unsigned char userId, unsigned char deadUserId, float x, float y);
 	void SendSpawnTarget(unsigned char targetId, unsigned char current_map);
-	void SendPlayerHit(unsigned char userId);
-	
+	void SendDespawnTarget(unsigned char targetId, unsigned char current_map);
+	void SendPlayerHit(unsigned char userId, unsigned char hitUserId);
+	void SendEnemyHit(unsigned char userId, unsigned char enemyId);
+	void SendEnemyHp(unsigned char userId, unsigned char enemyId, unsigned char current_map, unsigned char displayHp);
+	void SendWarpPlayer(unsigned char userId, unsigned char warpUserId, unsigned char current_map, float x, float y);
+	void SendQuitParty(unsigned char userId, unsigned char quitUserId);
+
 	// Item related functions
 	void SendSpawnItem(unsigned char userId, unsigned char itemObjId, unsigned char current_map, unsigned char itemType, float x, float y, float x_speed, float y_speed);
 	void SendDespawnItem(unsigned char userId, unsigned char itemObjId, unsigned char current_map);
+	void SendPocketItem(unsigned char userId, unsigned char itemId, unsigned int amount);
+
 
 	// Update client player's own stat points 
 	void SendStatHp(unsigned char userId, unsigned char hp);
@@ -48,6 +56,7 @@ public:
 	void SendStatPoints(unsigned char userId, unsigned char points);
 	void SendStatXp(unsigned char userId, unsigned int xp);
 	void SendStatXpMax(unsigned char userId, unsigned int xp_max);
+	void SendStatLevel(unsigned char userId, unsigned char level);
 
 	// Update party stats for client party player list
 	void SendBuddyStatXp(unsigned char userId, unsigned char partyMemberId, unsigned char displayXp); 
@@ -86,22 +95,19 @@ public:
 	void saveProfile(unsigned int userId);
 	void saveAllProfiles();
 	int loadProfile(std::string Username, std::string Password); //todo return std::String helpful return message
-	int SKO_Network::load_data(int userId);
+	int load_data(int userId);
 
 	// Client socket functions
-	void SKO_Network::RecvPacket(GE_Socket* socket);
-	void SKO_Network::DisconnectClient(unsigned int userId);
+	void RecvPacket(GE_Socket* socket);
+	void DisconnectClient(unsigned int userId);
 
 	// Helper functions
 	void despawnTarget(int target, int current_map);
 	void Respawn(int current_map, int i);
-	void Warp(int i, SKO_Portal portal);
-	void DivideLoot(int enemy, int party);
+	void DivideLoot(int enemy, int party); 
 	void KillEnemy(int current_map, int enemy);
-	void SpawnLoot(int current_map, SKO_ItemObject loot);
 	void GiveLoot(int enemy, int player);
 	void GiveXP(unsigned char userId, int xp);
-	void quitParty(unsigned char userId);
 	int createPlayer(std::string Username, std::string Password, std::string IP);
 	int banIP(int Mod_i, std::string IP, std::string Reason);
 	int banPlayer(int Mod_i, std::string Username, std::string Reason, int flag);

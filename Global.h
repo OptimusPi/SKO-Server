@@ -1,4 +1,5 @@
-#pragma once
+#ifndef __GLOBAL_H_
+#define __GLOBAL_H_
 
 // TODO: Make this better, move it to a variadic function
 //Colors for fun console log statements
@@ -41,23 +42,11 @@ extern void Right(unsigned char userId, float x, float y);
 extern void Stop(unsigned char userId, float x, float y);
 extern void GiveXP(unsigned char userId, int xp);
 extern void quitParty(unsigned char userId);
+extern void Warp(int userId, SKO_Portal portal);
+extern void SpawnLoot(int current_map, SKO_ItemObject lootItem);
 
-// TODO move to Utilities
-void trim(std::string s)
-{
-	std::stringstream ss;
-	ss << s;
-	ss.clear();
-	ss >> s;
-}
+//Utilities
+extern void trim(std::string& s);
+extern std::string lower(std::string myString) ;
 
-std::string lower(std::string myString)
-{
-	const int length = myString.length();
-	for (int i = 0; i != length; ++i)
-	{
-		myString[i] = std::tolower(myString[i]);
-	}
-	return myString;
-}
-
+#endif

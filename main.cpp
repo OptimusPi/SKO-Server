@@ -77,14 +77,40 @@ void Right(unsigned char userId, float x, float y);
 void Stop(unsigned char userId, float x, float y);
 void GiveXP(unsigned char userId, int xp);
 void quitParty(unsigned char userId);
-
+void PlayerDamaged(unsigned char userId, unsigned char damage);
+void EnemyHit(unsigned char enemyId, unsigned char current_map, unsigned char userId);
+void RespawnEnemy(int current_map, int enemy);
+void KillEnemy(unsigned char enemyId, unsigned char current_map, unsigned char killerUserId);
 void SpawnItem(unsigned char current_map, unsigned char itemObjId, unsigned char itemId, float x, float y, float x_speed, float y_speed);
 void DespawnItem(unsigned char itemId, unsigned char current_map);
+void PocketItem(unsigned char userId, unsigned char itemID, unsigned int amount);
+void EnemyAttack(int i, int current_map);
+void Warp(int userId, SKO_Portal portal);
+void Respawn(int current_map, int userId);
+void SpawnLoot(int current_map, SKO_ItemObject lootItem);
 
 static void *Physics(void *Arg);
 static void *TargetLoop(void *Arg);
 static void *EnemyLoop(void *arg);
 static void *UserLoop(void *arg);
+
+void trim(std::string& s)
+{
+    size_t first = s.find_first_not_of(' ');
+    if (std::string::npos == first)
+        return;
+    
+    size_t last = s.find_last_not_of(' ');
+    s = s.substr(first, (last - first + 1));
+}
+  
+std::string lower(std::string myString) 
+{ 
+  for(int i=0; i < myString.length(); ++i)
+    myString[i] = std::tolower(myString[i]);
+  
+  return myString;
+}
 
 int snap_distance = 64;
 
@@ -414,7 +440,7 @@ void *EnemyLoop(void *arg)
 
 			if (map[current_map].Enemy[i]->y > map[current_map].death_pit)
 			{
-				KillEnemy(current_map, i);
+				RespawnEnemy(current_map, i);
 				printf("Fix enemy from falling into death pit: map %i Enemy %i spawns at (%i,%i)\n", current_map, i, map[current_map].Enemy[i]->sx, map[current_map].Enemy[i]->sy);
 			}
 
@@ -719,7 +745,7 @@ void *Physics(void *arg)
 	char *p;
 	bool block_y;
 	bool block_x;
-	int ID = 0;
+	unsigned char itemId = 0;
 	float box1_x1, box1_y1, box1_x2, box1_y2;
 	unsigned int amt = 0;
 
@@ -1047,7 +1073,7 @@ void *Physics(void *arg)
 						map[current_map].ItemObj[i].ownerTicker = 0;
 					}
 
-					ID = map[current_map].ItemObj[i].itemID;
+					itemId = map[current_map].ItemObj[i].itemID;
 
 					// printf("(%.2f,%.2f)\n", map[current_map].ItemObj[i].x, map[current_map].ItemObj[i].y);
 					//horizontal collision detection
@@ -1115,46 +1141,15 @@ void *Physics(void *arg)
 							if (User[c].Ident && isMine)
 							{
 								//if user doesnt have it, can only pick up if they dont have a full inventory
-								if (User[c].inventory[ID] == 0 && User[c].inventory_index > 23)
+								if (User[c].inventory[itemId] == 0 && User[c].inventory_index > 23)
 								{
-									printf("User %s inventory is full and cant pick up item %i!", User[c].Nick.c_str(), ID);
+									printf("User %s inventory is full and cant pick up item %i!", User[c].Nick.c_str(), itemId);
 								}
 								else
 								{
-									unsigned char itemId = i;
-									DespawnItem(itemId, current_map);
-									PocketItem(c, ID, amount, User[c].inventory[ID], );
-
-									//put in players inventory
-									if (User[c].inventory[ID] == 0)
-										User[c].inventory_index++;
-
-									User[c].inventory[ID] += map[current_map].ItemObj[i].amount;
-									map[current_map].ItemObj[i].remove();
-
-									//put in players inventory
-									Packet = "0";
-									Packet += POCKET_ITEM;
-									Packet += ID;
-
-									//break up the int as 4 bytes
-									amt = User[c].inventory[ID];
-									printf("\n\nPutting this item in player's inventory!\nAmount: %i\nWhich item object? [0-255]: %i\nWhich item? [0-1]: %i\n", amt, i, ID);
-									printf("Player has [%i] ITEM_GOLD and [%i] ITEM_MYSTERY_BOX\n\n", User[c].inventory[0], User[c].inventory[1]);
-									p = (char *)&amt;
-									b1 = p[0];
-									b2 = p[1];
-									b3 = p[2];
-									b4 = p[3];
-									Packet += b1;
-									Packet += b2;
-									Packet += b3;
-									Packet += b4;
-
-									Packet[0] = Packet.length();
-									User[c].SendPacket(Packet);
-
-
+									DespawnItem(i, current_map);
+									unsigned int amount = map[current_map].ItemObj[i].amount + User[c].inventory[itemId];
+									PocketItem(c, itemId, amount);
 								} //end else not inventory full (you can pick up)
 							}
 						}
@@ -1279,7 +1274,7 @@ void Attack(unsigned char userId, float numx, float numy)
 					dam = 0;
 				}
 
-				std::string Packet;
+				
 				if (User[i].hp <= dam)
 				{
 					printf("Respawn, x:%.2f y:%.2f\n", User[i].x, User[i].y);
@@ -1289,38 +1284,7 @@ void Attack(unsigned char userId, float numx, float numy)
 				} //end died
 				else
 				{
-					User[i].hp -= dam;
-					Packet = "0";
-					Packet += STAT_HP;
-					Packet += User[i].hp;
-					Packet[0] = Packet.length();
-					User[i].SendPacket(Packet);
-					network->sendHp
-
-					Packet = "0";
-					Packet += TARGET_HIT;
-					Packet += 1; // player
-					Packet += i;
-					Packet[0] = Packet.length();
-
-					//party hp notification
-					std::string hpPacket = "0";
-					hpPacket += BUDDY_HP;
-					hpPacket += i;
-					hpPacket += (int)((User[i].hp / (float)User[i].max_hp) * 80);
-					hpPacket[0] = hpPacket.length();
-
-					for (int i1 = 0; i1 < MAX_CLIENTS; i1++)
-					{
-						if (User[i1].Ident && User[i1].current_map == User[i].current_map)
-							;
-						{
-							User[i1].SendPacket(Packet);
-
-							if (i != i1 && User[i1].partyStatus == PARTY && User[i1].party == User[i].party)
-								User[i1].SendPacket(hpPacket);
-						}
-					}
+					PlayerDamaged(i, dam);
 				} //end lose hp
 			}	 //end hit
 		}
@@ -1356,7 +1320,7 @@ void Attack(unsigned char userId, float numx, float numy)
 			//make this target disappear
 			map[current_map].Target[i].respawn_ticker = Clock();
 			map[current_map].Target[i].active = false;
-			despawnTarget(i, current_map);
+			network->SendDespawnTarget(i, current_map);
 
 			//spawn some loot
 			if (map[current_map].Target[i].loot >= 0)
@@ -1421,159 +1385,9 @@ void Attack(unsigned char userId, float numx, float numy)
 			//attack events
 			if (x_dist >= 0 && x_dist < max_dist && y_dist > -60 && y_dist < 60)
 			{
-				int dam = User[userId].strength - map[current_map].Enemy[i]->defence;
-
-				//keep track of damage
-				map[current_map].Enemy[i]->dibsDamage[userId] += dam;
-
-				//weapon
-				if (weap != 0)
-					dam += Item[weap].str;
-
-				printf("%s hit an enemy! damage is: %i\n", User[userId].Nick.c_str());
-
-				//don't give free hp
-				if (dam < 0)
-				{
-					dam = 0;
-				}
-				else
-				{
-					//damage! dibs this mob for the current player who hit it
-					map[current_map].Enemy[i]->dibsPlayer = userId;
-					map[current_map].Enemy[i]->dibsTicker = Clock();
-
-					Packet = "0";
-					Packet += TARGET_HIT;
-					Packet += (char)0; // npc
-					Packet += i;
-					Packet[0] = Packet.length();
-
-					for (int i1 = 0; i1 < MAX_CLIENTS; i1++)
-					{
-						if (User[i1].Ident && User[i1].current_map == current_map)
-						{
-							User[i1].SendPacket(Packet);
-						}
-					}
-				}
-
-				std::string Packet;
-				if (map[current_map].Enemy[i]->hp <= dam)
-				{
-					//keep track of damage but remove overflow
-					int extraHpHurt = (dam - map[current_map].Enemy[i]->hp);
-					map[current_map].Enemy[i]->dibsDamage[userId] -= extraHpHurt;
-
-					//Divide Loot between a party
-					if (User[userId].partyStatus == PARTY)
-					{
-						DivideLoot(i, User[userId].party);
-					}
-					else //not in a party, they get all the loots!
-					{
-						for (int it = 0; it < map[current_map].Enemy[i]->lootAmount; it++)
-							GiveLoot(i, userId);
-					}
-
-					//kill the enemy after loot is dropped !! :P
-					KillEnemy(current_map, i);
-
-					float bonus_clan_xp = 0;
-					float splitXP = map[current_map].Enemy[i]->xp;
-
-					//if in a clan add bonus xp
-					if (User[userId].Clan[0] == '[')
-					{
-						bonus_clan_xp = map[current_map].Enemy[i]->xp * 0.10; //10% bonus
-					}
-					printf("User is in a clan so bonus xp for them! %i\n", (int)bonus_clan_xp);
-					if (User[userId].partyStatus == PARTY)
-					{
-						//give bonus XP for party
-						float bonusXP = splitXP * 0.10;
-						float totalDamage = 0;
-
-						//find total damage from all party members
-						for (int p = 0; p < MAX_CLIENTS; p++)
-							if (User[p].Ident && User[p].partyStatus == PARTY && User[p].party == User[userId].party)
-								totalDamage += map[current_map].Enemy[i]->dibsDamage[p];
-
-						//find total damage from all party members
-						for (int p = 0; p < MAX_CLIENTS; p++)
-							if (User[p].Ident && User[p].partyStatus == PARTY && User[p].party == User[userId].party)
-							{
-								//base XP they deserve
-								float gimmieXP = 0;
-								float pl_dmg = (float)map[current_map].Enemy[i]->dibsDamage[p];
-
-								if (pl_dmg > 0)
-									gimmieXP = pl_dmg / totalDamage;
-
-								printf("Player %s dealt %.2f percent of the damage or %i HP out of %i HP done by the party.\n",
-									   User[p].Nick.c_str(), gimmieXP * 100, map[current_map].Enemy[i]->dibsDamage[p], (int)totalDamage);
-								gimmieXP *= splitXP;
-
-								//add bonus XP
-								gimmieXP += bonusXP;
-								printf("Player %s earned %.2f XP points\n", User[p].Nick.c_str(), gimmieXP);
-
-								int pXpGiven = (int)gimmieXP;
-
-								//get the decimal alone
-								gimmieXP = gimmieXP - pXpGiven;
-								gimmieXP *= 100;
-
-								//slight chance of bonus xp :)
-								printf("Player %s will be given %i XP points for sure but has a %.2f chance for a bonus XP\n", User[p].Nick.c_str(), pXpGiven, gimmieXP);
-								if (Roll(gimmieXP))
-								{
-									pXpGiven++;
-								}
-
-								GiveXP(p, pXpGiven + bonus_clan_xp);
-								printf("Player %s was given %i XP points\n", User[p].Nick.c_str(), pXpGiven);
-							}
-					} //end split xp with party
-					else
-					{
-						//just give myself xp
-						GiveXP(userId, map[current_map].Enemy[i]->xp + bonus_clan_xp);
-						printf("[SOLO] Player %s was given %i XP points\n", User[userId].Nick.c_str(), map[current_map].Enemy[i]->xp);
-					}
-				} //end died
-				else
-				{
-					map[current_map].Enemy[i]->hp -= dam;
-
-					//enemy health bars
-					int hp = (unsigned char)((float)map[current_map].Enemy[i]->hp / map[current_map].Enemy[i]->hp_max * hpBar);
-
-					//packet
-					std::string hpPacket = "0";
-					hpPacket += ENEMY_HP;
-					hpPacket += i;
-					hpPacket += current_map;
-					hpPacket += hp;
-					hpPacket[0] = hpPacket.length();
-
-					for (int c = 0; c < MAX_CLIENTS; c++)
-						if (User[c].Ident)
-							User[c].SendPacket(hpPacket);
-					printf("sending bandit hp shiz :)\n");
-				} //end not died enemy, just damage
-			}	 //end hit
-			else
-			{
-				printf("%s did not hit enemy because x_dist:%i, y_dist:%i, max_dist:%i\n",
-					   User[userId].Nick.c_str(), (int)x_dist, (int)y_dist, (int)max_dist);
+				EnemyHit(i, current_map, userId);
 			}
 		} //end loop if you hit enemys
-		else
-		{
-			printf("Skippy enemy[%i] because dead:%i, partyBlocked:%i, partBlockedBy:%i\n",
-				   i, (int)map[current_map].Enemy[i]->dead, partyBlocked, map[current_map].Enemy[i]->dibsPlayer);
-		}
 	} // end if enemy is dead
 }
 
@@ -1582,12 +1396,7 @@ void Stop(unsigned char userId, float numx, float numy)
 	//you cant move when attacking!
 	if (User[userId].attacking)
 	{
-		printf("tried to move stop when attacking.\7\n");
-		//if not in que, put it there.
-		if (User[userId].que_action == 0)
-		{
-			User[userId].que_action = MOVE_STOP;
-		}
+		User[userId].que_action = MOVE_STOP;
 
 		return;
 	}
@@ -1626,13 +1435,7 @@ void Right(unsigned char userId, float numx, float numy)
 	//you cant move when attacking!
 	if (User[userId].attacking)
 	{
-		printf("tried to move right when attacking.\7\n");
-		//if not in que, put it there.
-		if (User[userId].que_action == 0)
-		{
-			User[userId].que_action = MOVE_RIGHT;
-		}
-
+		User[userId].que_action = MOVE_RIGHT;
 		return;
 	}
 
@@ -1671,12 +1474,7 @@ void Left(unsigned char userId, float numx, float numy)
 	//you cant move when attacking!
 	if (User[userId].attacking)
 	{
-		printf("tried to move left when attacking.\7\n");
-		//if not in que, put it there.
-		if (User[userId].que_action == 0)
-		{
-			User[userId].que_action = MOVE_LEFT;
-		}
+		User[userId].que_action = MOVE_LEFT;
 		return;
 	}
 
@@ -1715,12 +1513,7 @@ void Jump(unsigned char userId, float numx, float numy)
 	//you cant move when attacking!
 	if (User[userId].attacking)
 	{
-		printf("tried to jump while attacking...\7\n");
-		//if not in que, put it there.
-		if (User[userId].que_action == 0)
-		{
-			User[userId].que_action = MOVE_JUMP;
-		}
+		User[userId].que_action = MOVE_JUMP;
 		return;
 	}
 	
@@ -1827,9 +1620,8 @@ void DivideLoot(int enemy, int party)
 	}
 }
 
-void KillEnemy(int current_map, int enemy)
+void RespawnEnemy(int current_map, int enemy)
 {
-
 	printf("Map %i Enemy %i killed at (%i, %i) spawns at (%i, %i)\n",
 		   current_map, enemy, (int)map[current_map].Enemy[enemy]->x, (int)map[current_map].Enemy[enemy]->y, (int)map[current_map].Enemy[enemy]->sx, (int)map[current_map].Enemy[enemy]->sy);
 	//set enemy to dead
@@ -1838,37 +1630,11 @@ void KillEnemy(int current_map, int enemy)
 	//set their respawn timer
 	map[current_map].Enemy[enemy]->respawn_ticker = Clock();
 
-	//disappear
+	//disappear TODO - remove this hack add enemy killed pakcet for client & server
 	map[current_map].Enemy[enemy]->x = -100000;
 	map[current_map].Enemy[enemy]->y = -100000;
 
-	printf("Now he's at (%i, %i) and spawns at (%i, %i)\n", (int)map[current_map].Enemy[enemy]->x, (int)map[current_map].Enemy[enemy]->y, (int)map[current_map].Enemy[enemy]->sx, (int)map[current_map].Enemy[enemy]->sy);
-
-	//tell players he disappeared
-	std::string Packet = "0";
-	Packet += ENEMY_MOVE_STOP;
-	Packet += enemy;
-	Packet += current_map;
-	char *p = (char *)&map[current_map].Enemy[enemy]->x;
-	Packet += p[0];
-	Packet += p[1];
-	Packet += p[2];
-	Packet += p[3];
-	p = (char *)&map[current_map].Enemy[enemy]->y;
-	Packet += p[0];
-	Packet += p[1];
-	Packet += p[2];
-	Packet += p[3];
-
-	//send packet to all players
-	Packet[0] = Packet.length();
-	for (int i = 0; i < MAX_CLIENTS; i++)
-	{
-		if (User[i].Ident)
-			User[i].SendPacket(Packet);
-	}
-
-	printf("Enemy killed, (%i,%i)\n", (int)map[current_map].Enemy[enemy]->x, (int)map[current_map].Enemy[enemy]->y);
+	network->SendEnemyAction(map[current_map].Enemy[enemy], ENEMY_MOVE_STOP, enemy, current_map);
 }
 
 void SpawnLoot(int current_map, SKO_ItemObject lootItem)
@@ -1901,11 +1667,6 @@ void SpawnLoot(int current_map, SKO_ItemObject lootItem)
 	float x_speed = map[current_map].ItemObj[rand_i].x_speed;
 	float y_speed = map[current_map].ItemObj[rand_i].y_speed;
 	SpawnItem(current_map, itemObjId, itemId, x, y, x_speed, y_speed);
-
-	printf("Item spawn packet (loot): ");
-	for (int pk = 0; pk < Packet.length(); pk++)
-		printf("[%i]", (int)(unsigned char)Packet[pk]);
-	printf("\n");
 }
 
 void GiveLoot(int enemy, int player)
@@ -1981,12 +1742,7 @@ void EnemyAttack(int i, int current_map)
 				{
 					dam = 0;
 				}
-				else
-				{
-					network->PlayerHit(u);
-				}
 
-				std::string Packet;
 				if (User[u].hp <= dam)
 				{
 					printf("Respawning, x:%i y:%i\n", (int)User[u].x, (int)User[u].y);
@@ -1997,77 +1753,25 @@ void EnemyAttack(int i, int current_map)
 				} //end died
 				else
 				{
-					User[u].hp -= dam;
-					std::string Packet2 = "0";
-					Packet2 += STAT_HP;
-					Packet2 += User[u].hp;
-					Packet2[0] = Packet2.length();
-					User[u].SendPacket(Packet2);
-
-					//party hp notification
-					std::string hpPacket = "0";
-					hpPacket += BUDDY_HP;
-					hpPacket += u;
-					hpPacket += (int)((User[u].hp / (float)User[u].max_hp) * 80);
-					hpPacket[0] = hpPacket.length();
-
-					for (int pl = 0; pl < MAX_CLIENTS; pl++)
-					{
-						if (pl != u && User[pl].Ident && User[pl].partyStatus == PARTY && User[pl].party == User[u].party)
-							User[pl].SendPacket(hpPacket);
-					}
+					PlayerDamaged(u, dam);
 				} //end lose hp
 			}	 //end hit
 		}
 	} //end loop everyone
 }
 
-void Warp(int i, SKO_Portal portal)
+void Warp(int userId, SKO_Portal portal)
 {
 	//move the player to this spot
-	User[i].current_map = portal.map;
-	User[i].x = portal.spawn_x;
-	User[i].y = portal.spawn_y;
+	unsigned char oldMap = User[userId].current_map;
+	User[userId].current_map = portal.map;
+	User[userId].x = portal.spawn_x;
+	User[userId].y = portal.spawn_y;
 
-	//tell everyone
-	std::string warpPacket = "0";
-	warpPacket += WARP;
-	warpPacket += i;
-	warpPacket += User[i].current_map;
-
-	printf("Warping player %s to map %i at (%i, %i)\n", User[i].Nick.c_str(), User[i].current_map, (int)User[i].x, (int)User[i].y);
-
-	//break up the int as 4 bytes
-	char *p = (char *)&User[i].x;
-	char b1 = p[0], b2 = p[1], b3 = p[2], b4 = p[3];
-
-	//spit out each of the bytes
-	warpPacket += b1;
-	warpPacket += b2;
-	warpPacket += b3;
-	warpPacket += b4;
-
-	p = (char *)&User[i].y;
-	b1 = p[0];
-	b2 = p[1];
-	b3 = p[2];
-	b4 = p[3];
-
-	//spit out each of the bytes
-	warpPacket += b1;
-	warpPacket += b2;
-	warpPacket += b3;
-	warpPacket += b4;
-
-	warpPacket[0] = warpPacket.length();
-
-	for (int pla = 0; pla < MAX_CLIENTS; pla++)
+	for (int c = 0; c < MAX_CLIENTS; c++)
 	{
-		if (User[pla].Ident)
-		{
-			//send packet to evertyone :)
-			User[pla].SendPacket(warpPacket);
-		}
+		if (User[c].Ident && (User[c].current_map == User[userId].current_map || User[c].current_map == oldMap))
+			network->SendWarpPlayer(c, userId, User[userId].current_map, User[userId].x, User[userId].y);
 	}
 
 	//TODO show all items and targets on warp?
@@ -2075,169 +1779,80 @@ void Warp(int i, SKO_Portal portal)
 
 void GiveXP(unsigned char userId, int xp)
 {
-	printf("GiveXP(%i, %i);\n", userId, xp);
-
-	if (xp < 0 || xp > 1000)
+	if (xp < 0 || xp > 10000)
 	{
-		printf("[WARN] Tried to give weird xp: %i\n", xp);
+		printf(kRed "[FATAL] Tried to give weird xp: %i\n" kNormal, xp);
 		return;
 	}
-	else
-	{
-		printf("Clear to give %i XP \n", xp);
-	}
-
-	std::string Packet = "";
-	char *p;
-	char b1, b2, b3, b4;
 
 	//add xp
 	if (User[userId].addXP(xp))
 	{
 		//you leveled up, send all stats
-
 		//level
-		Packet = "0";
-		Packet += STAT_LEVEL;
-		Packet += User[userId].level;
-		Packet[0] = Packet.length();
-		User[userId].SendPacket(Packet);
+		network->SendStatLevel(userId, User[userId].level);
 
 		//hp max
-		Packet = "0";
-		Packet += STATMAX_HP;
-		Packet += User[userId].max_hp;
-		Packet[0] = Packet.length();
-		User[userId].SendPacket(Packet);
+		network->SendStatXpMax(userId, User[userId].max_xp);
 
 		//hp
-		Packet = "0";
-		Packet += STAT_HP;
-		Packet += User[userId].hp;
-		Packet[0] = Packet.length();
-		User[userId].SendPacket(Packet);
+		network->SendStatHp(userId, User[userId].hp);
 
 		//stat_points
-		Packet = "0";
-		Packet += STAT_POINTS;
-		Packet += User[userId].stat_points;
-		Packet[0] = Packet.length();
-		User[userId].SendPacket(Packet);
+		network->SendStatPoints(userId, User[userId].stat_points);
 
 		//xp
-		Packet = "0";
-		Packet += STAT_XP;
-		p = (char *)&User[userId].xp;
-		b1 = p[0];
-		b2 = p[1];
-		b3 = p[2];
-		b4 = p[3];
-		Packet += b1;
-		Packet += b2;
-		Packet += b3;
-		Packet += b4;
-		Packet[0] = Packet.length();
-		User[userId].SendPacket(Packet);
+		network->SendStatXp(userId, User[userId].xp);
 
 		//max xp
-		Packet = "0";
-		Packet += STATMAX_XP;
-		p = (char *)&User[userId].max_xp;
-		b1 = p[0];
-		b2 = p[1];
-		b3 = p[2];
-		b4 = p[3];
-		Packet += b1;
-		Packet += b2;
-		Packet += b3;
-		Packet += b4;
-		Packet[0] = Packet.length();
-		User[userId].SendPacket(Packet);
+		network->SendStatXpMax(userId, User[userId].max_xp);
 
-		//tell party members my level
-		std::string lvlPacket = "0";
-		lvlPacket += BUDDY_LEVEL;
-		lvlPacket += userId;
-		lvlPacket += User[userId].level;
-		lvlPacket[0] = lvlPacket.length();
+		//tell party members my new stats - TODO - make these cosmetic stat bar calls into a function
+		unsigned char displayXp = (int)((User[userId].xp / (float)User[userId].max_xp) * 80);
+		unsigned char displayHp = (int)((User[userId].hp / (float)User[userId].max_hp) * 80);
 
 		for (int pl = 0; pl < MAX_CLIENTS; pl++)
 		{
 			if (pl != userId && User[pl].Ident && User[pl].partyStatus == PARTY && User[pl].party == User[userId].party)
-				User[pl].SendPacket(lvlPacket);
+			{
+				network->SendBuddyStatHp(pl, userId, User[userId].hp);
+				network->SendBuddyStatXp(pl, userId, User[userId].xp);
+				network->SendBuddyStatLevel(pl, userId, User[userId].level);
+			}
 		}
+		return;
 	} //end gain xp
 
 	//xp
-	Packet = "0";
-	Packet += STAT_XP;
-	p = (char *)&User[userId].xp;
-	b1 = p[0];
-	b2 = p[1];
-	b3 = p[2];
-	b4 = p[3];
-	Packet += b1;
-	Packet += b2;
-	Packet += b3;
-	Packet += b4;
-	Packet[0] = Packet.length();
-	User[userId].SendPacket(Packet);
+	network->SendStatXp(userId, User[userId].xp);
 
 	//tell party members my xp
-	std::string xpPacket = "0";
-	xpPacket += BUDDY_XP;
-	xpPacket += userId;
-	xpPacket += (int)((User[userId].xp / (float)User[userId].max_xp) * 80);
-	xpPacket[0] = xpPacket.length();
-
-	for (int pl = 0; pl < MAX_CLIENTS; pl++)
+	unsigned char displayXp = (int)((User[userId].xp / (float)User[userId].max_xp) * 80);
+	for (int c = 0; c < MAX_CLIENTS; c++)
 	{
-		if (pl != userId && User[pl].Ident && User[pl].partyStatus == PARTY && User[pl].party == User[userId].party)
-			User[pl].SendPacket(xpPacket);
+		if (c != userId && User[c].Ident && User[c].partyStatus == PARTY && User[c].party == User[userId].party)
+			network->SendBuddyStatXp(c, userId, displayXp);
 	}
 }
 
-void Respawn(int current_map, int i)
+void Respawn(int current_map, int userId)
 {
 	//place their coords
-	User[i].x = map[current_map].spawn_x;
-	User[i].y = map[current_map].spawn_y;
-	User[i].y_speed = 0;
-	User[i].hp = User[i].max_hp;
+	User[userId].x = map[current_map].spawn_x;
+	User[userId].y = map[current_map].spawn_y;
+	User[userId].y_speed = 0;
+	User[userId].hp = User[userId].max_hp;
 
-	std::string Packet1 = "0";
-	Packet1 += RESPAWN;
-	Packet1 += i;
-
-	float numx = User[i].x;
-	char *p = (char *)&numx;
-	Packet1 += p[0];
-	Packet1 += p[1];
-	Packet1 += p[2];
-	Packet1 += p[3];
-
-	float numy = User[i].y;
-	p = (char *)&numy;
-	Packet1 += p[0];
-	Packet1 += p[1];
-	Packet1 += p[2];
-	Packet1 += p[3];
-
-	Packet1[0] = Packet1.length();
-
-	//tell everyone they died
-	for (int ii = 0; ii < MAX_CLIENTS; ii++)
+	//tell everyone they respawned
+	for (int c = 0; c < MAX_CLIENTS; c++)
 	{
-		if (User[ii].Ident)
-		{
-			User[ii].SendPacket(Packet1);
-		}
+		if (User[c].Ident && User[c].current_map == current_map)
+			network->SendPlayerRespawn(c, userId, User[userId].x, User[userId].y);
 	}
 }
 
 void quitParty(unsigned char userId)
 {
-
 	printf("quitParty(%s)\n", User[userId].Nick.c_str());
 	if (User[userId].partyStatus == 0 || User[userId].party < 0)
 	{
@@ -2255,57 +1870,39 @@ void quitParty(unsigned char userId)
 	User[userId].party = -1;
 	User[userId].partyStatus = 0;
 
-	std::string acceptPacket = "0";
-	acceptPacket += PARTY;
-	acceptPacket += ACCEPT;
-	acceptPacket += userId;
-	acceptPacket += (char)-1;
-	acceptPacket[0] = acceptPacket.length();
-
 	printf("telling everyone that %s left his party.\n", User[userId].Nick.c_str());
 	//tell everyone
-	for (int pl = 0; pl < MAX_CLIENTS; pl++)
-		if (User[pl].Ident)
-			User[pl].SendPacket(acceptPacket);
+	for (int c = 0; c < MAX_CLIENTS; c++)
+		if (User[c].Ident)
+			network->SendQuitParty(c, userId);
 
 	//quit the inviter if there is only one
-	int inv;
+	unsigned char partyHostUserId;
 	int count = 0;
 	for (int i = 0; i < MAX_CLIENTS; i++)
 		if (User[i].Ident && User[i].party == partyToLeave)
 		{
 			count++;
-			inv = i;
+			partyHostUserId = i;
 		}
 
-	//only if they are the last one remaining
+	// If there is now only a party of 1 left, make them quit their party as well
 	if (count == 1)
 	{
-		User[inv].party = -1;
-		User[inv].partyStatus = 0;
-
-		acceptPacket = "0";
-		acceptPacket += PARTY;
-		acceptPacket += ACCEPT;
-		acceptPacket += inv;
-		acceptPacket += (char)-1;
-		acceptPacket[0] = acceptPacket.length();
-
-		//tell everyone
-		for (int pl = 0; pl < MAX_CLIENTS; pl++)
-			if (User[pl].Ident)
-				User[pl].SendPacket(acceptPacket);
+		User[partyHostUserId].party = -1;
+		User[partyHostUserId].partyStatus = 0;
+		network->SendQuitParty(partyHostUserId, partyHostUserId);
 	}
 }
 
-void DespawnItem(unsigned char itemId, unsigned char current_map)
+void DespawnItem(unsigned char itemObjId, unsigned char current_map)
 {
 	//remove from map
 	for (int userId = 0; userId < MAX_CLIENTS; userId++)
 	{
 		if (User[userId].Ident && User[userId].current_map == current_map)
-			network->SendDespawnItem(userId, itemId, current_map);
-	}
+			network->SendDespawnItem(userId, itemObjId, current_map);
+	} 
 }
 
 void SpawnItem(unsigned char current_map, unsigned char itemObjId, unsigned char itemId, float x, float y, float x_speed, float y_speed)
@@ -2314,6 +1911,204 @@ void SpawnItem(unsigned char current_map, unsigned char itemObjId, unsigned char
 	for (int userId = 0; userId < MAX_CLIENTS; userId++)
 	{
 		if (User[userId].Ident && User[userId].current_map == current_map)
-			network->SendSpawnItem(userId, itemObjId, itemId, x, y, x_speed, y_speed);
+			network->SendSpawnItem(userId, itemObjId, current_map, itemId, x, y, x_speed, y_speed);
 	}
 } 
+
+void PocketItem(unsigned char userId, unsigned char itemId, unsigned int amount)
+{
+	// If it's a new item, increase the count of held items for the player
+	if (User[userId].inventory[itemId] == 0 && amount > 0)
+			User[userId].inventory_index++;
+
+	// If the item was removed fromt he player's inventory, decrease inventory index
+	if (User[userId].inventory[itemId] > 0 && amount == 0) 
+			User[userId].inventory_index--;
+
+	//Set the user inventory amount
+	User[userId].inventory[itemId] = amount;
+
+	//put in client player's inventory
+	network->SendPocketItem(userId, itemId, amount);
+}
+
+void PlayerDamaged(unsigned char userId, unsigned char damage)
+{
+	//Notify client player about their new HP
+	User[userId].hp -= damage;
+	network->SendStatHp(userId, User[userId].hp);
+
+	//party hp notification
+	unsigned char displayHp = (int)((User[userId].hp / (float)User[userId].max_hp) * 80);
+	
+	for (int c = 0; c < MAX_CLIENTS; c++)
+	{
+		if (User[c].Ident && User[c].current_map == User[c].current_map)
+		{
+			network->SendPlayerHit(c, userId);
+			if (userId != c && User[c].partyStatus == PARTY && User[c].party == User[userId].party)
+				network->SendBuddyStatHp(c, userId, displayHp);
+		}
+	}
+}
+
+unsigned int GetTotalStrength(unsigned char userId)
+{
+	unsigned int totalStrength =  User[userId].strength;
+	unsigned char weapon = User[userId].equip[0];
+	unsigned char hat = User[userId].equip[1];
+	unsigned char trophy = User[userId].equip[2];
+	
+
+	//Add strength of all equipment
+	if (weapon)
+		totalStrength += Item[weapon].str;
+	if (hat)
+		totalStrength += Item[hat].str;
+	if (trophy)
+		totalStrength += Item[trophy].str;
+	
+	return totalStrength;
+}
+
+unsigned int GetTotalDefence(unsigned char userId)
+{
+	unsigned int totalDefence =  User[userId].defence;
+	unsigned char weapon = User[userId].equip[0];
+	unsigned char hat = User[userId].equip[1];
+	unsigned char trophy = User[userId].equip[2];
+	
+
+	//Add strength of all equipment
+	if (weapon)
+		totalDefence += Item[weapon].def;
+	if (hat)
+		totalDefence += Item[hat].def;
+	if (trophy)
+		totalDefence += Item[trophy].def;
+	
+	return totalDefence;
+}
+
+void KillEnemy(unsigned char enemyId, unsigned char current_map, unsigned char killerUserId)
+{
+	//Divide Loot between a party
+	if (User[killerUserId].partyStatus == PARTY)
+	{
+		DivideLoot(enemyId, User[killerUserId].party);
+	}
+	else //not in a party, they get all the loots!
+	{
+		for (int it = 0; it < map[current_map].Enemy[enemyId]->lootAmount; it++)
+			GiveLoot(enemyId, killerUserId);
+	}
+
+	//kill the enemy after loot is dropped !! :P
+	RespawnEnemy(current_map, enemyId);
+
+	float bonus_clan_xp = 0;
+	float splitXP = map[current_map].Enemy[enemyId]->xp;
+
+	//if in a clan add bonus xp - TODO: remove "(" versus "[" logic for clans
+	if (User[killerUserId].Clan[0] == '[')
+	{
+		bonus_clan_xp = map[current_map].Enemy[enemyId]->xp * 0.10; //10% bonus
+	}
+	printf("User is in a clan so bonus xp for them! %i\n", (int)bonus_clan_xp);
+	if (User[killerUserId].partyStatus == PARTY)
+	{
+		//give bonus XP for party
+		float bonusXP = splitXP * 0.10;
+		float totalDamage = 0;
+
+		//find total damage from all party members
+		for (int p = 0; p < MAX_CLIENTS; p++)
+			if (User[p].Ident && User[p].partyStatus == PARTY && User[p].party == User[killerUserId].party)
+				totalDamage += map[current_map].Enemy[enemyId]->dibsDamage[p];
+
+		//find total damage from all party members
+		for (int p = 0; p < MAX_CLIENTS; p++)
+			if (User[p].Ident && User[p].partyStatus == PARTY && User[p].party == User[killerUserId].party)
+			{
+				//base XP they deserve
+				float gimmieXP = 0;
+				float pl_dmg = (float)map[current_map].Enemy[enemyId]->dibsDamage[p];
+
+				if (pl_dmg > 0)
+					gimmieXP = pl_dmg / totalDamage;
+
+				printf("Player %s dealt %.2f percent of the damage or %i HP out of %i HP done by the party.\n",
+						User[p].Nick.c_str(), gimmieXP * 100, map[current_map].Enemy[enemyId]->dibsDamage[p], (int)totalDamage);
+				gimmieXP *= splitXP;
+
+				//add bonus XP
+				gimmieXP += bonusXP;
+				printf("Player %s earned %.2f XP points\n", User[p].Nick.c_str(), gimmieXP);
+
+				int pXpGiven = (int)gimmieXP;
+
+				//get the decimal alone
+				gimmieXP = gimmieXP - pXpGiven;
+				gimmieXP *= 100;
+
+				//slight chance of bonus xp :)
+				printf("Player %s will be given %i XP points for sure but has a %.2f chance for a bonus XP\n", User[p].Nick.c_str(), pXpGiven, gimmieXP);
+				if (Roll(gimmieXP))
+				{
+					pXpGiven++;
+				}
+
+				GiveXP(p, pXpGiven + bonus_clan_xp);
+				printf("[PARTY] Player %s was given %i XP points\n", User[p].Nick.c_str(), pXpGiven);
+			}
+	} //end split xp with party
+	else
+	{
+		//just give myself xp
+		GiveXP(killerUserId, map[current_map].Enemy[enemyId]->xp + bonus_clan_xp);
+		printf("[SOLO] Player %s was given %i XP points\n", User[killerUserId].Nick.c_str(), map[current_map].Enemy[enemyId]->xp);
+	}
+}
+
+void EnemyHit(unsigned char enemyId, unsigned char current_map, unsigned char userId)
+{
+	//Sum of all strength a player has, including equipment
+	int strength = GetTotalStrength(userId);
+	int damage = strength - map[current_map].Enemy[enemyId]->defence;
+
+	if (damage <= 0)
+		return;
+
+	//keep track of damage
+	map[current_map].Enemy[enemyId]->dibsDamage[userId] += damage;
+	map[current_map].Enemy[enemyId]->dibsPlayer = userId;
+	map[current_map].Enemy[enemyId]->dibsTicker = Clock();
+
+	for (int c = 0; c < MAX_CLIENTS; c++)
+	{
+		if (User[c].Ident && User[c].current_map == current_map)
+			network->SendEnemyHit(c, enemyId);
+	}
+
+	if (map[current_map].Enemy[enemyId]->hp <= damage)
+	{
+		//keep track of damage but remove overflow
+		int extraHpHurt = (damage - map[current_map].Enemy[enemyId]->hp);
+		map[current_map].Enemy[enemyId]->dibsDamage[userId] -= extraHpHurt;
+
+		KillEnemy(enemyId, current_map, userId);
+	} //end died
+	else
+	{
+		map[current_map].Enemy[enemyId]->hp -= damage;
+
+		//enemy health bars
+		unsigned char displayHp = (unsigned char)((float)map[current_map].Enemy[enemyId]->hp / map[current_map].Enemy[enemyId]->hp_max * hpBar);
+
+		for (int c = 0; c < MAX_CLIENTS; c++)
+		{
+			if (User[c].Ident)
+				network->SendEnemyHp(c, enemyId, current_map, displayHp);
+		}
+	}
+}
