@@ -26,10 +26,8 @@ class OPI_MYSQL
 		~OPI_MYSQL(); 
 
 		//error reporting
-		std::string getError();
 		int getStatus();
-		int reconnect();
-		int ping();
+		bool reconnect();
 
 		//connection factory
 		bool connect(std::string server, std::string database, std::string user, std::string password);
@@ -70,14 +68,12 @@ class OPI_MYSQL
 		char * user = new char[100];
 		char * password = new char [100]; 
 
-		std::string error;    
 		//results
 		MYSQL_RES *result;
 		MYSQL_ROW row;
 		unsigned long int *length;
 		int numOfFields;
 		int rowCount;
-		bool Connected;
 };
 
 //logging

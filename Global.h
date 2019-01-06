@@ -31,9 +31,10 @@ extern unsigned char hpBar;
 extern const bool HOLIDAY;
 extern unsigned const char HOLIDAY_NPC_DROP, HOLIDAY_BOX_DROP;
 extern const char NUM_MAPS;
+extern bool SERVER_QUIT;
 
 //TODO move to game logic
-extern bool blocked(int current_map, float box1_x1, float box1_y1, float box1_x2, float box1_y2, bool npc);
+extern bool blocked(unsigned char mapId, float box1_x1, float box1_y1, float box1_x2, float box1_y2, bool npc);
 extern void GiveLoot(int enemy, int player);
 extern void Attack(unsigned char userId, float x, float y);
 extern void Jump(unsigned char userId, float x, float y);
@@ -43,10 +44,10 @@ extern void Stop(unsigned char userId, float x, float y);
 extern void GiveXP(unsigned char userId, int xp);
 extern void quitParty(unsigned char userId);
 extern void Warp(int userId, SKO_Portal portal);
-extern void SpawnLoot(int current_map, SKO_ItemObject lootItem);
+extern void SpawnLoot(unsigned char mapId, SKO_ItemObject lootItem);
 
 //Utilities
-extern void trim(std::string& s);
+extern std::string trim(std::string s);
 extern std::string lower(std::string myString) ;
 
 #endif

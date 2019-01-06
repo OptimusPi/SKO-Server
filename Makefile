@@ -1,5 +1,5 @@
 CXX=g++
-CXXFLAGS=-c -std=c++11 -O3
+CXXFLAGS=-c -std=c++11 -O0
 DMYSQL_CXXFLAGS=-stdlib=libc++
 LDLIBS=-lpthread -lmysqlclient -lSDL -largon2
 SOURCES:=$(wildcard *.cpp)

@@ -92,7 +92,7 @@ class SKO_Player
         float y;
         float y_speed;
         float x_speed;
-        int current_map;
+        unsigned char mapId;
 
         //trading
         int tradeStatus;

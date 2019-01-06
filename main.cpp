@@ -1,7 +1,6 @@
 /* INCLUDES */
 #include <stdio.h>
 #include <stdlib.h>
-#include <pthread.h>
 #include <errno.h>
 #include <stdint.h>
 
@@ -20,11 +19,11 @@
 #include "SKO_Portal.h"
 #include "SKO_Target.h"
 #include "base64.h"
-#include "SKO_Repository.h"
 #include "SKO_PacketTypes.h"
 #include "SKO_Network.h"
 
 SKO_Network *network;
+SKO_Repository *repository;
 
 /* DEFINES */
 // Maximum number of clients allowed to connect
@@ -56,13 +55,10 @@ const float GRAVITY = 0.169;
 unsigned const char HOLIDAY_NPC_DROP = ITEM_EASTER_EGG, HOLIDAY_BOX_DROP = ITEM_BUNNY_EARS;
 const bool HOLIDAY = false;
 
-bool blocked(int current_map, float box1_x1, float box1_y1, float box1_x2, float box1_y2, bool npc);
+bool blocked(unsigned char mapId, float box1_x1, float box1_y1, float box1_x2, float box1_y2, bool npc);
 
 //attack time
 int attack_speed = 40 * 6;
-
-//Database connection
-OPI_MYSQL *db; // = new OPI_MYSQL();;
 
 //this waits for auto-save
 unsigned int persistTicker;
@@ -78,30 +74,36 @@ void Stop(unsigned char userId, float x, float y);
 void GiveXP(unsigned char userId, int xp);
 void quitParty(unsigned char userId);
 void PlayerDamaged(unsigned char userId, unsigned char damage);
-void EnemyHit(unsigned char enemyId, unsigned char current_map, unsigned char userId);
-void RespawnEnemy(int current_map, int enemy);
-void KillEnemy(unsigned char enemyId, unsigned char current_map, unsigned char killerUserId);
-void SpawnItem(unsigned char current_map, unsigned char itemObjId, unsigned char itemId, float x, float y, float x_speed, float y_speed);
-void DespawnItem(unsigned char itemId, unsigned char current_map);
+void EnemyHit(unsigned char enemyId, unsigned char mapId, unsigned char userId);
+void RespawnEnemy(unsigned char mapId, int enemy);
+void KillEnemy(unsigned char enemyId, unsigned char mapId, unsigned char killerUserId);
+void SpawnItem(unsigned char mapId, unsigned char itemObjId, unsigned char itemId, float x, float y, float x_speed, float y_speed);
+void DespawnItem(unsigned char itemId, unsigned char mapId);
 void PocketItem(unsigned char userId, unsigned char itemID, unsigned int amount);
-void EnemyAttack(int i, int current_map);
+void EnemyAttack(int i, unsigned char mapId);
 void Warp(int userId, SKO_Portal portal);
-void Respawn(int current_map, int userId);
-void SpawnLoot(int current_map, SKO_ItemObject lootItem);
+void Respawn(unsigned char mapId, int userId);
+void SpawnLoot(unsigned char mapId, SKO_ItemObject lootItem);
 
 static void *Physics(void *Arg);
 static void *TargetLoop(void *Arg);
 static void *EnemyLoop(void *arg);
 static void *UserLoop(void *arg);
 
-void trim(std::string& s)
+std::string trim(std::string str)
 {
-    size_t first = s.find_first_not_of(' ');
-    if (std::string::npos == first)
-        return;
-    
-    size_t last = s.find_last_not_of(' ');
-    s = s.substr(first, (last - first + 1));
+    std::size_t first = str.find_first_not_of(' ');
+
+    // If there is no non-whitespace character, both first and last will be std::string::npos (-1)
+    // There is no point in checking both, since if either doesn't work, the
+    // other won't work, either.
+    if(first == std::string::npos)
+        return "";
+
+    std::size_t last  = str.find_last_not_of(' ');
+
+    std::string returnVal =  str.substr(first, last-first+1);
+	return returnVal;
 }
   
 std::string lower(std::string myString) 
@@ -190,24 +192,21 @@ int main()
 		return 1;
 	}
 
-	trim(databaseHostname);
-	trim(databaseUsername);
-	trim(databasePassword);
-	trim(databaseSchema);
+	databaseHostname = trim(databaseHostname);
+	databaseUsername = trim(databaseUsername);
+	databasePassword = trim(databasePassword);
+	databaseSchema = trim(databaseSchema);
 
 	printf("About to connect to database.\n");
 
-	db = new OPI_MYSQL();
-	if (!db->connect(databaseHostname, databaseSchema, databaseUsername, databasePassword))
-	{
-		printf("Could not connect to MYSQL database.\n");
-		db->getError();
+	repository = new SKO_Repository();
+	
+	if (repository->Connect(databaseHostname, databaseSchema, databaseUsername, databasePassword) == "error")
 		return 1;
-	}
 
-	//items                            width,  height, type, def,  str,  hp,  reach, equipID
-	//values                              w      h     t     d     s     h      r     e  s = sell
-	Item[ITEM_GOLD] = SKO_Item(8, 8, 0, 0, 0, 0, 0, 0, 0);
+	//items                    width,  height, type, def,  str,  hp,  reach, equipID
+	//values                   w	h   t   d	s   h   r   e   s = sell
+	Item[ITEM_GOLD] = SKO_Item(8, 	8,	0, 	0,	0,	0,	0,	0,	0);
 	Item[ITEM_DIAMOND] = SKO_Item(15, 14, 0, 0, 0, 0, 0, 0, 100);
 	Item[ITEM_MYSTERY_BOX] = SKO_Item(16, 15, 4, 0, 0, 0, 0, 0, 0);
 	//food
@@ -274,12 +273,12 @@ int main()
 		for (int i = 0; i < 256; i++)
 			map[mp].ItemObj[i] = SKO_ItemObject();
 
-	network = new SKO_Network(db, serverPort, 30);
+	network = new SKO_Network(repository, serverPort, 60);
 	printf("Initialized SKO_Network.\n");
 
 	printf("Starting up SKO_Network...\n");
 	std::string networkStatus = network->Startup();
-	printf("SKO_Network status is: %s\n", networkStatus);
+	printf("SKO_Network status is: %s\n", networkStatus.c_str());
 
 	if (networkStatus == "success")
 	{
@@ -288,7 +287,7 @@ int main()
 	}
 	else
 	{
-		printf(kRed "Could not initialize SKO_Network. Here is the status: [%s]\n%s", networkStatus.c_str());
+		printf(kRed "Could not initialize SKO_Network. Here is the status: [%s]\n", networkStatus.c_str());
 		network->Cleanup();
 		return 1;
 	}
@@ -298,40 +297,35 @@ int main()
 
 	//multi threading
 	pthread_t physicsThread, enemyThread, targetThread;
-	pthread_t mainThread[MAX_CLIENTS];
+	pthread_t mainThread;
 
-	for (unsigned long int i = 0; i < NUM_MAPS; i++)
+	if (pthread_create(&physicsThread, NULL, Physics, NULL))
 	{
-		if (pthread_create(&physicsThread, NULL, Physics, (void *)i))
-		{
-			printf("Could not create thread for physics...\n");
-			return 1;
-		}
-
-		if (pthread_create(&enemyThread, NULL, EnemyLoop, (void *)i))
-		{
-			printf("Could not create thread for enemys...\n");
-			return 1;
-		}
-
-		if (pthread_create(&targetThread, NULL, TargetLoop, (void *)i))
-		{
-			printf("Could not create thread for targets...\n");
-			return 1;
-		}
+		printf("Could not create thread for physics...\n");
+		return 1;
 	}
 
-	for (unsigned long int i = 0; i < MAX_CLIENTS; i++)
+	if (pthread_create(&enemyThread, NULL, EnemyLoop, NULL))
 	{
-		if (pthread_create(&mainThread[i], NULL, UserLoop, (void *)i))
-		{
-			printf("Could not create thread for UserLoop...\n");
-			return 1;
-		}
+		printf("Could not create thread for enemys...\n");
+		return 1;
 	}
+
+	if (pthread_create(&targetThread, NULL, TargetLoop, NULL))
+	{
+		printf("Could not create thread for targets...\n");
+		return 1;
+	}
+
+	if (pthread_create(&mainThread, NULL, UserLoop, NULL))
+	{
+		printf("Could not create thread for UserLoop...\n");
+		return 1;
+	}
+	
 
 	printf("Done loading!\nStopping main, threads will continue.\n");
-	if (pthread_join(mainThread[0], NULL))
+	if (pthread_join(mainThread, NULL))
 	{
 		printf("Could not join thread for que...\n");
 	}
@@ -341,49 +335,47 @@ int main()
 
 void *UserLoop(void *arg)
 {
-	long int id = (intptr_t)arg;
-
 	while (!SERVER_QUIT)
 	{
-		// Ignore socket if it is not connected
-		if (!User[id].Status)
+		for (unsigned char userId = 0; userId < MAX_CLIENTS; userId++)
 		{
-			Sleep(1);
-			continue;
+			// Ignore socket if it is not connected
+			if (!User[userId].Status)
+				continue;
+				
+			network->HandleClient(userId);
 		}
-		
-		network->HandleClient(id);
 
 		// Sleep a bit
 		Sleep(1);
 	} //end while
 }
 
-bool blocked(int current_map, float box1_x1, float box1_y1, float box1_x2, float box1_y2, bool npc)
+bool blocked(unsigned char mapId, float box1_x1, float box1_y1, float box1_x2, float box1_y2, bool npc)
 {
-	for (int r = 0; r < map[current_map].number_of_rects; r++)
+	for (int r = 0; r < map[mapId].number_of_rects; r++)
 	{
-		float box2_x1 = map[current_map].collision_rect[r].x;
-		float box2_y1 = map[current_map].collision_rect[r].y;
-		float box2_x2 = map[current_map].collision_rect[r].x + map[current_map].collision_rect[r].w;
-		float box2_y2 = map[current_map].collision_rect[r].y + map[current_map].collision_rect[r].h;
+		float box2_x1 = map[mapId].collision_rect[r].x;
+		float box2_y1 = map[mapId].collision_rect[r].y;
+		float box2_x2 = map[mapId].collision_rect[r].x + map[mapId].collision_rect[r].w;
+		float box2_y2 = map[mapId].collision_rect[r].y + map[mapId].collision_rect[r].h;
 
 		if (box1_x2 > box2_x1 && box1_x1 < box2_x2 && box1_y2 > box2_y1 && box1_y1 < box2_y2)
 			return true;
 	}
 
-	for (int r = 0; r < map[current_map].num_targets; r++)
+	for (int r = 0; r < map[mapId].num_targets; r++)
 	{
-		if (!map[current_map].Target[r].active)
+		if (!map[mapId].Target[r].active)
 		{
 			if (!npc)
 				continue;
 		}
 
-		float box2_x1 = map[current_map].Target[r].x;
-		float box2_y1 = map[current_map].Target[r].y;
-		float box2_x2 = map[current_map].Target[r].x + map[current_map].Target[r].w;
-		float box2_y2 = map[current_map].Target[r].y + map[current_map].Target[r].h;
+		float box2_x1 = map[mapId].Target[r].x;
+		float box2_y1 = map[mapId].Target[r].y;
+		float box2_x2 = map[mapId].Target[r].x + map[mapId].Target[r].w;
+		float box2_y2 = map[mapId].Target[r].y + map[mapId].Target[r].h;
 
 		if (box1_x2 > box2_x1 && box1_x1 < box2_x2 && box1_y2 > box2_y1 && box1_y1 < box2_y2)
 			return true;
@@ -391,24 +383,24 @@ bool blocked(int current_map, float box1_x1, float box1_y1, float box1_x2, float
 
 	return false;
 }
-
+ 
 void *TargetLoop(void *arg)
 {
 	char *p;
-	long int timea;
-	long int current_map = (intptr_t)arg;
 
 	while (!SERVER_QUIT)
 	{
-		timea = Clock();
-		//npc
-		for (int i = 0; i < map[current_map].num_targets; i++)
+		for (unsigned char mapId = 0; mapId < NUM_MAPS; mapId++)
 		{
-			//respawn this box if it's been dead a while
-			if (!map[current_map].Target[i].active && Clock() - map[current_map].Target[i].respawn_ticker > 5000)
+			//npc
+			for (int i = 0; i < map[mapId].num_targets; i++)
 			{
-				map[current_map].Target[i].active = true;
-				network->SendSpawnTarget(i, current_map);
+				//respawn this box if it's been dead a while
+				if (!map[mapId].Target[i].active && Clock() - map[mapId].Target[i].respawn_ticker > 5000)
+				{
+					map[mapId].Target[i].active = true;
+					network->SendSpawnTarget(i, mapId);
+				}
 			}
 		}
 		Sleep(1000);
@@ -419,224 +411,300 @@ void *EnemyLoop(void *arg)
 {
 	char *p;
 	long int timea;
-	long int current_map = (intptr_t)arg;
+	unsigned char mapId = (intptr_t)arg;
 
 	while (!SERVER_QUIT)
 	{
 		timea = Clock();
 
-		//enemy
-		for (int i = 0; i < map[current_map].num_enemies; i++)
+		for (unsigned char mapId = 0; mapId < NUM_MAPS; mapId++)
 		{
-			int next_action = 0;
-
-			//check for dibs on the kill, reset after 5 seconds
-			if (Clock() - map[current_map].Enemy[i]->dibsTicker >= 5000)
+			//enemy
+			for (int i = 0; i < map[mapId].num_enemies; i++)
 			{
-				map[current_map].Enemy[i]->dibsPlayer = -1;
-				map[current_map].Enemy[i]->dibsTicker = 0;
-			}
+				int next_action = 0;
 
-
-			if (map[current_map].Enemy[i]->y > map[current_map].death_pit)
-			{
-				RespawnEnemy(current_map, i);
-				printf("Fix enemy from falling into death pit: map %i Enemy %i spawns at (%i,%i)\n", current_map, i, map[current_map].Enemy[i]->sx, map[current_map].Enemy[i]->sy);
-			}
-
-			//check for spawn
-			if (map[current_map].Enemy[i]->dead)
-			{
-				if (Clock() - map[current_map].Enemy[i]->respawn_ticker >= 7000)
+				//check for dibs on the kill, reset after 5 seconds
+				if (Clock() - map[mapId].Enemy[i]->dibsTicker >= 5000)
 				{
-					map[current_map].Enemy[i]->Respawn();
-					network->SendSpawnEnemy(map[current_map].Enemy[i], i, current_map);
-					map[current_map].Enemy[i]->dead = false;
+					map[mapId].Enemy[i]->dibsPlayer = -1;
+					map[mapId].Enemy[i]->dibsTicker = 0;
 				}
-			} //end if dead
-			else
-			{
-				//find out if bandit confronts someone
-				bool confront = false;
-				//decide what to do
-				for (int u = 0; u < MAX_CLIENTS; u++)
+
+
+				if (map[mapId].Enemy[i]->y > map[mapId].death_pit)
 				{
-					//find a target baby!
-					// rules: first player to be an acceptable target
-					if (User[u].Ident && User[u].current_map == current_map)
+					RespawnEnemy(mapId, i);
+					printf("Fix enemy from falling into death pit: map %i Enemy %i spawns at (%i,%i)\n", mapId, i, map[mapId].Enemy[i]->sx, map[mapId].Enemy[i]->sy);
+				}
+
+				//check for spawn
+				if (map[mapId].Enemy[i]->dead)
+				{
+					if (Clock() - map[mapId].Enemy[i]->respawn_ticker >= 7000)
 					{
-						float x_dist, y_dist;
-
-						//horizontal
-						if (map[current_map].Enemy[i]->facing_right)
-							x_dist = (User[u].x + 23) - (map[current_map].Enemy[i]->x + 41);
-						else
-							x_dist = (map[current_map].Enemy[i]->x + 23) - (User[u].x + 41);
-
-						//vertical
-						y_dist = User[u].y - map[current_map].Enemy[i]->y;
-
-						// confront
-						if (x_dist >= -10 && x_dist <= 10 && y_dist >= -60 && y_dist <= 60)
-						{
-							confront = true;
-
-							//timer override if first time
-							if (map[current_map].Enemy[i]->x_speed != 0)
-								map[current_map].Enemy[i]->AI_period = 0;
-						}
-
-					} //end for user Ident only
-
-					if (confront)
-					{
-						next_action = ENEMY_MOVE_STOP;
-						break;
+						map[mapId].Enemy[i]->Respawn();
+						network->SendSpawnEnemy(map[mapId].Enemy[i], i, mapId);
+						map[mapId].Enemy[i]->dead = false;
 					}
-
-				} //end for user: u
-
-				//not dead, do some actions.
-				if ((Clock() - map[current_map].Enemy[i]->AI_ticker) > map[current_map].Enemy[i]->AI_period)
+				} //end if dead
+				else
 				{
-					//only move if you shouldnt defend yourself, dumb enemy.
-					if (!confront)
+					//find out if bandit confronts someone
+					bool confront = false;
+					//decide what to do
+					for (int u = 0; u < MAX_CLIENTS; u++)
 					{
-						//decide what to do
-						for (int u = 0; u < MAX_CLIENTS; u++)
+						//find a target baby!
+						// rules: first player to be an acceptable target
+						if (User[u].Ident && User[u].mapId == mapId)
 						{
-							//find a target baby!
-							// rules: first player to be an acceptable target
-							if (User[u].Ident && User[u].current_map == current_map)
+							float x_dist, y_dist;
+
+							//horizontal
+							if (map[mapId].Enemy[i]->facing_right)
+								x_dist = (User[u].x + 23) - (map[mapId].Enemy[i]->x + 41);
+							else
+								x_dist = (map[mapId].Enemy[i]->x + 23) - (User[u].x + 41);
+
+							//vertical
+							y_dist = User[u].y - map[mapId].Enemy[i]->y;
+
+							// confront
+							if (x_dist >= -10 && x_dist <= 10 && y_dist >= -60 && y_dist <= 60)
 							{
-								float x_dist, y_dist;
-								if (map[current_map].Enemy[i]->facing_right)
-									x_dist = User[u].x - map[current_map].Enemy[i]->x;
-								else
-									x_dist = map[current_map].Enemy[i]->x - User[u].x;
-								//vertical
-								y_dist = User[u].y - map[current_map].Enemy[i]->y;
+								confront = true;
 
-								bool persue = false;
-								/* chase */
-								if (y_dist <= 60 && y_dist >= -60 && x_dist > -200 && x_dist < 200)
-								{
-									persue = true;
-									//push walk into right direction _OR_ continue
-									if (User[u].x > map[current_map].Enemy[i]->x)
-									{
-										//chase
-										if (map[current_map].Enemy[i]->hp > (map[current_map].Enemy[i]->hp_max / 2))
-										{
-											next_action = ENEMY_MOVE_RIGHT;
-										}
-										//flee
-										else
-										{
-											if (rand() % 3)
-												next_action = ENEMY_MOVE_LEFT;
-											else if (rand() % 2)
-												next_action = ENEMY_MOVE_STOP;
-											else
-												next_action = ENEMY_MOVE_RIGHT;
-										}
-									}
-									else // if (User[u].x < map[current_map].Enemy[i]->x)
-									{
-										//chase
-										if (map[current_map].Enemy[i]->hp > (map[current_map].Enemy[i]->hp_max / 2))
-										{
-											next_action = ENEMY_MOVE_LEFT;
-										}
-										else
-										{
-											if (rand() % 3)
-												next_action = ENEMY_MOVE_RIGHT;
-											else if (rand() % 2)
-												next_action = ENEMY_MOVE_STOP;
-											else
-												next_action = ENEMY_MOVE_LEFT;
-										}
-									}
+								//timer override if first time
+								if (map[mapId].Enemy[i]->x_speed != 0)
+									map[mapId].Enemy[i]->AI_period = 0;
+							}
 
-									u = MAX_CLIENTS;
-									break;
+						} //end for user Ident only
 
-								} //end same plane actions
-
-								//quit running or chasing me!
-								if (!persue)
-								{
-									// 1:15 chance of an action
-									int random_action = rand() % 15;
-									// UP TO quarter second extra delay
-									int random_delay = 500 + rand() % 250;
-
-									switch (random_action)
-									{
-									case 0:
-										next_action = ENEMY_MOVE_LEFT;
-										map[current_map].Enemy[i]->AI_period = random_delay;
-										break;
-
-									case 1:
-										next_action = ENEMY_MOVE_RIGHT;
-										map[current_map].Enemy[i]->AI_period = random_delay;
-										break;
-
-									default:
-										next_action = ENEMY_MOVE_STOP;
-										map[current_map].Enemy[i]->AI_period = random_delay;
-										break;
-									}
-								}
-
-							} //end u ident
-						}	 //end for User u
-					}		  //end !confront
-					else	  // if confront is true then:
-					{
-						//if you've stopped then attack
-						if (map[current_map].Enemy[i]->x_speed == 0)
-						{
-							next_action = ENEMY_ATTACK;
-							//half a second plus UP TO another half second
-							int attack_pause = 200 + rand() % 800;
-							map[current_map].Enemy[i]->AI_period = attack_pause;
-						}
-						//else if you're still moving, stop!
-						else
+						if (confront)
 						{
 							next_action = ENEMY_MOVE_STOP;
+							break;
 						}
+
+					} //end for user: u
+
+					//not dead, do some actions.
+					if ((Clock() - map[mapId].Enemy[i]->AI_ticker) > map[mapId].Enemy[i]->AI_period)
+					{
+						//only move if you shouldnt defend yourself, dumb enemy.
+						if (!confront)
+						{
+							//decide what to do
+							for (int u = 0; u < MAX_CLIENTS; u++)
+							{
+								//find a target baby!
+								// rules: first player to be an acceptable target
+								if (User[u].Ident && User[u].mapId == mapId)
+								{
+									float x_dist, y_dist;
+									if (map[mapId].Enemy[i]->facing_right)
+										x_dist = User[u].x - map[mapId].Enemy[i]->x;
+									else
+										x_dist = map[mapId].Enemy[i]->x - User[u].x;
+									//vertical
+									y_dist = User[u].y - map[mapId].Enemy[i]->y;
+
+									bool persue = false;
+									/* chase */
+									if (y_dist <= 60 && y_dist >= -60 && x_dist > -200 && x_dist < 200)
+									{
+										persue = true;
+										//push walk into right direction _OR_ continue
+										if (User[u].x > map[mapId].Enemy[i]->x)
+										{
+											//chase
+											if (map[mapId].Enemy[i]->hp > (map[mapId].Enemy[i]->hp_max / 2))
+											{
+												next_action = ENEMY_MOVE_RIGHT;
+											}
+											//flee
+											else
+											{
+												if (rand() % 3)
+													next_action = ENEMY_MOVE_LEFT;
+												else if (rand() % 2)
+													next_action = ENEMY_MOVE_STOP;
+												else
+													next_action = ENEMY_MOVE_RIGHT;
+											}
+										}
+										else // if (User[u].x < map[mapId].Enemy[i]->x)
+										{
+											//chase
+											if (map[mapId].Enemy[i]->hp > (map[mapId].Enemy[i]->hp_max / 2))
+											{
+												next_action = ENEMY_MOVE_LEFT;
+											}
+											else
+											{
+												if (rand() % 3)
+													next_action = ENEMY_MOVE_RIGHT;
+												else if (rand() % 2)
+													next_action = ENEMY_MOVE_STOP;
+												else
+													next_action = ENEMY_MOVE_LEFT;
+											}
+										}
+
+										u = MAX_CLIENTS;
+										break;
+
+									} //end same plane actions
+
+									//quit running or chasing me!
+									if (!persue)
+									{
+										// 1:15 chance of an action
+										int random_action = rand() % 15;
+										// UP TO quarter second extra delay
+										int random_delay = 500 + rand() % 250;
+
+										switch (random_action)
+										{
+										case 0:
+											next_action = ENEMY_MOVE_LEFT;
+											map[mapId].Enemy[i]->AI_period = random_delay;
+											break;
+
+										case 1:
+											next_action = ENEMY_MOVE_RIGHT;
+											map[mapId].Enemy[i]->AI_period = random_delay;
+											break;
+
+										default:
+											next_action = ENEMY_MOVE_STOP;
+											map[mapId].Enemy[i]->AI_period = random_delay;
+											break;
+										}
+									}
+
+								} //end u ident
+							}	 //end for User u
+						}		  //end !confront
+						else	  // if confront is true then:
+						{
+							//if you've stopped then attack
+							if (map[mapId].Enemy[i]->x_speed == 0)
+							{
+								next_action = ENEMY_ATTACK;
+								//half a second plus UP TO another half second
+								int attack_pause = 200 + rand() % 800;
+								map[mapId].Enemy[i]->AI_period = attack_pause;
+							}
+							//else if you're still moving, stop!
+							else
+							{
+								next_action = ENEMY_MOVE_STOP;
+							}
+						}
+
+						bool redundant = false;
+
+						switch (next_action)
+						{
+						case ENEMY_MOVE_STOP:
+							if (map[mapId].Enemy[i]->x_speed == 0)
+								redundant = true;
+							map[mapId].Enemy[i]->x_speed = 0;
+							break;
+
+						case ENEMY_MOVE_LEFT:
+							if (map[mapId].Enemy[i]->x_speed < 0)
+								redundant = true;
+							map[mapId].Enemy[i]->x_speed = -2;
+							map[mapId].Enemy[i]->facing_right = false;
+							break;
+
+						case ENEMY_MOVE_RIGHT:
+							if (map[mapId].Enemy[i]->x_speed > 0)
+								redundant = true;
+							map[mapId].Enemy[i]->x_speed = 2;
+							map[mapId].Enemy[i]->facing_right = true;
+							break;
+
+						case ENEMY_ATTACK:
+							EnemyAttack(i, mapId);
+							break;
+
+						default:
+							redundant = true;
+							break;
+						}
+
+						//dont spam packets bitch
+						if (!redundant)
+						{
+							//if it wasn't redundant, reset the ticker
+							network->SendEnemyAction(map[mapId].Enemy[i], next_action, i, mapId);
+							map[mapId].Enemy[i]->AI_ticker = Clock();
+						} //end no spam
+
+					} //end enemy AI
+
+				} //end not dead
+			}	 // end enemy for loop
+
+			//npc
+			for (unsigned char i = 0; i < map[mapId].num_npcs; i++)
+			{
+
+				unsigned char next_action = 0;
+
+				//not dead, do some actions.
+				if ((Clock() - map[mapId].NPC[i]->AI_ticker) > map[mapId].NPC[i]->AI_period)
+				{
+					// UP TO quarter second extra delay
+					int random_delay = 2500 + rand() % 169;
+
+					int random_action = rand() % 4; //2:1 ratio stopping to moving. To make him not seem like a meth tweaker
+
+					switch (random_action)
+					{
+					case 0:
+						next_action = NPC_MOVE_LEFT;
+						map[mapId].NPC[i]->AI_period = random_delay;
+						break;
+
+					case 1:
+						next_action = NPC_MOVE_RIGHT;
+						map[mapId].NPC[i]->AI_period = random_delay;
+						break;
+
+					default:
+						next_action = NPC_MOVE_STOP;
+						map[mapId].NPC[i]->AI_period = random_delay;
+						break;
 					}
 
 					bool redundant = false;
 
 					switch (next_action)
 					{
-					case ENEMY_MOVE_STOP:
-						if (map[current_map].Enemy[i]->x_speed == 0)
+					case NPC_MOVE_STOP:
+						if (map[mapId].NPC[i]->x_speed == 0)
 							redundant = true;
-						map[current_map].Enemy[i]->x_speed = 0;
+						map[mapId].NPC[i]->x_speed = 0;
 						break;
 
-					case ENEMY_MOVE_LEFT:
-						if (map[current_map].Enemy[i]->x_speed < 0)
+					case NPC_MOVE_LEFT:
+						if (map[mapId].NPC[i]->x_speed < 0)
 							redundant = true;
-						map[current_map].Enemy[i]->x_speed = -2;
-						map[current_map].Enemy[i]->facing_right = false;
+						map[mapId].NPC[i]->x_speed = -2;
+						map[mapId].NPC[i]->facing_right = false;
 						break;
 
-					case ENEMY_MOVE_RIGHT:
-						if (map[current_map].Enemy[i]->x_speed > 0)
+					case NPC_MOVE_RIGHT:
+						if (map[mapId].NPC[i]->x_speed > 0)
 							redundant = true;
-						map[current_map].Enemy[i]->x_speed = 2;
-						map[current_map].Enemy[i]->facing_right = true;
-						break;
-
-					case ENEMY_ATTACK:
-						EnemyAttack(i, current_map);
+						map[mapId].NPC[i]->x_speed = 2;
+						map[mapId].NPC[i]->facing_right = true;
 						break;
 
 					default:
@@ -648,87 +716,13 @@ void *EnemyLoop(void *arg)
 					if (!redundant)
 					{
 						//if it wasn't redundant, reset the ticker
-						network->SendEnemyAction(map[current_map].Enemy[i], next_action, i, current_map);
-						map[current_map].Enemy[i]->AI_ticker = Clock();
+						map[mapId].NPC[i]->AI_ticker = Clock();
+						network->SendNpcAction(map[mapId].NPC[i], next_action, i, mapId);
 					} //end no spam
 
 				} //end enemy AI
-
-			} //end not dead
-		}	 // end enemy for loop
-
-		//npc
-		for (unsigned char i = 0; i < map[current_map].num_npcs; i++)
-		{
-
-			unsigned char next_action = 0;
-
-			//not dead, do some actions.
-			if ((Clock() - map[current_map].NPC[i]->AI_ticker) > map[current_map].NPC[i]->AI_period)
-			{
-				// UP TO quarter second extra delay
-				int random_delay = 2500 + rand() % 169;
-
-				int random_action = rand() % 4; //2:1 ratio stopping to moving. To make him not seem like a meth tweaker
-
-				switch (random_action)
-				{
-				case 0:
-					next_action = NPC_MOVE_LEFT;
-					map[current_map].NPC[i]->AI_period = random_delay;
-					break;
-
-				case 1:
-					next_action = NPC_MOVE_RIGHT;
-					map[current_map].NPC[i]->AI_period = random_delay;
-					break;
-
-				default:
-					next_action = NPC_MOVE_STOP;
-					map[current_map].NPC[i]->AI_period = random_delay;
-					break;
-				}
-
-				bool redundant = false;
-
-				switch (next_action)
-				{
-				case NPC_MOVE_STOP:
-					if (map[current_map].NPC[i]->x_speed == 0)
-						redundant = true;
-					map[current_map].NPC[i]->x_speed = 0;
-					break;
-
-				case NPC_MOVE_LEFT:
-					if (map[current_map].NPC[i]->x_speed < 0)
-						redundant = true;
-					map[current_map].NPC[i]->x_speed = -2;
-					map[current_map].NPC[i]->facing_right = false;
-					break;
-
-				case NPC_MOVE_RIGHT:
-					if (map[current_map].NPC[i]->x_speed > 0)
-						redundant = true;
-					map[current_map].NPC[i]->x_speed = 2;
-					map[current_map].NPC[i]->facing_right = true;
-					break;
-
-				default:
-					redundant = true;
-					break;
-				}
-
-				//dont spam packets bitch
-				if (!redundant)
-				{
-					//if it wasn't redundant, reset the ticker
-					map[current_map].NPC[i]->AI_ticker = Clock();
-					network->SendNpcAction(map[current_map].NPC[i], next_action, i, current_map);
-				} //end no spam
-
-			} //end enemy AI
-		} // end enemy for loop
-
+			} // end enemy for loop
+		}
 		//Sleep for 2 ticks
 		Sleep(33);
 	}
@@ -738,8 +732,6 @@ void *Physics(void *arg)
 {
 	//initialize the timestep
 	KE_Timestep *timestep = new KE_Timestep(60);
-
-	long int current_map = (intptr_t)arg;
 
 	int a = 0;
 	char *p;
@@ -759,365 +751,366 @@ void *Physics(void *arg)
 
 		while (timestep->Check())
 		{
-			//enemies
-			for (int i = 0; i < map[current_map].num_enemies; i++)
+			for (unsigned char mapId = 0; mapId < NUM_MAPS; mapId++)
 			{
-
-				//enemy physics
-				if (map[current_map].Enemy[i]->y_speed < 10)
-					map[current_map].Enemy[i]->y_speed += GRAVITY;
-
-				//verical collision detection
-				block_y = blocked(current_map, map[current_map].Enemy[i]->x + map[current_map].Enemy[i]->x1, map[current_map].Enemy[i]->y + map[current_map].Enemy[i]->y_speed + map[current_map].Enemy[i]->y1 + 0.25, map[current_map].Enemy[i]->x + map[current_map].Enemy[i]->x2, map[current_map].Enemy[i]->y + map[current_map].Enemy[i]->y_speed + map[current_map].Enemy[i]->y2, true);
-
-				map[current_map].Enemy[i]->ground = true;
-
-				//vertical movement
-				if (!block_y)
-				{ //not blocked, fall
-
-					//animation
-					map[current_map].Enemy[i]->ground = false;
-
-					map[current_map].Enemy[i]->y += map[current_map].Enemy[i]->y_speed;
-				}
-				else
-				{ //blocked, stop
-					if (map[current_map].Enemy[i]->y_speed > 0)
-					{
-						map[current_map].Enemy[i]->y_speed = 1;
-
-						//while or if TODO
-						for (int loopVar = 0; loopVar < HIT_LOOP && (!blocked(current_map, map[current_map].Enemy[i]->x + map[current_map].Enemy[i]->x1, map[current_map].Enemy[i]->y + map[current_map].Enemy[i]->y_speed + map[current_map].Enemy[i]->y1 + 0.25, map[current_map].Enemy[i]->x + map[current_map].Enemy[i]->x2, map[current_map].Enemy[i]->y + map[current_map].Enemy[i]->y_speed + map[current_map].Enemy[i]->y1 + 0.25 + map[current_map].Enemy[i]->y2, true)); loopVar++)
-							map[current_map].Enemy[i]->y += map[current_map].Enemy[i]->y_speed;
-
-						map[current_map].Enemy[i]->y = (int)(map[current_map].Enemy[i]->y + 0.5);
-					}
-					if (map[current_map].Enemy[i]->y_speed < 0)
-					{
-						map[current_map].Enemy[i]->y_speed = -1;
-
-						//while or if TODO
-						for (int loopVar = 0; loopVar < HIT_LOOP && (!blocked(current_map, map[current_map].Enemy[i]->x + map[current_map].Enemy[i]->x1, map[current_map].Enemy[i]->y + map[current_map].Enemy[i]->y_speed + map[current_map].Enemy[i]->y1 + 0.25, map[current_map].Enemy[i]->x + map[current_map].Enemy[i]->x2, map[current_map].Enemy[i]->y + map[current_map].Enemy[i]->y_speed + map[current_map].Enemy[i]->y1 + 0.25 + map[current_map].Enemy[i]->y2, true)); loopVar++)
-							map[current_map].Enemy[i]->y += map[current_map].Enemy[i]->y_speed;
-					}
-
-					map[current_map].Enemy[i]->y_speed = 0;
-				}
-
-				//horizontal collision detection
-				block_x = blocked(current_map, map[current_map].Enemy[i]->x + map[current_map].Enemy[i]->x_speed + map[current_map].Enemy[i]->x1, map[current_map].Enemy[i]->y + map[current_map].Enemy[i]->y1, map[current_map].Enemy[i]->x + map[current_map].Enemy[i]->x_speed + map[current_map].Enemy[i]->x2, map[current_map].Enemy[i]->y + map[current_map].Enemy[i]->y2, true);
-
-				//horizontal movement
-				if (!block_x)
-				{ //not blocked, walk
-					map[current_map].Enemy[i]->x += map[current_map].Enemy[i]->x_speed;
-				}
-
-				if ((map[current_map].Enemy[i]->x_speed == 0 && map[current_map].Enemy[i]->y_speed == 0) || !map[current_map].Enemy[i]->attacking)
-					map[current_map].Enemy[i]->current_frame = 0;
-			} //end enemies/npc
-
-			//npcs
-			for (int i = 0; i < map[current_map].num_npcs; i++)
-			{
-				//enemy physics
-				if (map[current_map].NPC[i]->y_speed < 10)
-					map[current_map].NPC[i]->y_speed += GRAVITY;
-
-				//verical collision detection
-				block_y = blocked(current_map, map[current_map].NPC[i]->x + map[current_map].NPC[i]->x1, map[current_map].NPC[i]->y + map[current_map].NPC[i]->y_speed + map[current_map].NPC[i]->y1 + 0.25, map[current_map].NPC[i]->x + map[current_map].NPC[i]->x2, map[current_map].NPC[i]->y + map[current_map].NPC[i]->y_speed + map[current_map].NPC[i]->y2, true);
-
-				map[current_map].NPC[i]->ground = true;
-
-				//vertical movement
-				if (!block_y)
-				{ //not blocked, fall
-
-					//animation
-					map[current_map].NPC[i]->ground = false;
-
-					map[current_map].NPC[i]->y += map[current_map].NPC[i]->y_speed;
-				}
-				else
+				//enemies
+				for (int i = 0; i < map[mapId].num_enemies; i++)
 				{
-					//blocked, stop
-					if (map[current_map].NPC[i]->y_speed > 0)
-					{
-						map[current_map].NPC[i]->y_speed = 1;
 
-						//while or if TODO
-						for (int loopVar = 0; loopVar < HIT_LOOP && (!blocked(current_map, map[current_map].NPC[i]->x + map[current_map].NPC[i]->x1, map[current_map].NPC[i]->y + map[current_map].NPC[i]->y_speed + map[current_map].NPC[i]->y1 + 0.25, map[current_map].NPC[i]->x + map[current_map].NPC[i]->x2, map[current_map].NPC[i]->y + map[current_map].NPC[i]->y_speed + map[current_map].NPC[i]->y1 + 0.25 + map[current_map].NPC[i]->y2, true)); loopVar++)
-							map[current_map].NPC[i]->y += map[current_map].NPC[i]->y_speed;
-
-						map[current_map].NPC[i]->y = (int)(map[current_map].NPC[i]->y + 0.5);
-					}
-					if (map[current_map].NPC[i]->y_speed < 0)
-					{
-						map[current_map].NPC[i]->y_speed = -1;
-
-						//while or if TODO
-						for (int loopVar = 0; loopVar < HIT_LOOP && (!blocked(current_map, map[current_map].NPC[i]->x + map[current_map].NPC[i]->x1, map[current_map].NPC[i]->y + map[current_map].NPC[i]->y_speed + map[current_map].NPC[i]->y1 + 0.25, map[current_map].NPC[i]->x + map[current_map].NPC[i]->x2, map[current_map].NPC[i]->y + map[current_map].NPC[i]->y_speed + map[current_map].NPC[i]->y1 + 0.25 + map[current_map].NPC[i]->y2, true)); loopVar++)
-							map[current_map].NPC[i]->y += map[current_map].NPC[i]->y_speed;
-					}
-
-					map[current_map].NPC[i]->y_speed = 0;
-				}
-
-				//horizontal collision detection
-				block_x = blocked(current_map, map[current_map].NPC[i]->x + map[current_map].NPC[i]->x_speed + map[current_map].NPC[i]->x1, map[current_map].NPC[i]->y + map[current_map].NPC[i]->y1, map[current_map].NPC[i]->x + map[current_map].NPC[i]->x_speed + map[current_map].NPC[i]->x2, map[current_map].NPC[i]->y + map[current_map].NPC[i]->y2, true);
-
-				//horizontal movement
-				if (!block_x)
-				{
-					//not blocked, walk
-					map[current_map].NPC[i]->x += map[current_map].NPC[i]->x_speed;
-				}
-			} //end npc
-
-			//players
-			for (int i = 0; i < MAX_CLIENTS; i++)
-				if (User[i].current_map == current_map && User[i].Ident)
-				{
-					//check for portal collisions
-					for (int portal = 0; portal < map[current_map].num_portals; portal++)
-					{
-
-						//player box
-						float box1_x1 = User[i].x + 23;
-						float box1_y1 = User[i].y + 13;
-						float box1_x2 = User[i].x + 40;
-						float box1_y2 = User[i].y + 64;
-
-						//portal box
-						float box2_x1 = map[current_map].Portal[portal].x;
-						float box2_y1 = map[current_map].Portal[portal].y;
-						float box2_x2 = map[current_map].Portal[portal].x + map[current_map].Portal[portal].w;
-						float box2_y2 = map[current_map].Portal[portal].y + map[current_map].Portal[portal].h;
-
-						if (box1_x2 > box2_x1 && box1_x1 < box2_x2 && box1_y2 > box2_y1 && box1_y1 < box2_y2)
-						{
-							if (User[i].level >= map[current_map].Portal[portal].level_required)
-							{
-								Warp(i, map[current_map].Portal[portal]);
-								//TODO: how do players stay in a party on different maps?
-								//Maybe disconnect after a minute.
-								quitParty(i);
-							}
-						} //end portal collison
-					}	 //end for portal
-
-					//stop attacking
-					if (Clock() - User[i].attack_ticker > attack_speed)
-					{
-						User[i].attacking = false;
-
-						//if you made an action during an attack, it is saved utnil now. Execute
-						if (User[i].que_action != 0)
-						{
-							printf("Glitched user is %s :O\n", User[i].Nick.c_str());
-							float numx = User[i].x;
-							float numy = User[i].y;
-							switch (User[i].que_action)
-							{
-							case MOVE_LEFT:
-								Left(i, numx, numy);
-								printf("\e[0;32mCorrection! que action being sent NOW: MOVE_LEFT\e[m\n");
-								break;
-
-							case MOVE_RIGHT:
-								Right(i, numx, numy);
-								printf("\e[0;32mCorrection! que action being sent NOW: MOVE_RIGHT\e[m\n");
-								break;
-
-							case MOVE_JUMP:
-								Jump(i, numx, numy); 
-								printf("\e[0;32mCorrection! que action being sent NOW: JUMP\e[m\n");
-								break;
-
-							case ATTACK:
-								printf("\e[0;32mCorrection! que action being sent NOW: ATTACK\e[m\n");
-
-								//do attack actions
-								Attack(i, numx, numy);
-								break;
-
-							case MOVE_STOP:
-								printf("\e[0;32mCorrection! que action being sent NOW: MOVE_STOP\e[m\n");
-
-								//do attack actions
-								Stop(i, numx, numy);
-								break;
-
-							default:
-								printf("\e[0;32mCorrection! que action glitch: %i\e[m\n", User[i].que_action);
-
-								break;
-							} //end switch
-
-							//reset the cue
-							User[i].que_action = 0;
-
-						} // end que actions
-					}	 //end attack ticker
-
-					//HP regen
-					int regen = User[i].regen;
-					int weap = User[i].equip[0];
-					int hat = User[i].equip[1];
-
-					if (weap > 0)
-						regen += Item[weap].hp;
-
-					if (hat > 0)
-						regen += Item[hat].hp;
-
-					if (regen > 0)
-					{
-						if (Clock() - User[i].regen_ticker >= 1200)
-						{
-							//regen hp
-							if (User[i].hp < User[i].max_hp)
-							{
-								User[i].hp += regen;
-
-								//cap the hp to their max
-								if (User[i].hp > User[i].max_hp)
-									User[i].hp = User[i].max_hp;
-
-								//Send changed HP to client player's party members
-								unsigned char displayHp = (int)((User[i].hp / (float)User[i].max_hp) * 80);
-								for (int pl = 0; pl < MAX_CLIENTS; pl++)
-								{
-									if (pl != i && User[pl].Ident && User[pl].partyStatus == PARTY && User[pl].party == User[i].party)
-										network->SendBuddyStatHp(pl, i, displayHp);
-								}
-							}
-
-							//Send changed HP stat to client player
-							network->SendStatHp(i, User[i].hp);
-							User[i].regen_ticker = Clock();
-						}
-					}
-
-					if (User[i].y_speed < 10)
-					{
-						User[i].y_speed += GRAVITY;
-					}
+					//enemy physics
+					if (map[mapId].Enemy[i]->y_speed < 10)
+						map[mapId].Enemy[i]->y_speed += GRAVITY;
 
 					//verical collision detection
-					block_y = blocked(current_map, User[i].x + 25, User[i].y + User[i].y_speed + 13 + 0.25, User[i].x + 38, User[i].y + User[i].y_speed + 64, false);
+					block_y = blocked(mapId, map[mapId].Enemy[i]->x + map[mapId].Enemy[i]->x1, map[mapId].Enemy[i]->y + map[mapId].Enemy[i]->y_speed + map[mapId].Enemy[i]->y1 + 0.25, map[mapId].Enemy[i]->x + map[mapId].Enemy[i]->x2, map[mapId].Enemy[i]->y + map[mapId].Enemy[i]->y_speed + map[mapId].Enemy[i]->y2, true);
+
+					map[mapId].Enemy[i]->ground = true;
 
 					//vertical movement
 					if (!block_y)
 					{ //not blocked, fall
 
 						//animation
-						User[i].ground = false;
+						map[mapId].Enemy[i]->ground = false;
 
-						User[i].y += User[i].y_speed;
-
-						//bottomless pit
-						if (User[i].y > map[User[i].current_map].death_pit)
-						{
-							printf("user died in death pit on map %i because %i > %i\n", (int)current_map, (int)User[i].y, (int)map[current_map].death_pit);
-							Respawn(User[i].current_map, i);
-						}
+						map[mapId].Enemy[i]->y += map[mapId].Enemy[i]->y_speed;
 					}
 					else
-					{
-						User[i].ground = true;
-
-						//blocked, stop
-						if (User[i].y_speed > 0)
+					{ //blocked, stop
+						if (map[mapId].Enemy[i]->y_speed > 0)
 						{
-							User[i].y_speed = 1;
+							map[mapId].Enemy[i]->y_speed = 1;
 
 							//while or if TODO
-							for (int loopVar = 0; loopVar < HIT_LOOP && (!blocked(current_map, User[i].x + 25, User[i].y + User[i].y_speed + 13 + 0.25, User[i].x + 38, User[i].y + User[i].y_speed + 64 + 0.25, false)); loopVar++)
-								User[i].y += User[i].y_speed;
+							for (int loopVar = 0; loopVar < HIT_LOOP && (!blocked(mapId, map[mapId].Enemy[i]->x + map[mapId].Enemy[i]->x1, map[mapId].Enemy[i]->y + map[mapId].Enemy[i]->y_speed + map[mapId].Enemy[i]->y1 + 0.25, map[mapId].Enemy[i]->x + map[mapId].Enemy[i]->x2, map[mapId].Enemy[i]->y + map[mapId].Enemy[i]->y_speed + map[mapId].Enemy[i]->y1 + 0.25 + map[mapId].Enemy[i]->y2, true)); loopVar++)
+								map[mapId].Enemy[i]->y += map[mapId].Enemy[i]->y_speed;
 
-							User[i].y = (int)(User[i].y + 0.5);
+							map[mapId].Enemy[i]->y = (int)(map[mapId].Enemy[i]->y + 0.5);
 						}
-						if (User[i].y_speed < 0)
+						if (map[mapId].Enemy[i]->y_speed < 0)
 						{
-							User[i].y_speed = -1;
+							map[mapId].Enemy[i]->y_speed = -1;
 
 							//while or if TODO
-							for (int loopVar = 0; loopVar < HIT_LOOP && (!blocked(current_map, User[i].x + 25, User[i].y + User[i].y_speed + 13 + 0.25, User[i].x + 38, User[i].y + User[i].y_speed + 64 + 0.25, false)); loopVar++)
-								User[i].y += User[i].y_speed;
+							for (int loopVar = 0; loopVar < HIT_LOOP && (!blocked(mapId, map[mapId].Enemy[i]->x + map[mapId].Enemy[i]->x1, map[mapId].Enemy[i]->y + map[mapId].Enemy[i]->y_speed + map[mapId].Enemy[i]->y1 + 0.25, map[mapId].Enemy[i]->x + map[mapId].Enemy[i]->x2, map[mapId].Enemy[i]->y + map[mapId].Enemy[i]->y_speed + map[mapId].Enemy[i]->y1 + 0.25 + map[mapId].Enemy[i]->y2, true)); loopVar++)
+								map[mapId].Enemy[i]->y += map[mapId].Enemy[i]->y_speed;
 						}
 
-						User[i].y_speed = 0;
+						map[mapId].Enemy[i]->y_speed = 0;
 					}
 
 					//horizontal collision detection
-					block_x = blocked(current_map, User[i].x + User[i].x_speed + 23, User[i].y + 13, User[i].x + User[i].x_speed + 40, User[i].y + 64, false);
+					block_x = blocked(mapId, map[mapId].Enemy[i]->x + map[mapId].Enemy[i]->x_speed + map[mapId].Enemy[i]->x1, map[mapId].Enemy[i]->y + map[mapId].Enemy[i]->y1, map[mapId].Enemy[i]->x + map[mapId].Enemy[i]->x_speed + map[mapId].Enemy[i]->x2, map[mapId].Enemy[i]->y + map[mapId].Enemy[i]->y2, true);
 
 					//horizontal movement
 					if (!block_x)
 					{ //not blocked, walk
-						User[i].x += User[i].x_speed;
+						map[mapId].Enemy[i]->x += map[mapId].Enemy[i]->x_speed;
 					}
-				}
 
-			//item objects
-			for (int i = 0; i < 256; i++)
-				if (map[current_map].ItemObj[i].status)
+					if ((map[mapId].Enemy[i]->x_speed == 0 && map[mapId].Enemy[i]->y_speed == 0) || !map[mapId].Enemy[i]->attacking)
+						map[mapId].Enemy[i]->current_frame = 0;
+				} //end enemies/npc
+
+				//npcs
+				for (int i = 0; i < map[mapId].num_npcs; i++)
+				{
+					//enemy physics
+					if (map[mapId].NPC[i]->y_speed < 10)
+						map[mapId].NPC[i]->y_speed += GRAVITY;
+
+					//verical collision detection
+					block_y = blocked(mapId, map[mapId].NPC[i]->x + map[mapId].NPC[i]->x1, map[mapId].NPC[i]->y + map[mapId].NPC[i]->y_speed + map[mapId].NPC[i]->y1 + 0.25, map[mapId].NPC[i]->x + map[mapId].NPC[i]->x2, map[mapId].NPC[i]->y + map[mapId].NPC[i]->y_speed + map[mapId].NPC[i]->y2, true);
+
+					map[mapId].NPC[i]->ground = true;
+
+					//vertical movement
+					if (!block_y)
+					{ //not blocked, fall
+
+						//animation
+						map[mapId].NPC[i]->ground = false;
+
+						map[mapId].NPC[i]->y += map[mapId].NPC[i]->y_speed;
+					}
+					else
+					{
+						//blocked, stop
+						if (map[mapId].NPC[i]->y_speed > 0)
+						{
+							map[mapId].NPC[i]->y_speed = 1;
+
+							//while or if TODO
+							for (int loopVar = 0; loopVar < HIT_LOOP && (!blocked(mapId, map[mapId].NPC[i]->x + map[mapId].NPC[i]->x1, map[mapId].NPC[i]->y + map[mapId].NPC[i]->y_speed + map[mapId].NPC[i]->y1 + 0.25, map[mapId].NPC[i]->x + map[mapId].NPC[i]->x2, map[mapId].NPC[i]->y + map[mapId].NPC[i]->y_speed + map[mapId].NPC[i]->y1 + 0.25 + map[mapId].NPC[i]->y2, true)); loopVar++)
+								map[mapId].NPC[i]->y += map[mapId].NPC[i]->y_speed;
+
+							map[mapId].NPC[i]->y = (int)(map[mapId].NPC[i]->y + 0.5);
+						}
+						if (map[mapId].NPC[i]->y_speed < 0)
+						{
+							map[mapId].NPC[i]->y_speed = -1;
+
+							//while or if TODO
+							for (int loopVar = 0; loopVar < HIT_LOOP && (!blocked(mapId, map[mapId].NPC[i]->x + map[mapId].NPC[i]->x1, map[mapId].NPC[i]->y + map[mapId].NPC[i]->y_speed + map[mapId].NPC[i]->y1 + 0.25, map[mapId].NPC[i]->x + map[mapId].NPC[i]->x2, map[mapId].NPC[i]->y + map[mapId].NPC[i]->y_speed + map[mapId].NPC[i]->y1 + 0.25 + map[mapId].NPC[i]->y2, true)); loopVar++)
+								map[mapId].NPC[i]->y += map[mapId].NPC[i]->y_speed;
+						}
+
+						map[mapId].NPC[i]->y_speed = 0;
+					}
+
+					//horizontal collision detection
+					block_x = blocked(mapId, map[mapId].NPC[i]->x + map[mapId].NPC[i]->x_speed + map[mapId].NPC[i]->x1, map[mapId].NPC[i]->y + map[mapId].NPC[i]->y1, map[mapId].NPC[i]->x + map[mapId].NPC[i]->x_speed + map[mapId].NPC[i]->x2, map[mapId].NPC[i]->y + map[mapId].NPC[i]->y2, true);
+
+					//horizontal movement
+					if (!block_x)
+					{
+						//not blocked, walk
+						map[mapId].NPC[i]->x += map[mapId].NPC[i]->x_speed;
+					}
+				} //end npc
+
+				//players
+				for (int i = 0; i < MAX_CLIENTS; i++)
+					if (User[i].mapId == mapId && User[i].Ident)
+					{
+						//check for portal collisions
+						for (int portal = 0; portal < map[mapId].num_portals; portal++)
+						{
+
+							//player box
+							float box1_x1 = User[i].x + 23;
+							float box1_y1 = User[i].y + 13;
+							float box1_x2 = User[i].x + 40;
+							float box1_y2 = User[i].y + 64;
+
+							//portal box
+							float box2_x1 = map[mapId].Portal[portal].x;
+							float box2_y1 = map[mapId].Portal[portal].y;
+							float box2_x2 = map[mapId].Portal[portal].x + map[mapId].Portal[portal].w;
+							float box2_y2 = map[mapId].Portal[portal].y + map[mapId].Portal[portal].h;
+
+							if (box1_x2 > box2_x1 && box1_x1 < box2_x2 && box1_y2 > box2_y1 && box1_y1 < box2_y2)
+							{
+								if (User[i].level >= map[mapId].Portal[portal].level_required)
+								{
+									Warp(i, map[mapId].Portal[portal]);
+									//TODO: how do players stay in a party on different maps?
+									//Maybe disconnect after a minute.
+									quitParty(i);
+								}
+							} //end portal collison
+						}	 //end for portal
+
+						//stop attacking
+						if (Clock() - User[i].attack_ticker > attack_speed)
+						{
+							User[i].attacking = false;
+
+							//if you made an action during an attack, it is saved utnil now. Execute
+							if (User[i].que_action != 0)
+							{
+								printf("Glitched user is %s :O\n", User[i].Nick.c_str());
+								float numx = User[i].x;
+								float numy = User[i].y;
+								switch (User[i].que_action)
+								{
+								case MOVE_LEFT:
+									Left(i, numx, numy);
+									printf("\e[0;32mCorrection! que action being sent NOW: MOVE_LEFT\e[m\n");
+									break;
+
+								case MOVE_RIGHT:
+									Right(i, numx, numy);
+									printf("\e[0;32mCorrection! que action being sent NOW: MOVE_RIGHT\e[m\n");
+									break;
+
+								case MOVE_JUMP:
+									Jump(i, numx, numy); 
+									printf("\e[0;32mCorrection! que action being sent NOW: JUMP\e[m\n");
+									break;
+
+								case ATTACK:
+									printf("\e[0;32mCorrection! que action being sent NOW: ATTACK\e[m\n");
+
+									//do attack actions
+									Attack(i, numx, numy);
+									break;
+
+								case MOVE_STOP:
+									printf("\e[0;32mCorrection! que action being sent NOW: MOVE_STOP\e[m\n");
+
+									//do attack actions
+									Stop(i, numx, numy);
+									break;
+
+								default:
+									printf("\e[0;32mCorrection! que action glitch: %i\e[m\n", User[i].que_action);
+
+									break;
+								} //end switch
+
+								//reset the cue
+								User[i].que_action = 0;
+
+							} // end que actions
+						}	 //end attack ticker
+
+						//HP regen
+						int regen = User[i].regen;
+						int weap = User[i].equip[0];
+						int hat = User[i].equip[1];
+
+						if (weap > 0)
+							regen += Item[weap].hp;
+
+						if (hat > 0)
+							regen += Item[hat].hp;
+
+						if (regen > 0)
+						{
+							if (Clock() - User[i].regen_ticker >= 1200)
+							{
+								//regen hp
+								if (User[i].hp < User[i].max_hp)
+								{
+									User[i].hp += regen;
+
+									//cap the hp to their max
+									if (User[i].hp > User[i].max_hp)
+										User[i].hp = User[i].max_hp;
+
+									//Send changed HP to client player's party members
+									unsigned char displayHp = (int)((User[i].hp / (float)User[i].max_hp) * 80);
+									for (int pl = 0; pl < MAX_CLIENTS; pl++)
+									{
+										if (pl != i && User[pl].Ident && User[pl].partyStatus == PARTY && User[pl].party == User[i].party)
+											network->SendBuddyStatHp(pl, i, displayHp);
+									}
+								}
+
+								//Send changed HP stat to client player
+								network->SendStatHp(i, User[i].hp);
+								User[i].regen_ticker = Clock();
+							}
+						}
+
+						if (User[i].y_speed < 10)
+						{
+							User[i].y_speed += GRAVITY;
+						}
+
+						//verical collision detection
+						block_y = blocked(mapId, User[i].x + 25, User[i].y + User[i].y_speed + 13 + 0.25, User[i].x + 38, User[i].y + User[i].y_speed + 64, false);
+
+						//vertical movement
+						if (!block_y)
+						{ //not blocked, fall
+
+							//animation
+							User[i].ground = false;
+
+							User[i].y += User[i].y_speed;
+
+							//bottomless pit
+							if (User[i].y > map[User[i].mapId].death_pit)
+							{
+								printf("user died in death pit on map %i because %i > %i\n", (int)mapId, (int)User[i].y, (int)map[mapId].death_pit);
+								Respawn(User[i].mapId, i);
+							}
+						}
+						else
+						{
+							User[i].ground = true;
+
+							//blocked, stop
+							if (User[i].y_speed > 0)
+							{
+								User[i].y_speed = 1;
+
+								//while or if TODO
+								for (int loopVar = 0; loopVar < HIT_LOOP && (!blocked(mapId, User[i].x + 25, User[i].y + User[i].y_speed + 13 + 0.25, User[i].x + 38, User[i].y + User[i].y_speed + 64 + 0.25, false)); loopVar++)
+									User[i].y += User[i].y_speed;
+
+								User[i].y = (int)(User[i].y + 0.5);
+							}
+							if (User[i].y_speed < 0)
+							{
+								User[i].y_speed = -1;
+
+								//while or if TODO
+								for (int loopVar = 0; loopVar < HIT_LOOP && (!blocked(mapId, User[i].x + 25, User[i].y + User[i].y_speed + 13 + 0.25, User[i].x + 38, User[i].y + User[i].y_speed + 64 + 0.25, false)); loopVar++)
+									User[i].y += User[i].y_speed;
+							}
+
+							User[i].y_speed = 0;
+						}
+
+						//horizontal collision detection
+						block_x = blocked(mapId, User[i].x + User[i].x_speed + 23, User[i].y + 13, User[i].x + User[i].x_speed + 40, User[i].y + 64, false);
+
+						//horizontal movement
+						if (!block_x)
+						{ //not blocked, walk
+							User[i].x += User[i].x_speed;
+						}
+					}
+
+				//item objects
+				for (int i = 0; i < 256; i++)
+				if (map[mapId].ItemObj[i].status)
 				{
 					//ninja loot
-					if (Clock() - map[current_map].ItemObj[i].ownerTicker > 10000)
+					if (Clock() - map[mapId].ItemObj[i].ownerTicker > 10000)
 					{
 						//reset the item's owner
-						map[current_map].ItemObj[i].owner = -1;
-						map[current_map].ItemObj[i].ownerTicker = 0;
+						map[mapId].ItemObj[i].owner = -1;
+						map[mapId].ItemObj[i].ownerTicker = 0;
 					}
 
-					itemId = map[current_map].ItemObj[i].itemID;
+					itemId = map[mapId].ItemObj[i].itemID;
 
-					// printf("(%.2f,%.2f)\n", map[current_map].ItemObj[i].x, map[current_map].ItemObj[i].y);
+					// printf("(%.2f,%.2f)\n", map[mapId].ItemObj[i].x, map[mapId].ItemObj[i].y);
 					//horizontal collision detection
-					block_x = blocked(current_map, map[current_map].ItemObj[i].x + map[current_map].ItemObj[i].x_speed, map[current_map].ItemObj[i].y, map[current_map].ItemObj[i].x + map[current_map].ItemObj[i].x_speed + Item[map[current_map].ItemObj[i].itemID].w, map[current_map].ItemObj[i].y + Item[map[current_map].ItemObj[i].itemID].w, false);
+					block_x = blocked(mapId, map[mapId].ItemObj[i].x + map[mapId].ItemObj[i].x_speed, map[mapId].ItemObj[i].y, map[mapId].ItemObj[i].x + map[mapId].ItemObj[i].x_speed + Item[map[mapId].ItemObj[i].itemID].w, map[mapId].ItemObj[i].y + Item[map[mapId].ItemObj[i].itemID].w, false);
 
-					if (map[current_map].ItemObj[i].y_speed < 10)
-						map[current_map].ItemObj[i].y_speed += GRAVITY;
+					if (map[mapId].ItemObj[i].y_speed < 10)
+						map[mapId].ItemObj[i].y_speed += GRAVITY;
 
 					//vertical collision detection
-					block_y = blocked(current_map, map[current_map].ItemObj[i].x + map[current_map].ItemObj[i].x_speed, map[current_map].ItemObj[i].y + map[current_map].ItemObj[i].y_speed + 0.2, map[current_map].ItemObj[i].x + Item[map[current_map].ItemObj[i].itemID].w, map[current_map].ItemObj[i].y + map[current_map].ItemObj[i].y_speed + Item[map[current_map].ItemObj[i].itemID].h, false);
+					block_y = blocked(mapId, map[mapId].ItemObj[i].x + map[mapId].ItemObj[i].x_speed, map[mapId].ItemObj[i].y + map[mapId].ItemObj[i].y_speed + 0.2, map[mapId].ItemObj[i].x + Item[map[mapId].ItemObj[i].itemID].w, map[mapId].ItemObj[i].y + map[mapId].ItemObj[i].y_speed + Item[map[mapId].ItemObj[i].itemID].h, false);
 
 					//vertical movement
 					if (!block_y)
 					{
-						map[current_map].ItemObj[i].y += map[current_map].ItemObj[i].y_speed;
+						map[mapId].ItemObj[i].y += map[mapId].ItemObj[i].y_speed;
 					}
 					else
 					{
-						map[current_map].ItemObj[i].y_speed = 0;
-						map[current_map].ItemObj[i].x_speed *= 0.5;
+						map[mapId].ItemObj[i].y_speed = 0;
+						map[mapId].ItemObj[i].x_speed *= 0.5;
 					}
 
 					//horizontal movement
 					if (!block_x)
 					{
 						//not blocked, move
-						map[current_map].ItemObj[i].x += map[current_map].ItemObj[i].x_speed;
+						map[mapId].ItemObj[i].x += map[mapId].ItemObj[i].x_speed;
 					}
 					else
 					{
-						map[current_map].ItemObj[i].x_speed = 0;
+						map[mapId].ItemObj[i].x_speed = 0;
 					}
 
 					//item
-					box1_x1 = map[current_map].ItemObj[i].x;
-					box1_y1 = map[current_map].ItemObj[i].y;
-					box1_x2 = map[current_map].ItemObj[i].x + Item[map[current_map].ItemObj[i].itemID].w;
-					box1_y2 = map[current_map].ItemObj[i].y + Item[map[current_map].ItemObj[i].itemID].h;
+					box1_x1 = map[mapId].ItemObj[i].x;
+					box1_y1 = map[mapId].ItemObj[i].y;
+					box1_x2 = map[mapId].ItemObj[i].x + Item[map[mapId].ItemObj[i].itemID].w;
+					box1_y2 = map[mapId].ItemObj[i].y + Item[map[mapId].ItemObj[i].itemID].h;
 
 					//Despawn items that fell off the edge
-					if (map[current_map].ItemObj[i].y > map[current_map].death_pit)
+					if (map[mapId].ItemObj[i].y > map[mapId].death_pit)
 					{
-						DespawnItem(i, current_map);
-						map[current_map].ItemObj[i].remove();
+						DespawnItem(i, mapId);
 					} //end despawn items that fell off the edge of the map
 
 					//check for players intersecting
@@ -1126,7 +1119,7 @@ void *Physics(void *arg)
 						//ninja loot
 						bool isMine = false;
 
-						if (map[current_map].ItemObj[i].owner == -1 || map[current_map].ItemObj[i].owner == c)
+						if (map[mapId].ItemObj[i].owner == -1 || map[mapId].ItemObj[i].owner == c)
 							isMine = true;
 
 						//player
@@ -1147,14 +1140,17 @@ void *Physics(void *arg)
 								}
 								else
 								{
-									DespawnItem(i, current_map);
-									unsigned int amount = map[current_map].ItemObj[i].amount + User[c].inventory[itemId];
+									DespawnItem(i, mapId);
+									unsigned int amount = map[mapId].ItemObj[i].amount + User[c].inventory[itemId];
 									PocketItem(c, itemId, amount);
 								} //end else not inventory full (you can pick up)
 							}
 						}
 					}
 				}
+		
+		
+			}
 		} //end timestep
 
 		Sleep(1);
@@ -1166,7 +1162,7 @@ void *Physics(void *arg)
 void Attack(unsigned char userId, float numx, float numy)
 {
 	//set the current map
-	int current_map = User[userId].current_map;
+	unsigned char mapId = User[userId].mapId;
 
 	//Que next action
 	if (User[userId].attacking)
@@ -1224,7 +1220,7 @@ void Attack(unsigned char userId, float numx, float numy)
 		if (User[i].partyStatus == PARTY && User[i].party == User[userId].party)
 			inParty = true;
 
-		if (i != userId && !inParty && User[i].current_map == User[userId].current_map)
+		if (i != userId && !inParty && User[i].mapId == User[userId].mapId)
 		{
 			//check for collision
 			//horizontal
@@ -1278,7 +1274,7 @@ void Attack(unsigned char userId, float numx, float numy)
 				if (User[i].hp <= dam)
 				{
 					printf("Respawn, x:%.2f y:%.2f\n", User[i].x, User[i].y);
-					Respawn(User[i].current_map, i);
+					Respawn(User[i].mapId, i);
 					printf("Respawned, x:%.2f y:%.2f\n", User[i].x, User[i].y);
 
 				} //end died
@@ -1292,19 +1288,19 @@ void Attack(unsigned char userId, float numx, float numy)
 
 	//loop all targets
 	printf("Checking all targets\n");
-	for (int i = 0; i < map[current_map].num_targets; i++)
+	for (int i = 0; i < map[mapId].num_targets; i++)
 	{
-		if (!map[current_map].Target[i].active)
+		if (!map[mapId].Target[i].active)
 			continue;
 
 		//horizontal
 		float x_dist, y_dist;
 		if (User[userId].facing_right)
-			x_dist = map[current_map].Target[i].x - (User[userId].x + 38);
+			x_dist = map[mapId].Target[i].x - (User[userId].x + 38);
 		else
-			x_dist = (User[userId].x + 25) - (map[current_map].Target[i].x + map[current_map].Target[i].w);
+			x_dist = (User[userId].x + 25) - (map[mapId].Target[i].x + map[mapId].Target[i].w);
 		//vertical
-		y_dist = map[current_map].Target[i].y - User[userId].y;
+		y_dist = map[mapId].Target[i].y - User[userId].y;
 
 		//how far away you can hit, plus weapon
 		int max_dist = 30;
@@ -1315,19 +1311,19 @@ void Attack(unsigned char userId, float numx, float numy)
 		}
 
 		//attack events
-		if (x_dist > -map[current_map].Target[i].w && x_dist < max_dist && y_dist > 0 && y_dist < 60)
+		if (x_dist > -map[mapId].Target[i].w && x_dist < max_dist && y_dist > 0 && y_dist < 60)
 		{
 			//make this target disappear
-			map[current_map].Target[i].respawn_ticker = Clock();
-			map[current_map].Target[i].active = false;
-			network->SendDespawnTarget(i, current_map);
+			map[mapId].Target[i].respawn_ticker = Clock();
+			map[mapId].Target[i].active = false;
+			network->SendDespawnTarget(i, mapId);
 
 			//spawn some loot
-			if (map[current_map].Target[i].loot >= 0)
+			if (map[mapId].Target[i].loot >= 0)
 			{
-				SKO_ItemObject lootItem = map[current_map].Target[i].getLootItem();
+				SKO_ItemObject lootItem = map[mapId].Target[i].getLootItem();
 				lootItem.owner = userId;
-				SpawnLoot(current_map, lootItem);
+				SpawnLoot(mapId, lootItem);
 			}
 
 			//give player some XP
@@ -1336,44 +1332,44 @@ void Attack(unsigned char userId, float numx, float numy)
 	}
 
 	//loop all enemies
-	printf("Checking all enemies: %i\n", map[current_map].num_enemies);
-	for (int i = 0; i < map[current_map].num_enemies; i++)
+	printf("Checking all enemies: %i\n", map[mapId].num_enemies);
+	for (int i = 0; i < map[mapId].num_enemies; i++)
 	{
 		bool partyBlocked = false;
 
 		//if enemy is blocked by a party dibs
-		if (map[current_map].Enemy[i]->dibsPlayer >= 0)
+		if (map[mapId].Enemy[i]->dibsPlayer >= 0)
 		{
 			//then assume it's blocked
 			partyBlocked = true;
-			printf("partyBlocked because dibsPlayer = %i\n", map[current_map].Enemy[i]->dibsPlayer);
+			printf("partyBlocked because dibsPlayer = %i\n", map[mapId].Enemy[i]->dibsPlayer);
 			//if the player is you, it's not blocked
-			if (map[current_map].Enemy[i]->dibsPlayer == userId)
+			if (map[mapId].Enemy[i]->dibsPlayer == userId)
 				partyBlocked = false;
 
 			//but if you are part of the party it isn't blocked
 			if (User[userId].partyStatus == PARTY)
 			{
-				if (User[map[current_map].Enemy[i]->dibsPlayer].partyStatus == PARTY &&
-					User[map[current_map].Enemy[i]->dibsPlayer].party == User[userId].party)
+				if (User[map[mapId].Enemy[i]->dibsPlayer].partyStatus == PARTY &&
+					User[map[mapId].Enemy[i]->dibsPlayer].party == User[userId].party)
 					partyBlocked = false;
 			}
 		}
 
 		//check is they are active and not dib'sed by a party
-		if (!map[current_map].Enemy[i]->dead && !partyBlocked)
+		if (!map[mapId].Enemy[i]->dead && !partyBlocked)
 		{
-			printf("Checking enemy: %i on map: %i\n", i, current_map);
+			printf("Checking enemy: %i on map: %i\n", i, mapId);
 			//check for collision
 			//horizontal
 			float x_dist, y_dist;
 			if (User[userId].facing_right)
-				x_dist = map[current_map].Enemy[i]->x - User[userId].x;
+				x_dist = map[mapId].Enemy[i]->x - User[userId].x;
 			else
-				x_dist = User[userId].x - map[current_map].Enemy[i]->x;
+				x_dist = User[userId].x - map[mapId].Enemy[i]->x;
 
 			//vertical
-			y_dist = map[current_map].Enemy[i]->y - User[userId].y;
+			y_dist = map[mapId].Enemy[i]->y - User[userId].y;
 			//how far away you can hit, plus weapon
 			int max_dist = 30;
 			int weap = User[userId].equip[0];
@@ -1385,7 +1381,7 @@ void Attack(unsigned char userId, float numx, float numy)
 			//attack events
 			if (x_dist >= 0 && x_dist < max_dist && y_dist > -60 && y_dist < 60)
 			{
-				EnemyHit(i, current_map, userId);
+				EnemyHit(i, mapId, userId);
 			}
 		} //end loop if you hit enemys
 	} // end if enemy is dead
@@ -1548,7 +1544,7 @@ void Jump(unsigned char userId, float numx, float numy)
 
 void DivideLoot(int enemy, int party)
 {
-	int current_map = 0;
+	unsigned char mapId = 0;
 
 	//some function variables
 	float totalDamage = 0;
@@ -1560,8 +1556,8 @@ void DivideLoot(int enemy, int party)
 		if (User[p].Ident && User[p].partyStatus == PARTY && User[p].party == party)
 		{
 			//set the current map
-			current_map = User[p].current_map;
-			totalDamage += map[current_map].Enemy[enemy]->dibsDamage[p];
+			mapId = User[p].mapId;
+			totalDamage += map[mapId].Enemy[enemy]->dibsDamage[p];
 			numInParty++;
 		}
 
@@ -1569,14 +1565,14 @@ void DivideLoot(int enemy, int party)
 	int randStart = rand() % numInParty;
 
 	//give away items until they are all gone
-	while (totalLootGiven < map[current_map].Enemy[enemy]->lootAmount)
+	while (totalLootGiven < map[mapId].Enemy[enemy]->lootAmount)
 	{
 		//find total damage from all party members
 		for (int p = randStart; p < MAX_CLIENTS; p++)
 			if (User[p].Ident && User[p].partyStatus == PARTY && User[p].party == party)
 			{
 				//calculate chance of getting the loot
-				float lootEarned = (float)map[current_map].Enemy[enemy]->dibsDamage[p] / totalDamage * map[current_map].Enemy[enemy]->lootAmount;
+				float lootEarned = (float)map[mapId].Enemy[enemy]->dibsDamage[p] / totalDamage * map[mapId].Enemy[enemy]->lootAmount;
 				int lootGiven = 0;
 				printf("%s has earned %.2f loot items.\n", User[p].Nick.c_str(), lootEarned);
 
@@ -1588,17 +1584,17 @@ void DivideLoot(int enemy, int party)
 					totalLootGiven++;
 
 					//check if the max items has been given
-					if (totalLootGiven >= map[current_map].Enemy[enemy]->lootAmount)
+					if (totalLootGiven >= map[mapId].Enemy[enemy]->lootAmount)
 						return;
 				}
 
 				//printf("Loot given so far for %s is %i\n", User[p].Nick.c_str(), lootGiven);
 
 				//check if the max items has been given
-				if (totalLootGiven >= map[current_map].Enemy[enemy]->lootAmount)
+				if (totalLootGiven >= map[mapId].Enemy[enemy]->lootAmount)
 					return;
 
-				//printf("Total loot given so far is %i/%i so going to attempt a bonus item for %s.\n", totalLootGiven, map[current_map].Enemy[enemy]->lootAmount, User[p].Nick.c_str());
+				//printf("Total loot given so far is %i/%i so going to attempt a bonus item for %s.\n", totalLootGiven, map[mapId].Enemy[enemy]->lootAmount, User[p].Nick.c_str());
 
 				//give a possible bonus item
 				if (Roll(lootEarned - lootGiven))
@@ -1611,7 +1607,7 @@ void DivideLoot(int enemy, int party)
 				//printf("All the loot given to %s is %i\n", User[p].Nick.c_str(), lootGiven);
 
 				//check if the max items has been given
-				if (totalLootGiven >= map[current_map].Enemy[enemy]->lootAmount)
+				if (totalLootGiven >= map[mapId].Enemy[enemy]->lootAmount)
 					return;
 			}
 
@@ -1620,61 +1616,61 @@ void DivideLoot(int enemy, int party)
 	}
 }
 
-void RespawnEnemy(int current_map, int enemy)
+void RespawnEnemy(unsigned char mapId, int enemy)
 {
 	printf("Map %i Enemy %i killed at (%i, %i) spawns at (%i, %i)\n",
-		   current_map, enemy, (int)map[current_map].Enemy[enemy]->x, (int)map[current_map].Enemy[enemy]->y, (int)map[current_map].Enemy[enemy]->sx, (int)map[current_map].Enemy[enemy]->sy);
+		   mapId, enemy, (int)map[mapId].Enemy[enemy]->x, (int)map[mapId].Enemy[enemy]->y, (int)map[mapId].Enemy[enemy]->sx, (int)map[mapId].Enemy[enemy]->sy);
 	//set enemy to dead
-	map[current_map].Enemy[enemy]->dead = true;
+	map[mapId].Enemy[enemy]->dead = true;
 
 	//set their respawn timer
-	map[current_map].Enemy[enemy]->respawn_ticker = Clock();
+	map[mapId].Enemy[enemy]->respawn_ticker = Clock();
 
 	//disappear TODO - remove this hack add enemy killed pakcet for client & server
-	map[current_map].Enemy[enemy]->x = -100000;
-	map[current_map].Enemy[enemy]->y = -100000;
+	map[mapId].Enemy[enemy]->x = -100000;
+	map[mapId].Enemy[enemy]->y = -100000;
 
-	network->SendEnemyAction(map[current_map].Enemy[enemy], ENEMY_MOVE_STOP, enemy, current_map);
+	network->SendEnemyAction(map[mapId].Enemy[enemy], ENEMY_MOVE_STOP, enemy, mapId);
 }
 
-void SpawnLoot(int current_map, SKO_ItemObject lootItem)
+void SpawnLoot(unsigned char mapId, SKO_ItemObject lootItem)
 {
 	int rand_i;
 	for (rand_i = 0; rand_i < 255; rand_i++)
 	{
-		if (map[current_map].ItemObj[rand_i].status == false)
+		if (map[mapId].ItemObj[rand_i].status == false)
 			break;
 	}
 
 	if (rand_i == 255)
 	{
-		if (map[current_map].currentItem == 255)
-			map[current_map].currentItem = 0;
+		if (map[mapId].currentItem == 255)
+			map[mapId].currentItem = 0;
 
-		rand_i = map[current_map].currentItem;
-		map[current_map].currentItem++;
+		rand_i = map[mapId].currentItem;
+		map[mapId].currentItem++;
 	}
 
-	map[current_map].ItemObj[rand_i] = SKO_ItemObject(lootItem.itemID, lootItem.x, lootItem.y, lootItem.x_speed, lootItem.y_speed, lootItem.amount);
-	map[current_map].ItemObj[rand_i].owner = lootItem.owner;
-	map[current_map].ItemObj[rand_i].ownerTicker = Clock();
+	map[mapId].ItemObj[rand_i] = SKO_ItemObject(lootItem.itemID, lootItem.x, lootItem.y, lootItem.x_speed, lootItem.y_speed, lootItem.amount);
+	map[mapId].ItemObj[rand_i].owner = lootItem.owner;
+	map[mapId].ItemObj[rand_i].ownerTicker = Clock();
 
 	
 	unsigned char itemObjId = rand_i;
-	unsigned char itemId = map[current_map].ItemObj[rand_i].itemID;
-	float x = map[current_map].ItemObj[rand_i].x;
-	float y = map[current_map].ItemObj[rand_i].y;
-	float x_speed = map[current_map].ItemObj[rand_i].x_speed;
-	float y_speed = map[current_map].ItemObj[rand_i].y_speed;
-	SpawnItem(current_map, itemObjId, itemId, x, y, x_speed, y_speed);
+	unsigned char itemId = map[mapId].ItemObj[rand_i].itemID;
+	float x = map[mapId].ItemObj[rand_i].x;
+	float y = map[mapId].ItemObj[rand_i].y;
+	float x_speed = map[mapId].ItemObj[rand_i].x_speed;
+	float y_speed = map[mapId].ItemObj[rand_i].y_speed;
+	SpawnItem(mapId, itemObjId, itemId, x, y, x_speed, y_speed);
 }
 
 void GiveLoot(int enemy, int player)
 {
-	int current_map = User[player].current_map;
+	unsigned char mapId = User[player].mapId;
 
 	// remember about disabled items
-	SKO_ItemObject lootItem = map[current_map].Enemy[enemy]->getLootItem();
+	SKO_ItemObject lootItem = map[mapId].Enemy[enemy]->getLootItem();
 
 	//holiday event
 	if (HOLIDAY)
@@ -1690,9 +1686,9 @@ void GiveLoot(int enemy, int player)
 		//37.5 chance of a normal drop
 	}
 
-	lootItem.x = map[current_map].Enemy[enemy]->x + 16 + (32 - Item[lootItem.itemID].w) / 2.0;
-	lootItem.y = map[current_map].Enemy[enemy]->y +
-				 map[current_map].Enemy[enemy]->y1 + Item[lootItem.itemID].h;
+	lootItem.x = map[mapId].Enemy[enemy]->x + 16 + (32 - Item[lootItem.itemID].w) / 2.0;
+	lootItem.y = map[mapId].Enemy[enemy]->y +
+				 map[mapId].Enemy[enemy]->y1 + Item[lootItem.itemID].h;
 	lootItem.x_speed = (float)(rand() % 50 - 25) / 100.0;
 	lootItem.y_speed = (float)(rand() % 300 - 500) / 100.0;
 
@@ -1702,27 +1698,27 @@ void GiveLoot(int enemy, int player)
 
 	lootItem.owner = player;
 
-	SpawnLoot(current_map, lootItem);
+	SpawnLoot(mapId, lootItem);
 }
 
-void EnemyAttack(int i, int current_map)
+void EnemyAttack(int i, unsigned char mapId)
 {
-	map[current_map].Enemy[i]->x_speed = 0;
+	map[mapId].Enemy[i]->x_speed = 0;
 
 	//check if anyone got hit
 	for (unsigned char u = 0; u < MAX_CLIENTS; u++)
 	{
-		if (User[u].current_map == current_map && User[u].Ident)
+		if (User[u].mapId == mapId && User[u].Ident)
 		{
 			//check for collision
 			//horizontal
 			float x_dist, y_dist;
-			if (map[current_map].Enemy[i]->facing_right)
-				x_dist = User[u].x - map[current_map].Enemy[i]->x;
+			if (map[mapId].Enemy[i]->facing_right)
+				x_dist = User[u].x - map[mapId].Enemy[i]->x;
 			else
-				x_dist = map[current_map].Enemy[i]->x - User[u].x;
+				x_dist = map[mapId].Enemy[i]->x - User[u].x;
 			//vertical
-			y_dist = User[u].y - map[current_map].Enemy[i]->y;
+			y_dist = User[u].y - map[mapId].Enemy[i]->y;
 
 			if (x_dist >= 0 && x_dist < 60 && y_dist >= -64 && y_dist <= 64)
 			{
@@ -1730,7 +1726,7 @@ void EnemyAttack(int i, int current_map)
 				int weap = User[u].equip[0];
 				int hat = User[u].equip[1];
 
-				dam = map[current_map].Enemy[i]->strength - User[u].defence;
+				dam = map[mapId].Enemy[i]->strength - User[u].defence;
 
 				if (weap > 0)
 					dam -= Item[weap].def;
@@ -1747,7 +1743,7 @@ void EnemyAttack(int i, int current_map)
 				{
 					printf("Respawning, x:%i y:%i\n", (int)User[u].x, (int)User[u].y);
 
-					Respawn(User[u].current_map, u);
+					Respawn(User[u].mapId, u);
 
 					printf("Respawned!, x:%i y:%i\n", (int)User[u].x, (int)User[u].y);
 				} //end died
@@ -1763,15 +1759,15 @@ void EnemyAttack(int i, int current_map)
 void Warp(int userId, SKO_Portal portal)
 {
 	//move the player to this spot
-	unsigned char oldMap = User[userId].current_map;
-	User[userId].current_map = portal.map;
+	unsigned char oldMap = User[userId].mapId;
+	User[userId].mapId = portal.map;
 	User[userId].x = portal.spawn_x;
 	User[userId].y = portal.spawn_y;
 
 	for (int c = 0; c < MAX_CLIENTS; c++)
 	{
-		if (User[c].Ident && (User[c].current_map == User[userId].current_map || User[c].current_map == oldMap))
-			network->SendWarpPlayer(c, userId, User[userId].current_map, User[userId].x, User[userId].y);
+		if (User[c].Ident && (User[c].mapId == User[userId].mapId || User[c].mapId == oldMap))
+			network->SendWarpPlayer(c, userId, User[userId].mapId, User[userId].x, User[userId].y);
 	}
 
 	//TODO show all items and targets on warp?
@@ -1835,18 +1831,18 @@ void GiveXP(unsigned char userId, int xp)
 	}
 }
 
-void Respawn(int current_map, int userId)
+void Respawn(unsigned char mapId, int userId)
 {
 	//place their coords
-	User[userId].x = map[current_map].spawn_x;
-	User[userId].y = map[current_map].spawn_y;
+	User[userId].x = map[mapId].spawn_x;
+	User[userId].y = map[mapId].spawn_y;
 	User[userId].y_speed = 0;
 	User[userId].hp = User[userId].max_hp;
 
 	//tell everyone they respawned
 	for (int c = 0; c < MAX_CLIENTS; c++)
 	{
-		if (User[c].Ident && User[c].current_map == current_map)
+		if (User[c].Ident && User[c].mapId == mapId)
 			network->SendPlayerRespawn(c, userId, User[userId].x, User[userId].y);
 	}
 }
@@ -1874,7 +1870,7 @@ void quitParty(unsigned char userId)
 	//tell everyone
 	for (int c = 0; c < MAX_CLIENTS; c++)
 		if (User[c].Ident)
-			network->SendQuitParty(c, userId);
+			network->sendPartyLeave(c, userId);
 
 	//quit the inviter if there is only one
 	unsigned char partyHostUserId;
@@ -1891,27 +1887,29 @@ void quitParty(unsigned char userId)
 	{
 		User[partyHostUserId].party = -1;
 		User[partyHostUserId].partyStatus = 0;
-		network->SendQuitParty(partyHostUserId, partyHostUserId);
+		network->sendPartyLeave(partyHostUserId, partyHostUserId);
 	}
 }
 
-void DespawnItem(unsigned char itemObjId, unsigned char current_map)
+void DespawnItem(unsigned char itemObjId, unsigned char mapId)
 {
 	//remove from map
 	for (int userId = 0; userId < MAX_CLIENTS; userId++)
 	{
-		if (User[userId].Ident && User[userId].current_map == current_map)
-			network->SendDespawnItem(userId, itemObjId, current_map);
+		if (User[userId].Ident && User[userId].mapId == mapId)
+			network->SendDespawnItem(userId, itemObjId, mapId);
 	} 
+
+	map[mapId].ItemObj[itemObjId].remove();
 }
 
-void SpawnItem(unsigned char current_map, unsigned char itemObjId, unsigned char itemId, float x, float y, float x_speed, float y_speed)
+void SpawnItem(unsigned char mapId, unsigned char itemObjId, unsigned char itemId, float x, float y, float x_speed, float y_speed)
 {
 	//remove from map
 	for (int userId = 0; userId < MAX_CLIENTS; userId++)
 	{
-		if (User[userId].Ident && User[userId].current_map == current_map)
-			network->SendSpawnItem(userId, itemObjId, current_map, itemId, x, y, x_speed, y_speed);
+		if (User[userId].Ident && User[userId].mapId == mapId)
+			network->SendSpawnItem(userId, itemObjId, mapId, itemId, x, y, x_speed, y_speed);
 	}
 } 
 
@@ -1943,7 +1941,7 @@ void PlayerDamaged(unsigned char userId, unsigned char damage)
 	
 	for (int c = 0; c < MAX_CLIENTS; c++)
 	{
-		if (User[c].Ident && User[c].current_map == User[c].current_map)
+		if (User[c].Ident && User[c].mapId == User[c].mapId)
 		{
 			network->SendPlayerHit(c, userId);
 			if (userId != c && User[c].partyStatus == PARTY && User[c].party == User[userId].party)
@@ -1990,7 +1988,7 @@ unsigned int GetTotalDefence(unsigned char userId)
 	return totalDefence;
 }
 
-void KillEnemy(unsigned char enemyId, unsigned char current_map, unsigned char killerUserId)
+void KillEnemy(unsigned char enemyId, unsigned char mapId, unsigned char killerUserId)
 {
 	//Divide Loot between a party
 	if (User[killerUserId].partyStatus == PARTY)
@@ -1999,20 +1997,20 @@ void KillEnemy(unsigned char enemyId, unsigned char current_map, unsigned char k
 	}
 	else //not in a party, they get all the loots!
 	{
-		for (int it = 0; it < map[current_map].Enemy[enemyId]->lootAmount; it++)
+		for (int it = 0; it < map[mapId].Enemy[enemyId]->lootAmount; it++)
 			GiveLoot(enemyId, killerUserId);
 	}
 
 	//kill the enemy after loot is dropped !! :P
-	RespawnEnemy(current_map, enemyId);
+	RespawnEnemy(mapId, enemyId);
 
 	float bonus_clan_xp = 0;
-	float splitXP = map[current_map].Enemy[enemyId]->xp;
+	float splitXP = map[mapId].Enemy[enemyId]->xp;
 
 	//if in a clan add bonus xp - TODO: remove "(" versus "[" logic for clans
 	if (User[killerUserId].Clan[0] == '[')
 	{
-		bonus_clan_xp = map[current_map].Enemy[enemyId]->xp * 0.10; //10% bonus
+		bonus_clan_xp = map[mapId].Enemy[enemyId]->xp * 0.10; //10% bonus
 	}
 	printf("User is in a clan so bonus xp for them! %i\n", (int)bonus_clan_xp);
 	if (User[killerUserId].partyStatus == PARTY)
@@ -2024,7 +2022,7 @@ void KillEnemy(unsigned char enemyId, unsigned char current_map, unsigned char k
 		//find total damage from all party members
 		for (int p = 0; p < MAX_CLIENTS; p++)
 			if (User[p].Ident && User[p].partyStatus == PARTY && User[p].party == User[killerUserId].party)
-				totalDamage += map[current_map].Enemy[enemyId]->dibsDamage[p];
+				totalDamage += map[mapId].Enemy[enemyId]->dibsDamage[p];
 
 		//find total damage from all party members
 		for (int p = 0; p < MAX_CLIENTS; p++)
@@ -2032,13 +2030,13 @@ void KillEnemy(unsigned char enemyId, unsigned char current_map, unsigned char k
 			{
 				//base XP they deserve
 				float gimmieXP = 0;
-				float pl_dmg = (float)map[current_map].Enemy[enemyId]->dibsDamage[p];
+				float pl_dmg = (float)map[mapId].Enemy[enemyId]->dibsDamage[p];
 
 				if (pl_dmg > 0)
 					gimmieXP = pl_dmg / totalDamage;
 
 				printf("Player %s dealt %.2f percent of the damage or %i HP out of %i HP done by the party.\n",
-						User[p].Nick.c_str(), gimmieXP * 100, map[current_map].Enemy[enemyId]->dibsDamage[p], (int)totalDamage);
+						User[p].Nick.c_str(), gimmieXP * 100, map[mapId].Enemy[enemyId]->dibsDamage[p], (int)totalDamage);
 				gimmieXP *= splitXP;
 
 				//add bonus XP
@@ -2065,50 +2063,50 @@ void KillEnemy(unsigned char enemyId, unsigned char current_map, unsigned char k
 	else
 	{
 		//just give myself xp
-		GiveXP(killerUserId, map[current_map].Enemy[enemyId]->xp + bonus_clan_xp);
-		printf("[SOLO] Player %s was given %i XP points\n", User[killerUserId].Nick.c_str(), map[current_map].Enemy[enemyId]->xp);
+		GiveXP(killerUserId, map[mapId].Enemy[enemyId]->xp + bonus_clan_xp);
+		printf("[SOLO] Player %s was given %i XP points\n", User[killerUserId].Nick.c_str(), map[mapId].Enemy[enemyId]->xp);
 	}
 }
 
-void EnemyHit(unsigned char enemyId, unsigned char current_map, unsigned char userId)
+void EnemyHit(unsigned char enemyId, unsigned char mapId, unsigned char userId)
 {
 	//Sum of all strength a player has, including equipment
 	int strength = GetTotalStrength(userId);
-	int damage = strength - map[current_map].Enemy[enemyId]->defence;
+	int damage = strength - map[mapId].Enemy[enemyId]->defence;
 
 	if (damage <= 0)
 		return;
 
 	//keep track of damage
-	map[current_map].Enemy[enemyId]->dibsDamage[userId] += damage;
-	map[current_map].Enemy[enemyId]->dibsPlayer = userId;
-	map[current_map].Enemy[enemyId]->dibsTicker = Clock();
+	map[mapId].Enemy[enemyId]->dibsDamage[userId] += damage;
+	map[mapId].Enemy[enemyId]->dibsPlayer = userId;
+	map[mapId].Enemy[enemyId]->dibsTicker = Clock();
 
 	for (int c = 0; c < MAX_CLIENTS; c++)
 	{
-		if (User[c].Ident && User[c].current_map == current_map)
+		if (User[c].Ident && User[c].mapId == mapId)
 			network->SendEnemyHit(c, enemyId);
 	}
 
-	if (map[current_map].Enemy[enemyId]->hp <= damage)
+	if (map[mapId].Enemy[enemyId]->hp <= damage)
 	{
 		//keep track of damage but remove overflow
-		int extraHpHurt = (damage - map[current_map].Enemy[enemyId]->hp);
-		map[current_map].Enemy[enemyId]->dibsDamage[userId] -= extraHpHurt;
+		int extraHpHurt = (damage - map[mapId].Enemy[enemyId]->hp);
+		map[mapId].Enemy[enemyId]->dibsDamage[userId] -= extraHpHurt;
 
-		KillEnemy(enemyId, current_map, userId);
+		KillEnemy(enemyId, mapId, userId);
 	} //end died
 	else
 	{
-		map[current_map].Enemy[enemyId]->hp -= damage;
+		map[mapId].Enemy[enemyId]->hp -= damage;
 
 		//enemy health bars
-		unsigned char displayHp = (unsigned char)((float)map[current_map].Enemy[enemyId]->hp / map[current_map].Enemy[enemyId]->hp_max * hpBar);
+		unsigned char displayHp = (unsigned char)((float)map[mapId].Enemy[enemyId]->hp / map[mapId].Enemy[enemyId]->hp_max * hpBar);
 
 		for (int c = 0; c < MAX_CLIENTS; c++)
 		{
 			if (User[c].Ident)
-				network->SendEnemyHp(c, enemyId, current_map, displayHp);
+				network->SendEnemyHp(c, enemyId, mapId, displayHp);
 		}
 	}
 }

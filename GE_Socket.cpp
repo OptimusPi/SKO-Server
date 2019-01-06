@@ -277,7 +277,7 @@ int GE_Socket::Recv()
         else 
         { 
             perror("recv failed for an unexpected reason.");
-            printf("recv error ID: ", iResult); 
+            printf("recv error ID: %i\n", iResult); 
             Close(); 
             return (int)GE_Socket_Error; 
         } 

@@ -19,7 +19,7 @@ void SKO_Player::init()
 	//the tutorial map was added later and the id is 2
 	x = 1000;
 	y = 0;
-	current_map = 2;
+	mapId = 2;
 	hp = 0;
 	max_hp = 10;
 	xp = 0;
@@ -67,7 +67,7 @@ void SKO_Player::init()
     party = -1;
     partyStatus = 0;
     //current map
-    current_map = 0;
+    mapId = 0;
 
     mobKills = 0;
     pvpKills = 0;
