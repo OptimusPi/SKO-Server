@@ -1,6 +1,6 @@
 #pragma once
 
-const char
+const unsigned char
 	VERSION_CHECK = 255,
 	LOADED = 254,
 	SERVER_FULL = 253,

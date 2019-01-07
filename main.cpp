@@ -116,14 +116,16 @@ std::string lower(std::string myString)
 
 int snap_distance = 64;
 
+
 /* CODE */
 int main()
 {
 	//stdout buffer so we can tail -f the logs
-	setbuf(stdout, NULL);
-	setbuf(stderr, NULL);
+	//setbuf(stdout, NULL);
+	//setbuf(stderr, NULL);
 
 	printf("Starting Server...\n");
+
 
 	//load maps and stuff
 	for (int mp = 0; mp < NUM_MAPS; mp++)
@@ -1788,11 +1790,11 @@ void GiveXP(unsigned char userId, int xp)
 		//level
 		network->SendStatLevel(userId, User[userId].level);
 
-		//hp max
-		network->SendStatXpMax(userId, User[userId].max_xp);
-
 		//hp
 		network->SendStatHp(userId, User[userId].hp);
+
+		//hp max
+		network->SendStatHpMax(userId, User[userId].max_hp);
 
 		//stat_points
 		network->SendStatPoints(userId, User[userId].stat_points);

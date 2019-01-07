@@ -150,11 +150,17 @@ void SKO_Network::QueueLoop()
 				//if you got anything
 				if (User[userId].Sock->Data.length() >= 6)
 				{
+					unsigned char versionCheck = User[userId].Sock->Data[1];
+					unsigned char versionMajor = User[userId].Sock->Data[2];
+					unsigned char versionMinor = User[userId].Sock->Data[3];
+					unsigned char versionPatch = User[userId].Sock->Data[4];
+					unsigned char versionOS = User[userId].Sock->Data[5];
+
 					//if the packet code was VERSION_CHECK
-					if (User[userId].Sock->Data[1] == VERSION_CHECK)
+					if (versionCheck == VERSION_CHECK)
 					{
 						printf("User[userId].Sock->Data[1] == VERSION_CHECK\n");
-						if (User[userId].Sock->Data[2] == VERSION_MAJOR && User[userId].Sock->Data[3] == VERSION_MINOR && User[userId].Sock->Data[4] == VERSION_PATCH)
+						if (versionMajor == VERSION_MAJOR && versionMinor == VERSION_MINOR && versionPatch == VERSION_PATCH)
 						{
 							printf("Correct version!\n");
 							User[userId].Sock->Data = "";
@@ -165,14 +171,14 @@ void SKO_Network::QueueLoop()
 							printf("Current Time: \t%lu\n", Clock());
 
 							//operating system statistics
-							User[userId].OS = User[userId].Sock->Data[5];
+							User[userId].OS = versionOS;
 						}
 						else //not correct version
 						{
 							send(User[userId].Sock, VERSION_FAIL);
 							printf("error, packet code failed on VERSION_CHECK see look:\n");
-							printf(">>>[read values] VERSION_MAJOR: %i VERSION_MINOR: %i VERSION_PATCH: %i\n",
-								   User[userId].Sock->Data[2], User[userId].Sock->Data[3], User[userId].Sock->Data[4]);
+							printf(">>>[read values] VERSION_MAJOR: %i VERSION_MINOR: %i VERSION_PATCH: %i VERSION_OS: %i\n",
+								  versionMajor, versionMinor, versionPatch, versionOS);
 							printf(">>>[expected values] VERSION_MAJOR: %i VERSION_MINOR: %i VERSION_PATCH: %i\n",
 								   VERSION_MAJOR, VERSION_MINOR, VERSION_PATCH);
 							User[userId].Que = false;
@@ -355,16 +361,20 @@ void SKO_Network::RecvPacket(GE_Socket *socket)
 template <typename First, typename... Rest>
 void SKO_Network::send(GE_Socket *socket, First const &first, Rest const &... rest)
 {
+	// Construct packet to send to the given socket.
+	std::string packet = SKO_PacketFactory::getPacket(first, rest...);
+
+	// printf(kCyan "[network->send(...)]: ");
+	// for (int i = 0; i < packet.length(); i++)
+	// {
+	// 	printf("[%i]", (int)(unsigned char)packet[i]);
+	// }
+	// printf("\n" kNormal);
+
 	// Check socket health.
 	// If it's not healthy, the receive loop will clean it up.
 	if (!socket->Connected || (socket->GetStatus() & GE_Socket_Error))
-	{
-		printf("I can't send that packet. My socket is not connected!\n");
 		return;
-	}
-
-	// Construct packet to send to the given socket.
-	std::string packet = SKO_PacketFactory::getPacket(first, rest...);
 
 	// Send to the given socket but log errors.
 	if (socket->Send(packet) == GE_Socket_Error)
@@ -519,11 +529,7 @@ void SKO_Network::HandleClient(unsigned char userId)
 	if (data_len > pack_len)
 		newPacket = User[userId].Sock->Data.substr(pack_len, data_len - pack_len);
 
-	printf(kYellow "before length: %lu\n" kNormal, User[userId].Sock->Data.length());
 	User[userId].Sock->Data = User[userId].Sock->Data.substr(0, pack_len);
-	printf(kYellow "after length: %lu\n" kNormal, User[userId].Sock->Data.length());
-
-	printf(kGreen "parse() called with length of: %lu\n" kNormal, User[userId].Sock->Data.length());
 	packetHandler->parse(userId, User[userId].Sock->Data);
 
 	//put the extra data (if any) into data
@@ -620,7 +626,8 @@ void SKO_Network::SendStatXp(unsigned char userId, unsigned int xp)
 }
 void SKO_Network::SendStatXpMax(unsigned char userId, unsigned int xp_max)
 {
-	send(User[userId].Sock, STATMAX_HP, xp_max);
+	send(User[userId].Sock, STATMAX_XP, xp_max);
+
 }
 void SKO_Network::SendBuddyStatXp(unsigned char userId, unsigned char partyMemberId, unsigned char displayXp)
 {
@@ -672,7 +679,7 @@ void SKO_Network::SendRegisterResponse_AlreadyRegistered(unsigned char userId)
 }
 void SKO_Network::SendLoginResponse_Success(unsigned char userId)
 {
-	send(User[userId].Sock, LOGIN_SUCCESS);
+	send(User[userId].Sock, LOGIN_SUCCESS, userId);
 }
 void SKO_Network::SendLoginResponse_AlreadyOnline(unsigned char userId) 
 {

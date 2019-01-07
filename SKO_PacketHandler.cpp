@@ -19,8 +19,6 @@ void SKO_PacketHandler::parse(unsigned char userId, std::string packet)
         return;
     }
 
-    printf(kGreen "parse() proceeding with packet length %i and code %i" kNormal, packetLength, code);
-
     if (code == PONG)
     {
         User[userId].ping = Clock() - User[userId].pingTicker;
@@ -60,19 +58,12 @@ void SKO_PacketHandler::parse(unsigned char userId, std::string packet)
             {
                 printf("User that is you already is: %s x is %i i is %i\n", User[i].Nick.c_str(), (int)User[i].x, i);
                 network->SendLoginResponse_AlreadyOnline(userId);
+                return;
             }
         }
 
         //Login and load some status such as is mute, is banned
         int result = repository->loginPlayer(username, password);
-
-        //TODO - put this somewhere and finish
-        enum LoadProfileResponse
-        {
-            WrongPassword = 1,
-            AlreadyOnline = 2, 
-            Banned = 3
-        };
 
         if (result == 1) //wrong password 
         {
@@ -81,11 +72,6 @@ void SKO_PacketHandler::parse(unsigned char userId, std::string packet)
             //TODO kick server after several failed login attempts
             //warn the server, possible bruteforce hack attempt
             printf("%s has entered the wrong password!\n", username.c_str());
-        }
-        else if (result == 2) //character already logged in
-        {
-            network->SendLoginResponse_AlreadyOnline(userId);
-            printf("%s tried to double-log!\n", username.c_str());
         }
         else if (result == 3) //character is banned
         {
@@ -136,6 +122,11 @@ void SKO_PacketHandler::parse(unsigned char userId, std::string packet)
             
             printf("going to tell client stats\n");
 
+            printf(kGreen "hp: %i\n" kNormal, (int)User[userId].hp);
+            printf(kGreen "max hp: %i\n" kNormal, (int)User[userId].max_hp);
+            printf(kGreen "xp: %i\n" kNormal, (int)User[userId].xp);
+            printf(kGreen "max xp: %i\n" kNormal, (int)User[userId].max_xp);
+            
             // HP
             network->SendStatHp(userId, User[userId].hp);
             network->SendStatHpMax(userId, User[userId].max_hp);
@@ -1870,98 +1861,92 @@ void SKO_PacketHandler::parse(unsigned char userId, std::string packet)
             else //just chat
             {
                 //wrap long text messages
-                int max = 60 - User[userId].Nick.length();
+                int max = 62;
+                std::string userTag = "";
 
                 // Add nick to the send
                 std::string chatMessage = "";
 
                 if (User[userId].Nick.compare("Paladin") != 0)
                 {
-                    chatMessage += User[userId].Nick;
-                    chatMessage += ": ";
+                    userTag += "<";
+                    userTag += User[userId].Nick;
+                    userTag += "> ";
                 }
-                else
-                    max = 52;
 
-                std::string chatFull = User[userId].Sock->Data.substr(2, packetLength);
-                std::string chatChunk = "";
+                chatMessage += userTag;
+                chatMessage += User[userId].Sock->Data.substr(2, packetLength);
+                printf(kGreen "[Chat]%s\n" kNormal, chatMessage.c_str());
 
-                bool doneWrapping = false;
-                if (chatFull.length() < max)
+
+                // Send a short chat that fits on one line.
+                if (chatMessage.length() < max)
                 {
                     for (int i = 0; i < MAX_CLIENTS; i++)
                     {
                         if (User[i].Ident)
-                            network->sendChat(userId, chatMessage + chatFull);
+                            network->sendChat(i, chatMessage);
                     }
-                    doneWrapping = true;
+                    return;
                 }
 
-                int nickLength = 0;
-                if (User[userId].Nick.compare("Paladin") == 0)
-                {
-                    if (!doneWrapping && chatFull.find(": ") != std::string::npos)
-                    {
-                        nickLength += chatFull.find(": ");
-                        nickLength += 2; //colon and space
-                        max -= nickLength;
-                    }
-                } //end paladin
-                else
-                {
-                    nickLength = User[userId].Nick.length();
-                }
 
+                // Wrap long chat 
+                bool doneWrapping = false;
                 while (!doneWrapping)
                 {
-                    std::string cPacket = "";
-
-                    //add spaces
-                    for (int c = 0; c < nickLength; c++)
-                        cPacket += " ";
-
-                    //TODO remove hard-coded "Paladin" references
-                    if (User[userId].Nick.compare("Paladin") != 0)
-                        cPacket += "  ";
-
-                    if (chatChunk.length() > max)
+                    std::string chatChunk = "";
+                    if (chatMessage.length() > max)
                     {
-                        //add message
-                        cPacket += chatChunk.substr(0, max);
-                        chatChunk = chatChunk.substr(max);
+                        Sleep(1000);
+                        printf("chatMessage.length=%i > max%i\n", (int)chatMessage.length(), max);
+                        //Break message apart on spaces if they are found in the first chunk
+                        int found = chatMessage.substr(0, max).find_last_of(" ");
+                        printf("found is: %i\n", found);
+                        if (found > (int)userTag.length() && found > max - 6)
+                        {
+                            printf("(found=1) chatMessage was: %s\n", chatMessage.c_str());
+                            printf("(found=1) chatChunk was: %s\n", chatChunk.c_str());
+                            chatChunk = chatMessage.substr(0, found);
+                            chatMessage = chatMessage.substr(found + 1);
+                            printf("(found=1) chatMessage is now: %s\n", chatMessage.c_str());
+                            printf("(found=1) chatChunk is now: %s\n", chatChunk.c_str());
+                        }
+                        else
+                        {
+                            printf("(found=0) chatMessage was: %s\n", chatMessage.c_str());
+                            printf("(found=0) chatChunk was: %s\n", chatChunk.c_str());
+                            chatChunk = chatMessage.substr(0, max - 1) + "-";
+                            chatMessage = chatMessage.substr(max - 1);
+                            printf("(found=0) chatMessage is now: %s\n", chatMessage.c_str());
+                            printf("(found=0) chatChunk is now: %s\n", chatChunk.c_str());
+                        }
                     }
                     else
                     {
-                        cPacket += chatChunk;
+                        chatChunk = chatMessage;
                         doneWrapping = true; 
                     }
-                    cPacket[0] = cPacket.length();
 
                     for (int i = 0; i < MAX_CLIENTS; i++)
                     {
                         if (User[i].Ident)
-                            network->sendChat(i, cPacket);
+                            network->sendChat(i, chatChunk);
                     }
                 }
-                printf("\e[0;33m[Chat]%s: %s\e[m\n", User[userId].Nick.c_str(), chatFull.c_str());
             } //end just chat
         }	 //end if not muted
     }		  //end chat
     else
     {
-        //the user is hacking, or sent a bad packet
-        User[userId].Sock->Close();
-        User[userId].Sock->Connected = false;
-
         printf(kRed "[FATAL] (%s) ERR_BAD_PACKET_WAS: \n{\n> ", User[userId].Nick.c_str());
         for (int l = 0; l < User[userId].Sock->Data.length(); l++)
-            printf("[%i]", (int)User[userId].Sock->Data[l]);
+            printf("[%u]", (int)User[userId].Sock->Data[l]);
         printf("}\n> Packet length: %lu\n", User[userId].Sock->Data.length());
 
         printf("\n" kNormal);
 
-        User[userId].Sock->Data = "";
+        //the user is hacking, or sent a bad packet
+        User[userId].Sock->Close();
     } //end error packet
-
-    printf(kGreen "parse() done with packet length %i and code %i" kNormal, packetLength, code);
 }
