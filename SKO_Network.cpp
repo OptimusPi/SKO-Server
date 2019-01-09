@@ -530,7 +530,7 @@ void SKO_Network::HandleClient(unsigned char userId)
 		newPacket = User[userId].Sock->Data.substr(pack_len, data_len - pack_len);
 
 	User[userId].Sock->Data = User[userId].Sock->Data.substr(0, pack_len);
-	packetHandler->parse(userId, User[userId].Sock->Data);
+	packetHandler->parsePacket(userId, User[userId].Sock->Data);
 
 	//put the extra data (if any) into data
 	User[userId].Sock->Data = newPacket;

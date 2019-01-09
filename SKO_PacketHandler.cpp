@@ -1,301 +1,365 @@
 #include "SKO_PacketHandler.h"
-#include "SKO_PacketTypes.h"
 
+//constructor
 SKO_PacketHandler::SKO_PacketHandler(SKO_Network *network, SKO_Repository *repository)
 {
     this->network = network;
     this->repository = repository;
 }
-
-void SKO_PacketHandler::parse(unsigned char userId, std::string packet)
+// When server receives PING,
+// It immediately replies to the client with PONG
+void SKO_PacketHandler::parsePing(unsigned char userId)
 {
-    //rip the command
-    unsigned char packetLength = User[userId].Sock->Data[0];
-    unsigned char code = User[userId].Sock->Data[1];
+    network->SendPong(userId);
+}
+void SKO_PacketHandler::parsePong(unsigned char userId)
+{
+    User[userId].ping = Clock() - User[userId].pingTicker;
+    User[userId].pingTicker = Clock();
+    User[userId].pingWaiting = false;
+}
+void SKO_PacketHandler::parseLogin(unsigned char userId, std::string packetData)
+{
+    // Declare message string
+    std::string loginRequest = "";
+    std::string username = "";
+    std::string password = "";
 
-    if (packetLength == 0)
+    // Declare temp string
+    std::string Temp;
+
+    //fill message with username and password
+    loginRequest = packetData;
+
+    //strip the appropriate data
+    username += loginRequest.substr(0, loginRequest.find_first_of(" "));
+    password += loginRequest.substr(loginRequest.find_first_of(" ") + 1);
+
+    //printf("DATA:%s\n", User[userId].Sock->Data.c_str());
+    printf("\n::LOGIN::\nUsername[%s]\nPassword[%s]\n", username.c_str(), password.c_str());
+
+    //go through and see if you are logged in already
+    for (int i = 0; i < MAX_CLIENTS; i++)
     {
-        printf(kRed "[FATAL] SKO_PacketHandler::parse() called with no packet length!\n" kNormal); 
+        //tell the client if you are logged in already
+        if (lower(User[i].Nick).compare(lower(username)) == 0)
+        {
+            printf("User that is you already is: %s x is %i i is %i\n", User[i].Nick.c_str(), (int)User[i].x, i);
+            network->SendLoginResponse_AlreadyOnline(userId);
+            return;
+        }
+    }
+
+    //Login and load some status such as is mute, is banned
+    int result = repository->loginPlayer(username, password);
+
+    if (result == 1) //wrong password
+    {
+        network->SendLoginResponse_PasswordFailed(userId);
+
+        //TODO kick server after several failed login attempts
+        //warn the server, possible bruteforce hack attempt
+        printf("%s has entered the wrong password!\n", username.c_str());
+    }
+    else if (result == 3) //character is banned
+    {
+        network->SendLoginResponse_PlayerBanned(userId);
+        printf("%s is banned and tried to login!\n", username.c_str());
+    }
+    else if (result == 4)
+    {
+        network->SendLoginResponse_PasswordFailed(userId);
+        printf("%s tried to login but doesn't exist!\n", username.c_str());
+    }
+
+    if (result == 0 || result == 5) //login with no problems or with 1 problem: user is mute
+    {                               //login success
+
+        printf("(login success) User %i %s socket status: %i\n", userId, username.c_str(), User[userId].Sock->GetStatus());
+
+        if (result == 0)
+            User[userId].Mute = false;
+
+        //successful login
+        network->SendLoginResponse_Success(userId);
+
+        //set display name
+        User[userId].Nick = username;
+
+        std::string clanTag = repository->GetClanTag(username, "(noob)");
+
+        printf("Clan: %s\n", clanTag.c_str());
+        User[userId].Clan = clanTag;
+
+        printf(">>>about to load data.\n");
+        if (repository->loadPlayerData(userId) != 0)
+        {
+            printf("couldn't load data. KILL!\n");
+            User[userId].Save = false;
+            User[userId].Sock->Close();
+            return;
+        }
+
+        //set identified
+        User[userId].Ident = true;
+
+        //the current map of this user
+        unsigned char mapId = User[userId].mapId;
+
+        printf("going to tell client stats\n");
+
+        printf(kGreen "hp: %i\n" kNormal, (int)User[userId].hp);
+        printf(kGreen "max hp: %i\n" kNormal, (int)User[userId].max_hp);
+        printf(kGreen "xp: %i\n" kNormal, (int)User[userId].xp);
+        printf(kGreen "max xp: %i\n" kNormal, (int)User[userId].max_xp);
+
+        // HP
+        network->SendStatHp(userId, User[userId].hp);
+        network->SendStatHpMax(userId, User[userId].max_hp);
+        network->SendStatRegen(userId, User[userId].regen);
+
+        // XP
+        network->SendStatXp(userId, User[userId].xp);
+        network->SendStatXpMax(userId, User[userId].max_xp);
+
+        //STATS
+        network->SendStatLevel(userId, User[userId].level);
+        network->SendStatStr(userId, User[userId].strength);
+        network->SendStatDef(userId, User[userId].defence);
+        network->SendStatPoints(userId, User[userId].stat_points);
+
+        //equipment
+        network->SendEquip(userId, userId, (char)0, Item[User[userId].equip[0]].equipID, User[userId].equip[0]);
+        network->SendEquip(userId, userId, (char)1, Item[User[userId].equip[1]].equipID, User[userId].equip[1]);
+        network->SendEquip(userId, userId, (char)2, Item[User[userId].equip[2]].equipID, User[userId].equip[2]);
+
+        //cosmetic inventory order
+        network->SendInventoryOrder(userId, User[userId].getInventoryOrder());
+
+        //inventory
+        for (unsigned char i = 0; i < NUM_ITEMS; i++)
+        {
+            //if they own this item, tell them how many they own.
+            unsigned int amount = User[userId].inventory[i];
+            //prevents them from holding more than 24 items
+            if (amount > 0)
+            {
+                User[userId].inventory_index++;
+                network->SendPocketItem(userId, i, amount);
+            }
+
+            amount = User[userId].bank[i];
+            //printf("this player owns [%i] of item %i\n", amt, i);
+            if (amount > 0)
+            {
+                //TODO: remove this bank index or change how the bank works!
+                User[userId].bank_index++;
+                network->SendBankItem(userId, i, amount);
+            }
+        } //end loop 256 for items in inventory and map
+
+        //bank
+        for (int i = 0; i < 256; i++)
+        {
+            //go through all the ItemObjects since we're already looping
+            if (map[mapId].ItemObj[i].status)
+            {
+                unsigned char itemId = map[mapId].ItemObj[i].itemID;
+                float numx = map[mapId].ItemObj[i].x;
+                float numy = map[mapId].ItemObj[i].y;
+                float numxs = map[mapId].ItemObj[i].x_speed;
+                float numys = map[mapId].ItemObj[i].y_speed;
+                network->SendSpawnItem(userId, i, mapId, itemId, numx, numy, numxs, numys);
+            }
+        }
+
+        //targets
+        for (int i = 0; i < map[mapId].num_targets; i++)
+        {
+            if (map[mapId].Target[i].active)
+                network->SendSpawnTarget(i, mapId);
+        }
+
+        //npcs
+        for (int i = 0; i < map[mapId].num_npcs; i++)
+        {
+            unsigned char action = NPC_MOVE_STOP;
+
+            if (map[mapId].NPC[i]->x_speed < 0)
+                action = NPC_MOVE_LEFT;
+            if (map[mapId].NPC[i]->x_speed > 0)
+                action = NPC_MOVE_RIGHT;
+
+            network->SendNpcAction(map[mapId].NPC[i], action, i, mapId);
+        }
+
+        // load all enemies
+        for (int i = 0; i < map[mapId].num_enemies; i++)
+        {
+            unsigned char action = ENEMY_MOVE_STOP;
+            if (map[mapId].Enemy[i]->x_speed < 0)
+                action = ENEMY_MOVE_LEFT;
+            if (map[mapId].Enemy[i]->x_speed > 0)
+                action = ENEMY_MOVE_RIGHT;
+
+            network->SendEnemyAction(map[mapId].Enemy[i], action, i, mapId);
+
+            //enemy health bars
+            int hp = (unsigned char)((float)map[mapId].Enemy[i]->hp / map[mapId].Enemy[i]->hp_max * hpBar);
+            network->SendEnemyHp(userId, i, mapId, hp);
+        }
+
+        // inform all players
+        for (unsigned char i = 0; i < MAX_CLIENTS; i++)
+        {
+            // Tell the new user about existing players
+            if (i == userId && User[i].Nick.compare("Paladin") != 0)
+            {
+                network->SendPlayerJoin(userId, i);
+            }
+            // Tell existing players about new user
+            else if (User[i].Ident)
+            {
+                network->SendPlayerJoin(i, userId);
+            }
+        }
+
+        // Trigger loading complete on client.
+        network->SendPlayerLoaded(userId);
+
+        //mark this client to save when they disconnect..since Send/Recv change Ident!!
+        User[userId].Save = true;
+        network->saveAllProfiles();
+    } //end login success
+}
+
+void SKO_PacketHandler::parseRegister(unsigned char userId, std::string packetData)
+{
+    std::string username = "";
+    std::string password = "";
+
+    //strip the appropriate data
+    username += packetData.substr(0, packetData.find_first_of(" "));
+    password += packetData.substr(packetData.find_first_of(" ") + 1);
+
+    //try to create new player account
+    int result = repository->createPlayer(username, password, User[userId].Sock->IP);
+
+    if (result == 1) // user already exists
+    {
+        network->SendRegisterResponse_AlreadyRegistered(userId);
+        printf("%s tried to double-register!\n", username.c_str());
+    }
+    else if (result == 0) // user created successfully
+    {
+        network->SendRegisterResponse_Success(userId);
+        printf("%s has been registered!\n", username.c_str());
+    }
+    else if (result == 2) // user is banned
+    {
+        User[userId].Sock->Close();
+    }
+    else if (result == 3) // fatal error occurred
+    {
+        printf(kRed "[FATAL] Unable to create player.\n" kNormal);
+        User[userId].Sock->Close();
+    }
+}
+
+void SKO_PacketHandler::parseInt()
+{
+
+}
+void SKO_PacketHandler::parse(unsigned char userId, std::string packetData)
+{
+    //assert packet length
+    if (packetData.length != 8)
+    {
+        printf();
         return;
     }
 
-    if (code == PONG)
+    //parse four byte float value
+    float x;
+    ((char *)&numx)[0] = User[userId].Sock->Data[2];
+    ((char *)&numx)[1] = User[userId].Sock->Data[3];
+    ((char *)&numx)[2] = User[userId].Sock->Data[4];
+    ((char *)&numx)[3] = User[userId].Sock->Data[5];
+
+    //parse four byte float value
+    float y;
+    ((char *)&numy)[0] = User[userId].Sock->Data[6];
+    ((char *)&numy)[1] = User[userId].Sock->Data[7];
+    ((char *)&numy)[2] = User[userId].Sock->Data[8];
+    ((char *)&numy)[3] = User[userId].Sock->Data[9];
+    Attack(userId, numx, numy);
+}
+
+
+
+void SKO_PacketHandler::parse(unsigned char userId, std::string packetData)
+{
+    unsigned char packetLength = User[userId].Sock->Data[0];
+}
+
+
+
+void SKO_PacketHandler::parsePacket(unsigned char userId, std::string packet)
+{
+    // Construct a packet parser from this packet
+    this->parser = new SKO_PacketParser(packet);
+    
+    //Check packet sanity
+    if (packet.length() < 2)
     {
-        User[userId].ping = Clock() - User[userId].pingTicker;
-        User[userId].pingTicker = Clock();
-        User[userId].pingWaiting = false;
+        printf(kRed "[FATAL] SKO_PacketHandler::parsePacket() called with incomplete packet!\n" kNormal);
+        printf(kRed "[       SKO_PacketHandler::parsePacket(%i, %s)] \n" kNormal, userId, parser.toString();
+        return;
     }
-    else if (code == PING)
+
+    //Check packet sanity
+    if (packet.length() < parser.getLength())
     {
-        network->SendPong(userId);
+        printf(kRed "[FATAL] SKO_PacketHandler::parsePacket() called with incomplete packet!\n" kNormal);
+        printf(kRed "[       SKO_PacketHandler::parsePacket(%i, %s)] \n" kNormal, userId, parser.toString());
+        return;
     }
-    else if (code == LOGIN)
+    if (packet.length() > parser.getLength())
     {
-        // Declare message string
-        std::string loginRequest = "";
-        std::string username = "";
-        std::string password = "";
-
-        // Declare temp string
-        std::string Temp;
-
-        //fill message with username and password
-        loginRequest += User[userId].Sock->Data.substr(2, packetLength - 2);
-
-        //strip the appropriate data
-        username += loginRequest.substr(0, loginRequest.find_first_of(" "));
-        password += loginRequest.substr(loginRequest.find_first_of(" ") + 1, packetLength - loginRequest.find_first_of(" ") + 1);
-
-        //printf("DATA:%s\n", User[userId].Sock->Data.c_str());
-        printf("\n::LOGIN::\nUsername[%s]\nPassword[%s]\n", username.c_str(), password.c_str());
-
-
-        //go through and see if you are logged in already
-        for (int i = 0; i < MAX_CLIENTS; i++)
-        {
-            //tell the client if you are logged in already
-            if (lower(User[i].Nick).compare(lower(username)) == 0)
-            {
-                printf("User that is you already is: %s x is %i i is %i\n", User[i].Nick.c_str(), (int)User[i].x, i);
-                network->SendLoginResponse_AlreadyOnline(userId);
-                return;
-            }
-        }
-
-        //Login and load some status such as is mute, is banned
-        int result = repository->loginPlayer(username, password);
-
-        if (result == 1) //wrong password 
-        {
-            network->SendLoginResponse_PasswordFailed(userId);
-
-            //TODO kick server after several failed login attempts
-            //warn the server, possible bruteforce hack attempt
-            printf("%s has entered the wrong password!\n", username.c_str());
-        }
-        else if (result == 3) //character is banned
-        {
-            network->SendLoginResponse_PlayerBanned(userId);
-            printf("%s is banned and tried to login!\n", username.c_str());
-        }
-        else if (result == 4)
-        {
-            network->SendLoginResponse_PasswordFailed(userId); 
-            printf("%s tried to login but doesn't exist!\n", username.c_str());
-        }
-
-        if (result == 0 || result == 5) //login with no problems or with 1 problem: user is mute
-        {								//login success
-
-            printf("(login success) User %i %s socket status: %i\n", userId, username.c_str(), User[userId].Sock->GetStatus());
-
-            if (result == 0)
-                User[userId].Mute = false;
-
-            //successful login
-            network->SendLoginResponse_Success(userId);
-
-            //set display name
-            User[userId].Nick = username;
-
-            std::string clanTag = repository->GetClanTag(username, "(noob)");
-
-            printf("Clan: %s\n", clanTag.c_str());
-            User[userId].Clan = clanTag;
-
-            printf(">>>about to load data.\n");
-            if (repository->loadPlayerData(userId) != 0)
-            {
-                printf("couldn't load data. KILL!\n");
-                User[userId].Save = false;
-                User[userId].Sock->Close();
-                return;
-            }
-
-            
-            //set identified
-            User[userId].Ident = true;
-
-            //the current map of this user
-            unsigned char mapId = User[userId].mapId;
-
-            
-            printf("going to tell client stats\n");
-
-            printf(kGreen "hp: %i\n" kNormal, (int)User[userId].hp);
-            printf(kGreen "max hp: %i\n" kNormal, (int)User[userId].max_hp);
-            printf(kGreen "xp: %i\n" kNormal, (int)User[userId].xp);
-            printf(kGreen "max xp: %i\n" kNormal, (int)User[userId].max_xp);
-            
-            // HP
-            network->SendStatHp(userId, User[userId].hp);
-            network->SendStatHpMax(userId, User[userId].max_hp);
-            network->SendStatRegen(userId, User[userId].regen);
-
-            // XP
-            network->SendStatXp(userId, User[userId].xp);
-            network->SendStatXpMax(userId, User[userId].max_xp);
-
-            //STATS
-            network->SendStatLevel(userId, User[userId].level);
-            network->SendStatStr(userId, User[userId].strength);
-            network->SendStatDef(userId, User[userId].defence);
-            network->SendStatPoints(userId, User[userId].stat_points);
-
-            //equipment
-            network->SendEquip(userId, userId, (char)0, Item[User[userId].equip[0]].equipID, User[userId].equip[0]);
-            network->SendEquip(userId, userId, (char)1, Item[User[userId].equip[1]].equipID, User[userId].equip[1]);
-            network->SendEquip(userId, userId, (char)2, Item[User[userId].equip[2]].equipID, User[userId].equip[2]);
-
-            //cosmetic inventory order
-            network->SendInventoryOrder(userId, User[userId].getInventoryOrder());
-
-            //inventory
-            for (unsigned char i = 0; i < NUM_ITEMS; i++)
-            {
-                //if they own this item, tell them how many they own.
-                unsigned int amount = User[userId].inventory[i];
-                //prevents them from holding more than 24 items
-                if (amount > 0)
-                {
-                    User[userId].inventory_index++;
-                    network->SendPocketItem(userId, i, amount);
-                }
-
-                amount = User[userId].bank[i];
-                //printf("this player owns [%i] of item %i\n", amt, i);
-                if (amount > 0)
-                {
-                    //TODO: remove this bank index or change how the bank works!
-                    User[userId].bank_index++;
-                    network->SendBankItem(userId, i, amount);
-                }
-            } //end loop 256 for items in inventory and map
-
-            //bank
-            for (int i = 0; i < 256; i++)
-            {
-                //go through all the ItemObjects since we're already looping
-                if (map[mapId].ItemObj[i].status)
-                {
-                    unsigned char itemId = map[mapId].ItemObj[i].itemID;
-                    float numx = map[mapId].ItemObj[i].x;
-                    float numy = map[mapId].ItemObj[i].y;
-                    float numxs = map[mapId].ItemObj[i].x_speed;
-                    float numys = map[mapId].ItemObj[i].y_speed;
-                    network->SendSpawnItem(userId, i, mapId, itemId, numx, numy, numxs, numys);
-                }
-            }
-
-            //targets
-            for (int i = 0; i < map[mapId].num_targets; i++)
-            {
-                if (map[mapId].Target[i].active)
-                    network->SendSpawnTarget(i, mapId);
-            }
-
-            //npcs
-            for (int i = 0; i < map[mapId].num_npcs; i++)
-            {
-                unsigned char action = NPC_MOVE_STOP;
-
-                if (map[mapId].NPC[i]->x_speed < 0)
-                    action = NPC_MOVE_LEFT;
-                if (map[mapId].NPC[i]->x_speed > 0)
-                    action = NPC_MOVE_RIGHT;
-
-                network->SendNpcAction(map[mapId].NPC[i], action, i, mapId);
-            }
-
-            // load all enemies
-            for (int i = 0; i < map[mapId].num_enemies; i++)
-            {
-                unsigned char action = ENEMY_MOVE_STOP;
-                if (map[mapId].Enemy[i]->x_speed < 0)
-                    action = ENEMY_MOVE_LEFT;
-                if (map[mapId].Enemy[i]->x_speed > 0)
-                    action = ENEMY_MOVE_RIGHT;
-
-                network->SendEnemyAction(map[mapId].Enemy[i], action, i, mapId);
-                
-                //enemy health bars
-                int hp = (unsigned char)((float)map[mapId].Enemy[i]->hp / map[mapId].Enemy[i]->hp_max * hpBar);
-                network->SendEnemyHp(userId, i,mapId, hp);
-            }
-
-            // inform all players
-            for (unsigned char i = 0; i < MAX_CLIENTS; i++)
-            {
-                // Tell the new user about existing players
-                if (i == userId && User[i].Nick.compare("Paladin") != 0)
-                {
-                    network->SendPlayerJoin(userId, i);
-                }
-                // Tell existing players about new user
-                else if (User[i].Ident)
-                {
-                    network->SendPlayerJoin(i, userId);
-                }
-            }
-
-            // Trigger loading complete on client.
-            network->SendPlayerLoaded(userId);
-
-            //mark this client to save when they disconnect..since Send/Recv change Ident!!
-            User[userId].Save = true;
-            network->saveAllProfiles();
-        } //end login success
-    }	 //end "login"
-    else if (code == REGISTER)
+        printf(kRed "[FATAL] SKO_PacketHandler::parsePacket() called with too many packets!\n" kNormal);
+        printf(kRed "[       SKO_PacketHandler::parsePacket(%i, %s)] \n" kNormal, userId, parser.toString());
+        return;
+    }
+    switch (parser.getPacketType())
     {
-        // Declare message string
-        std::string Message = "";
-        std::string Username = "";
-        std::string Password = "";
+    case PING:
+        parsePing(userId);
+        break;
 
-        //fill message with username and password
-        Message += User[userId].Sock->Data.substr(2, packetLength - 2);
+    case PONG:
+        parsePong(userId);
+        break;
 
-        //strip the appropriate data
-        Username += Message.substr(0, Message.find_first_of(" "));
-        Password += Message.substr(Message.find_first_of(" ") + 1, packetLength - Message.find_first_of(" ") + 1);
+    case LOGIN:
+        parseLogin(userId, parser);
+        break;
 
-        //try to create new player account
-        int result = repository->createPlayer(Username, Password, User[userId].Sock->IP);
+    case REGISTER:
+        parseRegister(userId, parser);
+        break;
 
-        if (result == 1) // user already exists
-        {
-            network->SendRegisterResponse_AlreadyRegistered(userId);
-            printf("%s tried to double-register!\n", Username.c_str());
-        }
-        else if (result == 0) // user created successfully
-        {
-            network->SendRegisterResponse_Success(userId);
-            printf("%s has been registered!\n", Username.c_str());
-        }
-        else if (result == 2) // user is banned
-        {
-            User[userId].Sock->Close();
-        }
-        else if (result == 3) // fatal error occurred
-        {
-            printf(kRed "[FATAL] Unable to create player.\n" kNormal);
-            User[userId].Sock->Close();
-        }
-    } //end "register"
-    else if (code == ATTACK)
-    {
-        float numx, numy;
-        ((char *)&numx)[0] = User[userId].Sock->Data[2];
-        ((char *)&numx)[1] = User[userId].Sock->Data[3];
-        ((char *)&numx)[2] = User[userId].Sock->Data[4];
-        ((char *)&numx)[3] = User[userId].Sock->Data[5];
-        ((char *)&numy)[0] = User[userId].Sock->Data[6];
-        ((char *)&numy)[1] = User[userId].Sock->Data[7];
-        ((char *)&numy)[2] = User[userId].Sock->Data[8];
-        ((char *)&numy)[3] = User[userId].Sock->Data[9];
-        Attack(userId, numx, numy);
-    } //end enemy loop
+    case ATTACK:
+        parseAttack(userId, parser);
+        break;
+
+    default:
+        // Disconnect clients sending nonsense packets
+        User[userId].Sock->Close();
+        printf(kRed "[FATAL] SKO_PacketHandler::parsePacket() called with unknown packet type!\n" kNormal);
+        printf(kRed "[       SKO_PacketHandler::parsePacket(%i, %s)] \n" kNormal, userId, parser.toString());
+        break;
+    }
+
     else if (code == MOVE_RIGHT)
     {
 
@@ -379,7 +443,7 @@ void SKO_PacketHandler::parse(unsigned char userId, std::string packet)
         ((char *)&numy)[2] = User[userId].Sock->Data[8];
         ((char *)&numy)[3] = User[userId].Sock->Data[9];
         Jump(userId, numx, numy);
-    }						//end jump
+    }                       //end jump
     else if (code == EQUIP) //if user sends EQUIP it means they are unequipping that item
     {
         unsigned char slot = User[userId].Sock->Data[2];
@@ -398,7 +462,7 @@ void SKO_PacketHandler::parse(unsigned char userId, std::string packet)
 
             //tell everyone
             for (int uc = 0; uc < MAX_CLIENTS; uc++)
-                network->SendEquip(uc,userId, slot, (char)0, (char)0);
+                network->SendEquip(uc, userId, slot, (char)0, (char)0);
 
             //update the player's inventory
             int amount = User[userId].inventory[item];
@@ -524,7 +588,7 @@ void SKO_PacketHandler::parse(unsigned char userId, std::string packet)
                 for (int i1 = 0; i1 < MAX_CLIENTS; i1++)
                 {
                     if (User[i1].Ident)
-                       network->SendEquip(i1, userId, (char)1, Item[item].equipID, item);
+                        network->SendEquip(i1, userId, (char)1, Item[item].equipID, item);
                 }
                 break;
             }
@@ -649,8 +713,8 @@ void SKO_PacketHandler::parse(unsigned char userId, std::string packet)
             default:
                 break;
             } //end switch
-        }	 //end if you have the item
-    }		  //end USE_ITEM
+        }     //end if you have the item
+    }         //end USE_ITEM
     else if (code == DROP_ITEM)
     {
         unsigned char item = User[userId].Sock->Data[2];
@@ -828,7 +892,7 @@ void SKO_PacketHandler::parse(unsigned char userId, std::string packet)
                 User[userId].localTrade[i] = 0;
                 User[playerB].localTrade[i] = 0;
             }
-            
+
             break;
 
         case OFFER:
@@ -853,7 +917,7 @@ void SKO_PacketHandler::parse(unsigned char userId, std::string packet)
 
                     //send to both players!
                     network->sendTradeOffer(userId, (char)1, item, amount);
- 
+
                     //send to playerB
                     network->sendTradeOffer(playerB, (char)2, item, amount);
                 }
@@ -1012,7 +1076,7 @@ void SKO_PacketHandler::parse(unsigned char userId, std::string packet)
                         if (!taken)
                             break;
                     } //find oepn party id
-                }	 //end if party is null
+                }     //end if party is null
 
                 //make the parties equal
                 User[userId].party = partyID;
@@ -1074,13 +1138,13 @@ void SKO_PacketHandler::parse(unsigned char userId, std::string packet)
         default:
             break;
         } //end switch mode
-    }	 //invite to party
+    }     //invite to party
     else if (code == CLAN)
     {
         int mode = User[userId].Sock->Data[2];
         int playerB = 0;
         std::string clanId = "";
-        
+
         printf("Clan mode is %i\n", mode);
         switch (mode)
         {
@@ -1107,21 +1171,21 @@ void SKO_PacketHandler::parse(unsigned char userId, std::string packet)
                 network->sendChat(userId, "Sorry, only the clan owner can invite new members.");
                 return;
             }
-            
+
             //set the clan status of the invited person
             User[playerB].clanStatus = INVITE;
             User[playerB].tempClanId = clanId;
 
             //ask the user to clan
             network->sendClanInvite(playerB, userId);
-           
+
             break;
 
         case ACCEPT:
             //TODO do not disconnect the player when they accept clan invites
             //only if I was invited :)
             if (User[userId].clanStatus == INVITE)
-            { 
+            {
                 repository->setClanId(User[userId].Nick, User[userId].tempClanId);
 
                 // TODO - make new packet type to update clan instead of booting player
@@ -1140,7 +1204,7 @@ void SKO_PacketHandler::parse(unsigned char userId, std::string packet)
         default:
             break;
         } //end switch mode
-    }	 //invite to clan
+    }     //invite to clan
     else if (code == SHOP)
     {
         int action = User[userId].Sock->Data[2];
@@ -1379,7 +1443,7 @@ void SKO_PacketHandler::parse(unsigned char userId, std::string packet)
             //Clan already exists
             network->sendChat(userId, "You cannot establish [" + clanTag + "] because it already exists.");
         }
-    }	 //end make clan
+    } //end make clan
     else if (code == CAST_SPELL)
     {
         //What do you have equipped?
@@ -1441,19 +1505,19 @@ void SKO_PacketHandler::parse(unsigned char userId, std::string packet)
             {
                 // Declare message string
                 std::string Message = "";
-                std::string Username = "";
+                std::string username = "";
                 std::string Reason = "";
 
                 //fill message with username and reason
                 Message += User[userId].Sock->Data.substr(User[userId].Sock->Data.find_first_of(" ") + 1, packetLength - User[userId].Sock->Data.find_first_of(" ") + 1);
 
                 //strip the appropriate data
-                Username += Message.substr(0, Message.find_first_of(" "));
+                username += Message.substr(0, Message.find_first_of(" "));
                 Reason += Message.substr(Message.find_first_of(" ") + 1, Message.length() - Message.find_first_of(" ") + 1);
 
                 int result = 0;
 
-                result = repository->banPlayer(userId, Username, Reason, 1);
+                result = repository->banPlayer(userId, username, Reason, 1);
 
                 if (result == 0)
                 {
@@ -1463,10 +1527,10 @@ void SKO_PacketHandler::parse(unsigned char userId, std::string packet)
                         if (User[i].Ident)
                         {
                             // Send data
-                            network->sendChat(userId, Username + " has been banned. (" + Reason + ")");
+                            network->sendChat(userId, username + " has been banned. (" + Reason + ")");
 
                             //find which socket, yo
-                            if (lower(User[i].Nick).compare(lower(Username)) == 0)
+                            if (lower(User[i].Nick).compare(lower(username)) == 0)
                             {
                                 User[i].Sock->Close();
                             }
@@ -1475,15 +1539,15 @@ void SKO_PacketHandler::parse(unsigned char userId, std::string packet)
                 }
                 else if (result == 1)
                 {
-                    network->sendChat(userId, Username + " does not exist.");
+                    network->sendChat(userId, username + " does not exist.");
                 }
                 else if (result == 2)
                 {
-                    network->sendChat(userId, Username + " cannot be banned.");
+                    network->sendChat(userId, username + " cannot be banned.");
                 }
                 else if (result == 3)
                 {
-                    printf("The user [%s] tried to ban [%s] but they are not moderator!\n", User[userId].Nick.c_str(), Username.c_str());
+                    printf("The user [%s] tried to ban [%s] but they are not moderator!\n", User[userId].Nick.c_str(), username.c_str());
                     network->sendChat(userId, "You re not authorized to ban a player.");
                 }
 
@@ -1491,34 +1555,34 @@ void SKO_PacketHandler::parse(unsigned char userId, std::string packet)
             else if (command.compare("/unban") == 0)
             {
                 // Declare message string
-                std::string Username = "";
+                std::string username = "";
                 std::string Message = "";
 
                 //fill message with username and reason
                 Message += User[userId].Sock->Data.substr(User[userId].Sock->Data.find_first_of(" ") + 1, packetLength - User[userId].Sock->Data.find_first_of(" ") + 1);
 
                 //strip the appropriate data
-                Username += Message.substr(Message.find_first_of(" ") + 1, packetLength - Message.find_first_of(" ") + 1);
+                username += Message.substr(Message.find_first_of(" ") + 1, packetLength - Message.find_first_of(" ") + 1);
 
                 int result = 0;
 
-                result = repository->banPlayer(userId, Username, "this will unban the player", 0);
+                result = repository->banPlayer(userId, username, "this will unban the player", 0);
 
                 if (result == 0)
                 {
-                   network->sendChat(userId, Username + " has been unbanned.");
+                    network->sendChat(userId, username + " has been unbanned.");
                 }
                 else if (result == 1)
                 {
-                    network->sendChat(userId, Username + " does not exist.");
+                    network->sendChat(userId, username + " does not exist.");
                 }
                 else if (result == 2)
                 {
-                    network->sendChat(userId, Username + " cannot be unbanned.");
+                    network->sendChat(userId, username + " cannot be unbanned.");
                 }
                 else if (result == 3)
                 {
-                    printf("The user [%s] tried to unban [%s] but they are not moderator!\n", User[userId].Nick.c_str(), Username.c_str());
+                    printf("The user [%s] tried to unban [%s] but they are not moderator!\n", User[userId].Nick.c_str(), username.c_str());
                     network->sendChat(userId, "You are not authorized to unban a player.");
                 }
 
@@ -1527,19 +1591,19 @@ void SKO_PacketHandler::parse(unsigned char userId, std::string packet)
             {
                 // Declare message string
                 std::string Message = "";
-                std::string Username = "";
+                std::string username = "";
                 std::string Reason = "";
 
                 //fill message with username and reason
                 Message += User[userId].Sock->Data.substr(User[userId].Sock->Data.find_first_of(" ") + 1, packetLength - User[userId].Sock->Data.find_first_of(" ") + 1);
 
                 //strip the appropriate data
-                Username += Message.substr(0, Message.find_first_of(" "));
+                username += Message.substr(0, Message.find_first_of(" "));
                 Reason += Message.substr(Message.find_first_of(" ") + 1, Message.length() - Message.find_first_of(" ") + 1);
 
                 int result = 0;
 
-                result = network->mutePlayer(userId, Username, 1);
+                result = network->mutePlayer(userId, username, 1);
 
                 printf("MUTE result is: %i\n", result);
                 if (result == 0)
@@ -1548,27 +1612,27 @@ void SKO_PacketHandler::parse(unsigned char userId, std::string packet)
                     for (int i = 0; i < MAX_CLIENTS; i++)
                     {
                         //well, unmute the person
-                        std::string lower_username = lower(Username);
+                        std::string lower_username = lower(username);
                         std::string lower_nick = lower(User[i].Nick);
 
                         if (lower_username.compare(lower_nick) == 0)
                             User[i].Mute = true;
 
                         if (User[i].Ident)
-                            network->sendChat(userId, Username + " has been muted.");
+                            network->sendChat(userId, username + " has been muted.");
                     }
                 }
                 else if (result == 1)
                 {
-                    network->sendChat(userId, Username + " does not exist.");
+                    network->sendChat(userId, username + " does not exist.");
                 }
                 else if (result == 2)
                 {
-                    network->sendChat(userId, Username + " cannot be muted,");
+                    network->sendChat(userId, username + " cannot be muted,");
                 }
                 else if (result == 3)
                 {
-                    printf("The user [%s] tried to mute [%s] but they are not moderator!\n", User[userId].Nick.c_str(), Username.c_str());
+                    printf("The user [%s] tried to mute [%s] but they are not moderator!\n", User[userId].Nick.c_str(), username.c_str());
                     network->sendChat(userId, "You are not authorized to mute players.");
                 }
 
@@ -1576,17 +1640,17 @@ void SKO_PacketHandler::parse(unsigned char userId, std::string packet)
             else if (command.compare("/unmute") == 0)
             {
                 // Declare message string
-                std::string Username = "";
+                std::string username = "";
                 std::string Message = "";
                 //fill message with username and reason
                 Message += User[userId].Sock->Data.substr(User[userId].Sock->Data.find_first_of(" ") + 1, packetLength - User[userId].Sock->Data.find_first_of(" ") + 1);
 
                 //strip the appropriate data
-                Username += Message.substr(Message.find_first_of(" ") + 1, packetLength - Message.find_first_of(" ") + 1);
+                username += Message.substr(Message.find_first_of(" ") + 1, packetLength - Message.find_first_of(" ") + 1);
 
                 int result = 0;
 
-                result = network->mutePlayer(userId, Username, 0);
+                result = network->mutePlayer(userId, username, 0);
 
                 if (result == 0)
                 {
@@ -1594,26 +1658,26 @@ void SKO_PacketHandler::parse(unsigned char userId, std::string packet)
                     for (int i = 0; i < MAX_CLIENTS; i++)
                     {
                         //well, unmute the person
-                        if (lower(User[i].Nick).compare(lower(Username)) == 0)
+                        if (lower(User[i].Nick).compare(lower(username)) == 0)
                             User[i].Mute = false;
 
                         //well, tell everyone
                         // If this socket is taken
                         if (User[i].Ident)
-                            network->sendChat(userId, Username + " has been unmuted.");
+                            network->sendChat(userId, username + " has been unmuted.");
                     }
                 }
                 else if (result == 1)
                 {
-                    network->sendChat(userId, Username + " does not exist.");
+                    network->sendChat(userId, username + " does not exist.");
                 }
                 else if (result == 2)
                 {
-                    network->sendChat(userId, Username + " cannot be muted.");
+                    network->sendChat(userId, username + " cannot be muted.");
                 }
                 else if (result == 3)
                 {
-                    printf("The user [%s] tried to unmute [%s] but they are not moderator!\n", User[userId].Nick.c_str(), Username.c_str());
+                    printf("The user [%s] tried to unmute [%s] but they are not moderator!\n", User[userId].Nick.c_str(), username.c_str());
                     network->sendChat(userId, "You are not authorized to mute players.");
                 }
 
@@ -1622,19 +1686,19 @@ void SKO_PacketHandler::parse(unsigned char userId, std::string packet)
             {
                 // Declare message string
                 std::string Message = "";
-                std::string Username = "";
+                std::string username = "";
                 std::string Reason = "";
 
                 //fill message with username and reason
                 Message += User[userId].Sock->Data.substr(User[userId].Sock->Data.find_first_of(" ") + 1, packetLength - User[userId].Sock->Data.find_first_of(" ") + 1);
 
                 //strip the appropriate data
-                Username += Message.substr(0, Message.find_first_of(" "));
+                username += Message.substr(0, Message.find_first_of(" "));
                 Reason += Message.substr(Message.find_first_of(" ") + 1, Message.length() - Message.find_first_of(" ") + 1);
 
                 int result = 0;
 
-                result = network->kickPlayer(userId, Username);
+                result = network->kickPlayer(userId, username);
 
                 if (result == 0)
                 {
@@ -1643,10 +1707,10 @@ void SKO_PacketHandler::parse(unsigned char userId, std::string packet)
                     {
                         //if socket is taken
                         if (User[i].Ident)
-                            network->sendChat(userId, Username + " has been kicked. (" + Reason + ")");
+                            network->sendChat(userId, username + " has been kicked. (" + Reason + ")");
 
                         //kick the user
-                        if (lower(Username).compare(lower(User[i].Nick)) == 0)
+                        if (lower(username).compare(lower(User[i].Nick)) == 0)
                         {
                             User[i].Sock->Close();
                             User[i].Sock->Connected = false;
@@ -1655,11 +1719,11 @@ void SKO_PacketHandler::parse(unsigned char userId, std::string packet)
                 }
                 else if (result == 1)
                 {
-                    network->sendChat(userId, Username + " is not online.");
+                    network->sendChat(userId, username + " is not online.");
                 }
                 else if (result == 2)
                 {
-                    printf("The user [%s] tried to kick [%s] but they are not moderator!\n", User[userId].Nick.c_str(), Username.c_str());
+                    printf("The user [%s] tried to kick [%s] but they are not moderator!\n", User[userId].Nick.c_str(), username.c_str());
                     network->sendChat(userId, "You are not authorized to kick players.");
                 }
 
@@ -1727,11 +1791,11 @@ void SKO_PacketHandler::parse(unsigned char userId, std::string packet)
                     }
                     else
                     {
-                       //TODO - verify ban worked
-                       network->sendChat(userId, "Could not ban IP [" + IP + "] for unknown error.");
+                        //TODO - verify ban worked
+                        network->sendChat(userId, "Could not ban IP [" + IP + "] for unknown error.");
                     }
                 }
-                else 
+                else
                 {
                     network->sendChat(userId, "You are not authorized to ban IP addresses.");
                 }
@@ -1739,23 +1803,21 @@ void SKO_PacketHandler::parse(unsigned char userId, std::string packet)
             else if (command.compare("/getip") == 0)
             {
                 // Declare message string
-                std::string Username = "";
+                std::string username = "";
                 std::string Message = "";
 
                 //fill message with username
                 Message += User[userId].Sock->Data.substr(User[userId].Sock->Data.find_first_of(" ") + 1, packetLength - User[userId].Sock->Data.find_first_of(" ") + 1);
 
                 //strip the appropriate data
-                Username += Message.substr(Message.find_first_of(" ") + 1, packetLength - Message.find_first_of(" ") + 1);
-
-
+                username += Message.substr(Message.find_first_of(" ") + 1, packetLength - Message.find_first_of(" ") + 1);
 
                 if (User[userId].Moderator)
                 {
-                    std::string playerIP = repository->getIP(Username);
-                    network->sendChat(userId, Username + " has an IP of [" + playerIP + "]");
+                    std::string playerIP = repository->getIP(username);
+                    network->sendChat(userId, username + " has an IP of [" + playerIP + "]");
                 }
-                else 
+                else
                 {
                     network->sendChat(userId, "You are not authorized to get IP addresses.");
                 }
@@ -1815,22 +1877,22 @@ void SKO_PacketHandler::parse(unsigned char userId, std::string packet)
             else if (command.compare("/ping") == 0)
             {
                 // Declare message string
-                std::string Username = "";
+                std::string username = "";
 
                 //if they are moderator
                 if (User[userId].Moderator)
                 {
                     //find username
-                    Username += User[userId].Sock->Data.substr(User[userId].Sock->Data.find_first_of(" ") + 1, packetLength - User[userId].Sock->Data.find_first_of(" ") + 1);
+                    username += User[userId].Sock->Data.substr(User[userId].Sock->Data.find_first_of(" ") + 1, packetLength - User[userId].Sock->Data.find_first_of(" ") + 1);
 
                     int datUser;
                     bool result = false;
 
                     for (datUser = 0; datUser < MAX_CLIENTS; datUser++)
                     {
-                        if (User[datUser].Ident && User[datUser].Nick.compare(Username) == 0)
+                        if (User[datUser].Ident && User[datUser].Nick.compare(username) == 0)
                         {
-                            printf("Moderator inquiry of %s\n", Username.c_str());
+                            printf("Moderator inquiry of %s\n", username.c_str());
                             result = true;
                             break;
                         }
@@ -1848,7 +1910,7 @@ void SKO_PacketHandler::parse(unsigned char userId, std::string packet)
                     }
                     else
                     {
-                        network->sendChat(userId, "Username " + Username + " was not found.");
+                        network->sendChat(userId, "username " + username + " was not found.");
                     }
                 }
 
@@ -1878,7 +1940,6 @@ void SKO_PacketHandler::parse(unsigned char userId, std::string packet)
                 chatMessage += User[userId].Sock->Data.substr(2, packetLength);
                 printf(kGreen "[Chat]%s\n" kNormal, chatMessage.c_str());
 
-
                 // Send a short chat that fits on one line.
                 if (chatMessage.length() < max)
                 {
@@ -1890,8 +1951,7 @@ void SKO_PacketHandler::parse(unsigned char userId, std::string packet)
                     return;
                 }
 
-
-                // Wrap long chat 
+                // Wrap long chat
                 bool doneWrapping = false;
                 while (!doneWrapping)
                 {
@@ -1925,7 +1985,7 @@ void SKO_PacketHandler::parse(unsigned char userId, std::string packet)
                     else
                     {
                         chatChunk = chatMessage;
-                        doneWrapping = true; 
+                        doneWrapping = true;
                     }
 
                     for (int i = 0; i < MAX_CLIENTS; i++)
@@ -1935,18 +1995,6 @@ void SKO_PacketHandler::parse(unsigned char userId, std::string packet)
                     }
                 }
             } //end just chat
-        }	 //end if not muted
-    }		  //end chat
-    else
-    {
-        printf(kRed "[FATAL] (%s) ERR_BAD_PACKET_WAS: \n{\n> ", User[userId].Nick.c_str());
-        for (int l = 0; l < User[userId].Sock->Data.length(); l++)
-            printf("[%u]", (int)User[userId].Sock->Data[l]);
-        printf("}\n> Packet length: %lu\n", User[userId].Sock->Data.length());
-
-        printf("\n" kNormal);
-
-        //the user is hacking, or sent a bad packet
-        User[userId].Sock->Close();
-    } //end error packet
+        }     //end if not muted
+    }         //end chat
 }
