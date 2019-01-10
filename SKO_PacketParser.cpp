@@ -14,6 +14,9 @@ SKO_PacketParser::SKO_PacketParser(std::string packet)
 
 std::string SKO_PacketParser::getPacketBody()
 {
+    if (this->packet.length() <= 2)
+        return "";
+
     return this->packet.substr(2);
 }
 

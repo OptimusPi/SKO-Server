@@ -34,6 +34,14 @@ public:
     // Returns packet length code valued between 0-255
     unsigned char getPacketLength();
 
+
+    // Parse primitive types from binary and return values
+    char nextByte();
+    short nextShort();
+    int nextInt();
+    float nextFloat();
+    double nextDouble();
+
     // Format packet as a readable string for logging purposes
     std::string toString(); 
 
@@ -43,13 +51,6 @@ private:
     std::string packet = "";
     unsigned char packetType = 0;
     unsigned char packetLength = 0; 
-
-    // Parse primitive types from binary
-    char nextByte();
-    short nextShort();
-    int nextInt();
-    float nextFloat();
-    double nextDouble();
 };
 
 #endif

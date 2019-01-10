@@ -18,7 +18,7 @@ void SKO_PacketHandler::parsePong(unsigned char userId)
     User[userId].pingTicker = Clock();
     User[userId].pingWaiting = false;
 }
-void SKO_PacketHandler::parseLogin(unsigned char userId, std::string packetData)
+void SKO_PacketHandler::parseLogin(unsigned char userId, SKO_PacketParser *parser)
 {
     // Declare message string
     std::string loginRequest = "";
@@ -29,7 +29,7 @@ void SKO_PacketHandler::parseLogin(unsigned char userId, std::string packetData)
     std::string Temp;
 
     //fill message with username and password
-    loginRequest = packetData;
+    loginRequest = parser->getPacketBody();;
 
     //strip the appropriate data
     username += loginRequest.substr(0, loginRequest.find_first_of(" "));
@@ -233,10 +233,11 @@ void SKO_PacketHandler::parseLogin(unsigned char userId, std::string packetData)
     } //end login success
 }
 
-void SKO_PacketHandler::parseRegister(unsigned char userId, std::string packetData)
+void SKO_PacketHandler::parseRegister(unsigned char userId, SKO_PacketParser *parser)
 {
     std::string username = "";
     std::string password = "";
+    std::string packetData = parser->getPacketBody();
 
     //strip the appropriate data
     username += packetData.substr(0, packetData.find_first_of(" "));
@@ -266,71 +267,52 @@ void SKO_PacketHandler::parseRegister(unsigned char userId, std::string packetDa
     }
 }
 
-void SKO_PacketHandler::parseInt()
-{
 
-}
-void SKO_PacketHandler::parse(unsigned char userId, std::string packetData)
+void SKO_PacketHandler::parseAttack(unsigned char userId, SKO_PacketParser *parser)
 {
-    //assert packet length
-    if (packetData.length != 8)
-    {
-        printf();
-        return;
-    }
+    //parse four byte float value
+    float x = parser->nextFloat();
 
     //parse four byte float value
-    float x;
-    ((char *)&numx)[0] = User[userId].Sock->Data[2];
-    ((char *)&numx)[1] = User[userId].Sock->Data[3];
-    ((char *)&numx)[2] = User[userId].Sock->Data[4];
-    ((char *)&numx)[3] = User[userId].Sock->Data[5];
-
-    //parse four byte float value
-    float y;
-    ((char *)&numy)[0] = User[userId].Sock->Data[6];
-    ((char *)&numy)[1] = User[userId].Sock->Data[7];
-    ((char *)&numy)[2] = User[userId].Sock->Data[8];
-    ((char *)&numy)[3] = User[userId].Sock->Data[9];
-    Attack(userId, numx, numy);
+    float y = parser->nextFloat();
+    Attack(userId, x, y);
 }
 
 
-
-void SKO_PacketHandler::parse(unsigned char userId, std::string packetData)
-{
-    unsigned char packetLength = User[userId].Sock->Data[0];
-}
+// void SKO_PacketHandler::parse(unsigned char userId, std::string packetData)
+// {
+//     unsigned char parser->getPacketLength() = User[userId].Sock->Data[0];
+// }
 
 
 
 void SKO_PacketHandler::parsePacket(unsigned char userId, std::string packet)
 {
     // Construct a packet parser from this packet
-    this->parser = new SKO_PacketParser(packet);
+    SKO_PacketParser *parser = new SKO_PacketParser(packet);
     
     //Check packet sanity
     if (packet.length() < 2)
     {
         printf(kRed "[FATAL] SKO_PacketHandler::parsePacket() called with incomplete packet!\n" kNormal);
-        printf(kRed "[       SKO_PacketHandler::parsePacket(%i, %s)] \n" kNormal, userId, parser.toString();
+        printf(kRed "[       SKO_PacketHandler::parsePacket(%i, %s)] \n" kNormal, userId, parser->toString().c_str());
         return;
     }
 
     //Check packet sanity
-    if (packet.length() < parser.getLength())
+    if (packet.length() < parser->getPacketLength())
     {
         printf(kRed "[FATAL] SKO_PacketHandler::parsePacket() called with incomplete packet!\n" kNormal);
-        printf(kRed "[       SKO_PacketHandler::parsePacket(%i, %s)] \n" kNormal, userId, parser.toString());
+        printf(kRed "[       SKO_PacketHandler::parsePacket(%i, %s)] \n" kNormal, userId, parser->toString().c_str());
         return;
     }
-    if (packet.length() > parser.getLength())
+    if (packet.length() > parser->getPacketLength())
     {
         printf(kRed "[FATAL] SKO_PacketHandler::parsePacket() called with too many packets!\n" kNormal);
-        printf(kRed "[       SKO_PacketHandler::parsePacket(%i, %s)] \n" kNormal, userId, parser.toString());
+        printf(kRed "[       SKO_PacketHandler::parsePacket(%i, %s)] \n" kNormal, userId, parser->toString().c_str());
         return;
     }
-    switch (parser.getPacketType())
+    switch (parser->getPacketType())
     {
     case PING:
         parsePing(userId);
@@ -354,13 +336,14 @@ void SKO_PacketHandler::parsePacket(unsigned char userId, std::string packet)
 
     default:
         // Disconnect clients sending nonsense packets
-        User[userId].Sock->Close();
+        //TODO//User[userId].Sock->Close();
         printf(kRed "[FATAL] SKO_PacketHandler::parsePacket() called with unknown packet type!\n" kNormal);
-        printf(kRed "[       SKO_PacketHandler::parsePacket(%i, %s)] \n" kNormal, userId, parser.toString());
+        printf(kRed "[       SKO_PacketHandler::parsePacket(%i, %s)] \n" kNormal, userId, parser->toString().c_str());
         break;
     }
 
-    else if (code == MOVE_RIGHT)
+    unsigned char code = parser->getPacketType();
+    if (code == MOVE_RIGHT)
     {
 
         float numx, numy;
@@ -1509,7 +1492,7 @@ void SKO_PacketHandler::parsePacket(unsigned char userId, std::string packet)
                 std::string Reason = "";
 
                 //fill message with username and reason
-                Message += User[userId].Sock->Data.substr(User[userId].Sock->Data.find_first_of(" ") + 1, packetLength - User[userId].Sock->Data.find_first_of(" ") + 1);
+                Message += User[userId].Sock->Data.substr(User[userId].Sock->Data.find_first_of(" ") + 1, parser->getPacketLength() - User[userId].Sock->Data.find_first_of(" ") + 1);
 
                 //strip the appropriate data
                 username += Message.substr(0, Message.find_first_of(" "));
@@ -1559,10 +1542,10 @@ void SKO_PacketHandler::parsePacket(unsigned char userId, std::string packet)
                 std::string Message = "";
 
                 //fill message with username and reason
-                Message += User[userId].Sock->Data.substr(User[userId].Sock->Data.find_first_of(" ") + 1, packetLength - User[userId].Sock->Data.find_first_of(" ") + 1);
+                Message += User[userId].Sock->Data.substr(User[userId].Sock->Data.find_first_of(" ") + 1, parser->getPacketLength() - User[userId].Sock->Data.find_first_of(" ") + 1);
 
                 //strip the appropriate data
-                username += Message.substr(Message.find_first_of(" ") + 1, packetLength - Message.find_first_of(" ") + 1);
+                username += Message.substr(Message.find_first_of(" ") + 1, parser->getPacketLength() - Message.find_first_of(" ") + 1);
 
                 int result = 0;
 
@@ -1595,7 +1578,7 @@ void SKO_PacketHandler::parsePacket(unsigned char userId, std::string packet)
                 std::string Reason = "";
 
                 //fill message with username and reason
-                Message += User[userId].Sock->Data.substr(User[userId].Sock->Data.find_first_of(" ") + 1, packetLength - User[userId].Sock->Data.find_first_of(" ") + 1);
+                Message += User[userId].Sock->Data.substr(User[userId].Sock->Data.find_first_of(" ") + 1, parser->getPacketLength() - User[userId].Sock->Data.find_first_of(" ") + 1);
 
                 //strip the appropriate data
                 username += Message.substr(0, Message.find_first_of(" "));
@@ -1643,10 +1626,10 @@ void SKO_PacketHandler::parsePacket(unsigned char userId, std::string packet)
                 std::string username = "";
                 std::string Message = "";
                 //fill message with username and reason
-                Message += User[userId].Sock->Data.substr(User[userId].Sock->Data.find_first_of(" ") + 1, packetLength - User[userId].Sock->Data.find_first_of(" ") + 1);
+                Message += User[userId].Sock->Data.substr(User[userId].Sock->Data.find_first_of(" ") + 1, parser->getPacketLength() - User[userId].Sock->Data.find_first_of(" ") + 1);
 
                 //strip the appropriate data
-                username += Message.substr(Message.find_first_of(" ") + 1, packetLength - Message.find_first_of(" ") + 1);
+                username += Message.substr(Message.find_first_of(" ") + 1, parser->getPacketLength() - Message.find_first_of(" ") + 1);
 
                 int result = 0;
 
@@ -1690,7 +1673,7 @@ void SKO_PacketHandler::parsePacket(unsigned char userId, std::string packet)
                 std::string Reason = "";
 
                 //fill message with username and reason
-                Message += User[userId].Sock->Data.substr(User[userId].Sock->Data.find_first_of(" ") + 1, packetLength - User[userId].Sock->Data.find_first_of(" ") + 1);
+                Message += User[userId].Sock->Data.substr(User[userId].Sock->Data.find_first_of(" ") + 1, parser->getPacketLength() - User[userId].Sock->Data.find_first_of(" ") + 1);
 
                 //strip the appropriate data
                 username += Message.substr(0, Message.find_first_of(" "));
@@ -1775,7 +1758,7 @@ void SKO_PacketHandler::parsePacket(unsigned char userId, std::string packet)
                 std::string Reason = "";
 
                 //fill message with username and reason
-                Message += User[userId].Sock->Data.substr(User[userId].Sock->Data.find_first_of(" ") + 1, packetLength - User[userId].Sock->Data.find_first_of(" ") + 1);
+                Message += User[userId].Sock->Data.substr(User[userId].Sock->Data.find_first_of(" ") + 1, parser->getPacketLength() - User[userId].Sock->Data.find_first_of(" ") + 1);
 
                 //strip the appropriate data
                 IP += Message.substr(0, Message.find_first_of(" "));
@@ -1807,10 +1790,10 @@ void SKO_PacketHandler::parsePacket(unsigned char userId, std::string packet)
                 std::string Message = "";
 
                 //fill message with username
-                Message += User[userId].Sock->Data.substr(User[userId].Sock->Data.find_first_of(" ") + 1, packetLength - User[userId].Sock->Data.find_first_of(" ") + 1);
+                Message += User[userId].Sock->Data.substr(User[userId].Sock->Data.find_first_of(" ") + 1, parser->getPacketLength() - User[userId].Sock->Data.find_first_of(" ") + 1);
 
                 //strip the appropriate data
-                username += Message.substr(Message.find_first_of(" ") + 1, packetLength - Message.find_first_of(" ") + 1);
+                username += Message.substr(Message.find_first_of(" ") + 1, parser->getPacketLength() - Message.find_first_of(" ") + 1);
 
                 if (User[userId].Moderator)
                 {
@@ -1883,7 +1866,7 @@ void SKO_PacketHandler::parsePacket(unsigned char userId, std::string packet)
                 if (User[userId].Moderator)
                 {
                     //find username
-                    username += User[userId].Sock->Data.substr(User[userId].Sock->Data.find_first_of(" ") + 1, packetLength - User[userId].Sock->Data.find_first_of(" ") + 1);
+                    username += User[userId].Sock->Data.substr(User[userId].Sock->Data.find_first_of(" ") + 1, parser->getPacketLength() - User[userId].Sock->Data.find_first_of(" ") + 1);
 
                     int datUser;
                     bool result = false;
@@ -1937,7 +1920,7 @@ void SKO_PacketHandler::parsePacket(unsigned char userId, std::string packet)
                 }
 
                 chatMessage += userTag;
-                chatMessage += User[userId].Sock->Data.substr(2, packetLength);
+                chatMessage += User[userId].Sock->Data.substr(2, parser->getPacketLength());
                 printf(kGreen "[Chat]%s\n" kNormal, chatMessage.c_str());
 
                 // Send a short chat that fits on one line.

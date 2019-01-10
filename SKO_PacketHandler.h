@@ -22,22 +22,18 @@ private:
     //SKO_GameState gameState;
     SKO_Network *network;
     SKO_Repository *repository;
-    SKO_PacketParser *parser;
+    
 
     // Health check packet types
     void parsePing(unsigned char userId);
     void parsePong(unsigned char userId);
 
     // Login and Register player account
-    void parseLogin(unsigned char userId, std::string packetData);
-    void parseRegister(unsigned char userId, std::string packetData);    
+    void parseLogin(unsigned char userId, SKO_PacketParser *parser);
+    void parseRegister(unsigned char userId, SKO_PacketParser *parser);    
     
     // Player actions
-    void parseAttack(unsigned char userId, std::string packetData);    
-
-
-
-
+    void parseAttack(unsigned char userId, SKO_PacketParser *parser);    
 };
     
 #endif
