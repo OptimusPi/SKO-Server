@@ -112,6 +112,7 @@ public:
 	// Admin commands
 	int kickPlayer(int Mod_i, std::string username);
 	int mutePlayer(int Mod_i, std::string username, int flag);
+	int banPlayer(int Mod_i, std::string username, std::string reason, int flag);
  private:
 	
 	// Bind to this port and accept incoming connections.

@@ -8,16 +8,21 @@ SKO_PacketHandler::SKO_PacketHandler(SKO_Network *network, SKO_Repository *repos
 }
 // When server receives PING,
 // It immediately replies to the client with PONG
+// [PING]
 void SKO_PacketHandler::parsePing(unsigned char userId)
 {
     network->SendPong(userId);
 }
+
+// [PONG]
 void SKO_PacketHandler::parsePong(unsigned char userId)
 {
     User[userId].ping = Clock() - User[userId].pingTicker;
     User[userId].pingTicker = Clock();
     User[userId].pingWaiting = false;
 }
+
+// [LOGIN][<username>][" "][<password>]
 void SKO_PacketHandler::parseLogin(unsigned char userId, SKO_PacketParser *parser)
 {
     // Declare message string
@@ -35,7 +40,6 @@ void SKO_PacketHandler::parseLogin(unsigned char userId, SKO_PacketParser *parse
     username += loginRequest.substr(0, loginRequest.find_first_of(" "));
     password += loginRequest.substr(loginRequest.find_first_of(" ") + 1);
 
-    //printf("DATA:%s\n", User[userId].Sock->Data.c_str());
     printf("\n::LOGIN::\nUsername[%s]\nPassword[%s]\n", username.c_str(), password.c_str());
 
     //go through and see if you are logged in already
@@ -233,6 +237,8 @@ void SKO_PacketHandler::parseLogin(unsigned char userId, SKO_PacketParser *parse
     } //end login success
 }
 
+
+// [REGISTER][<username>][" "][<password>]
 void SKO_PacketHandler::parseRegister(unsigned char userId, SKO_PacketParser *parser)
 {
     std::string username = "";
@@ -267,24 +273,942 @@ void SKO_PacketHandler::parseRegister(unsigned char userId, SKO_PacketParser *pa
     }
 }
 
-
+// [ATTACK][(float)x][(float)y]
 void SKO_PacketHandler::parseAttack(unsigned char userId, SKO_PacketParser *parser)
 {
-    //parse four byte float value
     float x = parser->nextFloat();
-
-    //parse four byte float value
     float y = parser->nextFloat();
     Attack(userId, x, y);
 }
 
+// [MOVE_LEFT][(float)x][(float)y]
+void SKO_PacketHandler::parseMoveLeft(unsigned char userId, SKO_PacketParser *parser)
+{
+    float x = parser->nextFloat();
+    float y = parser->nextFloat();
+    Left(userId, x, y);
+}
 
-// void SKO_PacketHandler::parse(unsigned char userId, std::string packetData)
-// {
-//     unsigned char parser->getPacketLength() = User[userId].Sock->Data[0];
-// }
+// [MOVE_RIGHT][(float)x][(float)y]
+void SKO_PacketHandler::parseMoveRight(unsigned char userId, SKO_PacketParser *parser)
+{
+    float x = parser->nextFloat();
+    float y = parser->nextFloat();
+    Right(userId, x, y);
+}
+
+// [MOVE_JUMP][(float)x][(float)y]
+void SKO_PacketHandler::parseMoveJump(unsigned char userId, SKO_PacketParser *parser)
+{
+    float x = parser->nextFloat();
+    float y = parser->nextFloat();
+    Jump(userId, x, y);
+}
+
+// [MOVE_STOP][(float)x][(float)y]
+void SKO_PacketHandler::parseMoveStop(unsigned char userId, SKO_PacketParser *parser)
+{
+    float x = parser->nextFloat();
+    float y = parser->nextFloat();
+    Stop(userId, x, y);
+}
+
+// [CAST_SPELL]
+void SKO_PacketHandler::parseCastSpell(unsigned char userId)
+{
+    //What do you have equipped?
+    int spell = User[userId].equip[2];
+    if (spell > 0)
+    {
+        if (User[userId].inventory[spell] > 0)
+        {
+            User[userId].inventory[spell]--;
+            if (User[userId].inventory[spell] == 0)
+                User[userId].inventory_index--;
+
+            //notify user the item was thrown
+            unsigned int amount = User[userId].inventory[spell];
+            network->SendPocketItem(userId, spell, amount);
+        }
+        else
+        {
+            //Throw the item from your hand instead of inventory if that's all you have
+            User[userId].equip[2] = 0;
+            //send packet that says you arent holding anything!
+            for (int c = 0; c < MAX_CLIENTS; c++)
+                if (User[c].Ident)
+                    network->SendEquip(c, userId, (char)2, (char)0, (char)0);
+        }
+
+        //tell all the users that an item has been thrown...
+        //just use an item object with no value.
+        SKO_ItemObject lootItem = SKO_ItemObject();
+        lootItem.y = User[userId].y + 24;
+
+        if (User[userId].facing_right)
+        {
+            lootItem.x_speed = 10;
+            lootItem.x = User[userId].x + 50;
+        }
+        else
+        {
+            lootItem.x_speed = -10;
+            lootItem.x = User[userId].x - 32;
+        }
+
+        lootItem.y_speed = -3.2;
+        lootItem.itemID = spell;
+        lootItem.owner = userId;
+        lootItem.amount = 1;
+
+        SpawnLoot(User[userId].mapId, lootItem);
+    }
+}
+
+// [STAT_HP]
+void SKO_PacketHandler::parseStatHp(unsigned char userId, SKO_PacketParser* parser)
+{
+    if (User[userId].stat_points > 0)
+    {
+        User[userId].stat_points--;
+        User[userId].regen++;
+
+        network->SendStatRegen(userId, User[userId].regen);
+        network->SendStatPoints(userId, User[userId].stat_points);
+    }
+}
+
+// [STAT_STR]
+void SKO_PacketHandler::parseStatStr(unsigned char userId, SKO_PacketParser* parser)
+{
+    if (User[userId].stat_points > 0)
+    {
+        User[userId].stat_points--;
+        User[userId].strength++;
+
+        network->SendStatStr(userId, User[userId].strength);
+        network->SendStatPoints(userId, User[userId].stat_points);
+    }
+}
+
+// [STAT_DEF]
+void SKO_PacketHandler::parseStatDef(unsigned char userId, SKO_PacketParser* parser)
+{
+    if (User[userId].stat_points > 0)
+    {
+        User[userId].stat_points--;
+        User[userId].defence++;
+
+        network->SendStatDef(userId, User[userId].defence);
+        network->SendStatPoints(userId, User[userId].stat_points);
+    }
+}
 
 
+// [EQUIP][(unsigned char)equipSlot]
+void SKO_PacketHandler::parseUnequip(unsigned int userId, SKO_PacketParser *parser)
+{
+    unsigned char slot = parser->nextByte();
+    unsigned char item = User[userId].equip[slot];
+
+    // TODO - do not let user unequip if their inventory is full.
+    // Only unequip and transfer to inventory if it actually is equipped
+    if (item > 0)
+    {
+        //un-wear it
+        User[userId].equip[slot] = 0; //TODO refactor
+        //put it in the player's inventory
+        User[userId].inventory[item]++; //TODO refactor
+
+        //tell everyone
+        for (int uc = 0; uc < MAX_CLIENTS; uc++)
+            network->SendEquip(uc, userId, slot, (char)0, (char)0);
+
+        //update the player's inventory
+        int amount = User[userId].inventory[item];
+        network->SendPocketItem(userId, item, amount);
+    }
+}
+
+// TODO - move logic to game class
+// [USE_ITEM][(unsigned char)item]
+void SKO_PacketHandler::parseUseItem(unsigned char userId, SKO_PacketParser *parser)
+{
+    int item = parser->nextByte();
+    int type = Item[item].type;
+    unsigned char mapId = User[userId].mapId;
+
+    //only attempt to use items if the player has them
+    if (User[userId].inventory[item] > 0)
+    {
+        unsigned int amt = 0;
+        float numy, numx, numys, numxs,
+            rand_xs, rand_ys,
+            rand_x, rand_y;
+        int rand_i, rand_item;
+
+        //TODO - refactor this into use a item handler.
+        switch (type)
+        {
+        case 0:
+            break; //cosmetic
+
+        case 1: //food
+        {
+            // Do not eat food if player is full health.
+            if (User[userId].hp == User[userId].max_hp)
+                break;
+
+            //TODO refactor
+            User[userId].hp += Item[item].hp;
+
+            if (User[userId].hp > User[userId].max_hp)
+                User[userId].hp = User[userId].max_hp;
+
+            //tell this client
+            network->SendStatHp(userId, User[userId].hp);
+
+            //remove item
+            User[userId].inventory[item]--;
+
+            //tell them how many items they have
+            unsigned int amount = User[userId].inventory[item];
+            if (amount == 0)
+                User[userId].inventory_index--;
+
+            // party hp notification
+            // TODO - change magic number 80 to use a config value
+            unsigned char displayHp = (int)((User[userId].hp / (float)User[userId].max_hp) * 80);
+
+            for (int pl = 0; pl < MAX_CLIENTS; pl++)
+            {
+                if (pl != userId && User[pl].Ident && User[pl].partyStatus == PARTY && User[pl].party == User[userId].party)
+                    network->SendBuddyStatHp(pl, userId, displayHp);
+            }
+
+            //put in client players inventory
+            network->SendPocketItem(userId, item, amount);
+
+            break;
+        }
+        case 2: //weapon
+        {
+            // Does the other player have another WEAPON equipped?
+            // If so, transfer it to inventory
+            unsigned char otherItem = User[userId].equip[0];
+
+            // Transfer weapon from inventory to equipment slot
+            User[userId].equip[0] = item;
+            User[userId].inventory[item]--;
+
+            // Tranfer old weapon to users inventory
+            if (otherItem > 0)
+            {
+                User[userId].inventory[otherItem]++;
+                User[userId].inventory_index++;
+                unsigned int amount = User[userId].inventory[otherItem];
+                network->SendPocketItem(userId, otherItem, amount);
+            }
+
+            // Tell player one weapon is removed from their inventory
+            unsigned int amount = User[userId].inventory[item];
+            network->SendPocketItem(userId, item, amount);
+
+            //tell everyone the player equipped their weapon
+            for (int i1 = 0; i1 < MAX_CLIENTS; i1++)
+            {
+                if (User[i1].Ident)
+                    network->SendEquip(i1, userId, (char)0, Item[item].equipID, item);
+            }
+            break;
+        }
+        case 3: //hat
+        {
+            // Does the other player have another HAT equipped?
+            // If so, transfer it to inventory
+            unsigned char otherItem = User[userId].equip[1];
+
+            // Transfer hat from inventory to equipment slot
+            User[userId].equip[1] = item;
+            User[userId].inventory[item]--;
+
+            // Tranfer old hat to users inventory
+            if (otherItem > 0)
+            {
+                User[userId].inventory[otherItem]++;
+                User[userId].inventory_index++;
+                unsigned int amount = User[userId].inventory[otherItem];
+                network->SendPocketItem(userId, otherItem, amount);
+            }
+
+            // Tell player one hat is removed from their inventory
+            unsigned int amount = User[userId].inventory[item];
+            network->SendPocketItem(userId, item, amount);
+
+            //tell everyone the player equipped their hat
+            for (int i1 = 0; i1 < MAX_CLIENTS; i1++)
+            {
+                if (User[i1].Ident)
+                    network->SendEquip(i1, userId, (char)1, Item[item].equipID, item);
+            }
+            break;
+        }
+        case 4: // mystery box
+        {
+            // holiday event
+            if (HOLIDAY)
+            {
+                ////get rid of the box
+                int numUsed = 0;
+
+                if (User[userId].inventory[item] >= 10)
+                {
+                    numUsed = 10;
+                    User[userId].inventory[item] -= 10;
+                }
+                else
+                {
+                    numUsed = User[userId].inventory[item];
+                    User[userId].inventory[item] = 0;
+                    User[userId].inventory_index--;
+                }
+
+                //tell them how many items they have
+                unsigned int amount = User[userId].inventory[item];
+
+                //put in players inventory
+                network->SendPocketItem(userId, item, amount);
+
+                for (int it = 0; it < numUsed; it++)
+                {
+                    //spawn a hat or nothing
+                    rand_xs = 0;
+                    rand_ys = -5;
+
+                    // 1:100 chance of item
+                    rand_item = rand() % 100;
+                    if (rand_item != 1)
+                        rand_item = ITEM_GOLD;
+                    else
+                        rand_item = HOLIDAY_BOX_DROP;
+
+                    int rand_i;
+                    rand_x = User[userId].x + 32;
+                    rand_y = User[userId].y - 32;
+
+                    for (rand_i = 0; rand_i < 256; rand_i++)
+                    {
+                        if (rand_i == 255 || map[mapId].ItemObj[rand_i].status == false)
+                            break;
+                    }
+
+                    //TODO change this limit to 2 bytes (32K)
+                    if (rand_i == 255)
+                    {
+                        //If we traversed the whole item list already, start over.
+                        if (map[mapId].currentItem == 255)
+                            map[mapId].currentItem = 0;
+
+                        //use the currentItem to traverse the list whenever it overflows, so the "oldest" item gets deleted.
+                        rand_i = map[mapId].currentItem;
+                        map[mapId].currentItem++;
+                    }
+
+                    map[mapId].ItemObj[rand_i] = SKO_ItemObject(rand_item, rand_x, rand_y, rand_xs, rand_ys, 1);
+
+                    {
+                        int i = rand_i;
+                        //dont let them get stuck
+                        if (blocked(mapId, map[mapId].ItemObj[i].x + map[mapId].ItemObj[i].x_speed, map[mapId].ItemObj[i].y + map[mapId].ItemObj[i].y_speed + 0.15, map[mapId].ItemObj[i].x + Item[map[mapId].ItemObj[i].itemID].w, map[mapId].ItemObj[i].y + map[mapId].ItemObj[i].y_speed + Item[map[mapId].ItemObj[i].itemID].h, false))
+                        {
+                            //move it down a bit
+                            rand_y = User[userId].y + 1;
+                            map[mapId].ItemObj[i].y = rand_y;
+                        }
+                    }
+                    float x = rand_x;
+                    float y = rand_y;
+                    float x_speed = rand_xs;
+                    float y_speed = rand_ys;
+
+                    for (int iii = 0; iii < MAX_CLIENTS; iii++)
+                    {
+                        if (User[iii].Ident && User[iii].mapId == mapId)
+                            network->SendSpawnItem(iii, rand_i, mapId, rand_item, x, y, x_speed, y_speed);
+                    }
+                }
+            }
+            break;
+        }
+        case 5: // trophy / spell
+        {
+            // Does the other player have another TROPHY equipped?
+            // If so, transfer it to inventory
+            unsigned char otherItem = User[userId].equip[2];
+
+            // Transfer trophy from inventory to equipment slot
+            User[userId].equip[2] = item;
+            User[userId].inventory[item]--;
+
+            // Tranfer old trophy to users inventory
+            if (otherItem > 0)
+            {
+                User[userId].inventory[otherItem]++;
+                User[userId].inventory_index++;
+                unsigned int amount = User[userId].inventory[otherItem];
+                network->SendPocketItem(userId, otherItem, amount);
+            }
+
+            // Tell player one trophy is removed from their inventory
+            unsigned int amount = User[userId].inventory[item];
+            network->SendPocketItem(userId, item, amount);
+
+            //tell everyone the player equipped their trophy
+            for (int i1 = 0; i1 < MAX_CLIENTS; i1++)
+            {
+                if (User[i1].Ident)
+                    network->SendEquip(i1, userId, (char)2, Item[item].equipID, item);
+            }
+            break;
+        }
+        default:
+            break;
+        } //end switch
+    }     //end if you have the item
+}
+
+// [DROP_ITEM][(unsigned char)item][]
+void SKO_PacketHandler::parseDropItem(unsigned char userId, SKO_PacketParser *parser)
+{
+    unsigned char item = parser->nextByte();
+    unsigned char mapId = User[userId].mapId;
+    unsigned int amount = parser->nextInt();
+
+    //if they have enough to drop
+    if (User[userId].inventory[item] >= amount && amount > 0 && User[userId].tradeStatus < 1)
+    {
+        //take the items away from the player
+        User[userId].inventory[item] -= amount;
+        int ownedAmount = User[userId].inventory[item];
+
+        //keeping track of inventory slots
+        if (User[userId].inventory[item] == 0)
+        {
+            //printf("the user has %i of Item[%i]", amt, i );
+            //prevents them from holding more than 24 items
+            User[userId].inventory_index--;
+        }
+
+        //tell the user they dropped their items.
+        network->SendPocketItem(userId, item, ownedAmount);
+
+        //TODO refactor all of this
+        //next spawn a new item for all players
+        int rand_i;
+        float rand_x = User[userId].x + 16 + (32 - Item[item].w) / 2.0;
+        float rand_y = User[userId].y - Item[item].h;
+
+        float rand_xs = 0;
+        if (User[userId].facing_right)
+        {
+            rand_xs = 2.2;
+        }
+        else
+        {
+            rand_xs = -2.2;
+        }
+
+        float rand_ys = -5;
+        for (rand_i = 0; rand_i < 255; rand_i++)
+        {
+            if (map[mapId].ItemObj[rand_i].status == false)
+                break;
+        }
+
+        //find item object that's free
+        if (rand_i == 255)
+        {
+            if (map[mapId].currentItem == 255)
+                map[mapId].currentItem = 0;
+
+            rand_i = map[mapId].currentItem;
+
+            map[mapId].currentItem++;
+        }
+
+        //tell everyone there's an item up for grabs
+        map[mapId].ItemObj[rand_i] = SKO_ItemObject(item, rand_x, rand_y, rand_xs, rand_ys, amount);
+
+        int i = rand_i;
+        //dont let them get stuck
+        if (blocked(mapId, map[mapId].ItemObj[i].x + map[mapId].ItemObj[i].x_speed, map[mapId].ItemObj[i].y + map[mapId].ItemObj[i].y_speed + 0.15, map[mapId].ItemObj[i].x + Item[map[mapId].ItemObj[i].itemID].w, map[mapId].ItemObj[i].y + map[mapId].ItemObj[i].y_speed + Item[map[mapId].ItemObj[i].itemID].h, false))
+        {
+            //move it down a bit
+            rand_y = User[userId].y + 1;
+            map[mapId].ItemObj[i].y = rand_y;
+        }
+
+        float x = rand_x;
+        float y = rand_y;
+        float x_speed = rand_xs;
+        float y_speed = rand_ys;
+
+        for (int iii = 0; iii < MAX_CLIENTS; iii++)
+        {
+            if (User[iii].Ident && User[iii].mapId == mapId)
+                network->SendSpawnItem(iii, rand_i, mapId, item, x, y, x_speed, x_speed);
+        }
+    }
+}
+
+
+std::string SKO_PacketHandler::nextParameter(std::string &parameters)
+{
+    //grab first parameter from list
+    std::string next = parameters.substr(0, parameters.find_first_of(" ") + 1);
+
+    //shrink list of parameters 
+    parameters = parameters.substr(parameters.find_first_of(" ") + 1);
+    
+    //return a single parameter; the next in line
+    return next;
+}
+
+
+void SKO_PacketHandler::parseSlashBan(unsigned char userId, std::string parameters)
+{
+    std::string username = nextParameter(parameters);
+    std::string reason = parameters;
+
+    int result = network->banPlayer(userId, username, reason, 1);
+    if (result == 0)
+    {
+        for (int i = 0; i < MAX_CLIENTS; i++)
+        {
+            if (User[i].Ident)
+            {
+                // Send data
+                network->sendChat(userId, username + " has been banned. (" + reason + ")");
+
+                //find which socket, yo
+                if (lower(User[i].Nick).compare(lower(username)) == 0)
+                {
+                    User[i].Sock->Close();
+                }
+            }
+        }
+    }
+    else if (result == 1)
+    {
+        network->sendChat(userId, username + " does not exist.");
+    }
+    else if (result == 2)
+    {
+        network->sendChat(userId, username + " cannot be banned.");
+    }
+    else if (result == 3)
+    {
+        printf("The user [%s] tried to ban [%s] but they are not moderator!\n", User[userId].Nick.c_str(), username.c_str());
+        network->sendChat(userId, "You re not authorized to ban a player.");
+    }
+}
+
+void SKO_PacketHandler::parseSlashUnban(unsigned char userId, std::string parameters)
+{
+    //strip the appropriate data
+    std::string username = parameters;
+
+    int result = repository->banPlayer(userId, username, "unban the player :)", 0);
+
+    if (result == 0)
+    {
+        network->sendChat(userId, username + " has been unbanned.");
+    }
+    else if (result == 1)
+    {
+        network->sendChat(userId, username + " does not exist.");
+    }
+    else if (result == 2)
+    {
+        network->sendChat(userId, username + " cannot be unbanned.");
+    }
+    else if (result == 3)
+    {
+        printf("The user [%s] tried to unban [%s] but they are not moderator!\n", User[userId].Nick.c_str(), username.c_str());
+        network->sendChat(userId, "You are not authorized to unban a player.");
+    }
+}
+
+void SKO_PacketHandler::parseSlashMute(unsigned char userId, std::string parameters)
+{
+    //strip the appropriate data
+    std::string username = nextParameter(parameters);
+    std::string reason = parameters;
+
+    int result = network->mutePlayer(userId, username, 1);
+    if (result == 0)
+    {
+        //find the sock of the username
+        for (int i = 0; i < MAX_CLIENTS; i++)
+        {
+            //well, unmute the person
+            std::string lower_username = lower(username);
+            std::string lower_nick = lower(User[i].Nick);
+
+            if (lower_username.compare(lower_nick) == 0)
+                User[i].Mute = true;
+
+            if (User[i].Ident)
+                network->sendChat(userId, username + " has been muted.");
+        }
+    }
+    else if (result == 1)
+    {
+        network->sendChat(userId, username + " does not exist.");
+    }
+    else if (result == 2)
+    {
+        network->sendChat(userId, username + " cannot be muted,");
+    }
+    else if (result == 3)
+    {
+        printf("The user [%s] tried to mute [%s] but they are not moderator!\n", User[userId].Nick.c_str(), username.c_str());
+        network->sendChat(userId, "You are not authorized to mute players.");
+    }
+}
+
+
+void SKO_PacketHandler::parseSlashUnmute(unsigned char userId, std::string parameters)
+{
+    //strip the appropriate data
+    std::string username = nextParameter(parameters);
+    
+    int result = network->mutePlayer(userId, username, 0);
+    if (result == 0)
+    {
+        //find the sock of the username
+        for (int i = 0; i < MAX_CLIENTS; i++)
+        {
+            // well, unmute the person
+            if (lower(User[i].Nick).compare(lower(username)) == 0)
+                User[i].Mute = false;
+
+            // well, tell everyone
+            // If this socket is taken
+            if (User[i].Ident)
+                network->sendChat(userId, username + " has been unmuted.");
+        }
+    }
+    else if (result == 1)
+    {
+        network->sendChat(userId, username + " does not exist.");
+    }
+    else if (result == 2)
+    {
+        network->sendChat(userId, username + " cannot be muted.");
+    }
+    else if (result == 3)
+    {
+        printf("The user [%s] tried to unmute [%s] but they are not moderator!\n", User[userId].Nick.c_str(), username.c_str());
+        network->sendChat(userId, "You are not authorized to mute players.");
+    }
+}
+
+void SKO_PacketHandler::parseSlashKick(unsigned char userId, std::string parameters)
+{
+    std::string username = nextParameter(parameters);
+    std::string Reason = parameters;
+    
+    int result = 0;
+    result = network->kickPlayer(userId, username);
+
+    if (result == 0)
+    {
+        //okay, now send
+        for (int i = 0; i < MAX_CLIENTS; i++)
+        {
+            //if socket is taken
+            if (User[i].Ident)
+                network->sendChat(userId, username + " has been kicked. (" + Reason + ")");
+
+            //kick the user
+            if (lower(username).compare(lower(User[i].Nick)) == 0)
+            {
+                User[i].Sock->Close();
+                User[i].Sock->Connected = false;
+            }
+        }
+    }
+    else if (result == 1)
+    {
+        network->sendChat(userId, username + " is not online.");
+    }
+    else if (result == 2)
+    {
+        printf("The user [%s] tried to kick [%s] but they are not moderator!\n", User[userId].Nick.c_str(), username.c_str());
+        network->sendChat(userId, "You are not authorized to kick players.");
+    }
+}
+
+void SKO_PacketHandler::parseSlashWho(unsigned char userId)
+{
+    //find how many players are online
+    int players = 0;
+    bool flag = false;
+    std::string strNicks = "";
+
+    for (int i = 0; i < MAX_CLIENTS; i++)
+    {
+        //if socket is taken
+        if (User[i].Ident && User[i].Nick.compare("Paladin") != 0)
+        {
+            players++;
+
+            //formatting
+            if (flag)
+                strNicks += ", ";
+            else if (User[i].Ident)
+                flag = true;
+
+            //add the nickname to the list
+            if (User[i].Ident)
+                strNicks += User[i].Nick;
+        }
+    }
+
+    //TODO change this
+    char strPlayers[127];
+    if (players == 1)
+        sprintf(strPlayers, "There is %i player online: ", players);
+    else
+        sprintf(strPlayers, "There are %i players online: ", players);
+    network->sendChat(userId, strPlayers);
+
+    if (players > 0)
+        network->sendChat(userId, strNicks);
+}
+
+void SKO_PacketHandler::parseSlashIpban(unsigned char userId, std::string parameters)
+{
+    std::string IP = nextParameter(parameters);
+    std::string Reason = parameters;
+
+    //TODO create SKO_Network function to wrap repository call.
+    if (User[userId].Moderator)
+    {
+        int result = repository->banIP(User[userId].Nick, IP, Reason);
+        if (result == 0)
+        {
+            network->sendChat(userId, "[" + IP + "] has been banned (" + Reason + ")");
+        }
+        else
+        {
+            network->sendChat(userId, "Could not ban IP [" + IP + "] for unknown error.");
+        }
+    }
+    else
+    {
+        network->sendChat(userId, "You are not authorized to ban IP addresses.");
+    }
+}
+
+void SKO_PacketHandler::parseSlashGetip(unsigned char userId, std::string parameters)
+{
+    std::string username = nextParameter(parameters);
+
+    //TODO create SKO_Network function to wrap repository call.
+    if (User[userId].Moderator)
+    {
+        std::string playerIP = repository->getIP(username);
+        network->sendChat(userId, username + " has an IP of [" + playerIP + "]");
+    }
+    else
+    {
+        network->sendChat(userId, "You are not authorized to get IP addresses.");
+    }
+}
+
+void SKO_PacketHandler::parseSlashWarp(unsigned char userId, std::string parameters)
+{
+    //TODO create SKO_Network function to wrap repository call.
+    if (User[userId].Moderator)
+    {
+
+        std::string warp_user = nextParameter(parameters);
+        int warp_x = atoi(nextParameter(parameters).c_str());
+        int warp_y = atoi(nextParameter(parameters).c_str());
+        int warp_m = atoi(nextParameter(parameters).c_str());
+
+        printf("Warp %s to (%i,%i) on map [%i]\n", warp_user.c_str(), warp_x, warp_y, warp_m);
+
+        //find user
+        for (int wu = 0; warp_m >= NUM_MAPS && wu < MAX_CLIENTS; wu++)
+        {
+            if (User[wu].Ident && (lower(User[wu].Nick).compare(lower(warp_user)) == 0))
+            {
+                SKO_Portal warp_p = SKO_Portal();
+                warp_p.spawn_x = warp_x;
+                warp_p.spawn_y = warp_y;
+                warp_p.map = warp_m;
+
+                Warp(wu, warp_p);
+                break;
+            }
+        }
+    }
+    else
+    {
+        network->sendChat(userId, "You are not authorized to warp players.");
+    }
+}
+
+void SKO_PacketHandler::parseSlashPing(unsigned char userId, std::string parameters)
+{
+    //if they are moderator
+    if (User[userId].Moderator)
+    {
+        std::string username = nextParameter(parameters);
+
+        int datUser;
+        bool result = false;
+
+        for (datUser = 0; datUser < MAX_CLIENTS; datUser++)
+        {
+            if (User[datUser].Ident && User[datUser].Nick.compare(username) == 0)
+            {
+                printf("Moderator inquiry of %s\n", username.c_str());
+                result = true;
+                break;
+            }
+        }
+
+        //find user
+        std::string pingDumpPacket = "0";
+        pingDumpPacket += CHAT;
+
+        if (result)
+        {
+            std::stringstream ss;
+            ss << "User[" << datUser << "] " << User[datUser].Nick << " has a ping of " << User[datUser].ping;
+            network->sendChat(userId, ss.str());
+        }
+        else
+        {
+            network->sendChat(userId, "username " + username + " was not found.");
+        }
+    }
+}
+
+void SKO_PacketHandler::parseSlashCommand(unsigned char userId, std::string message)
+{
+    std::string command = message.substr(0, message.find_first_of(" ") - 2);
+    std::string parameters = message.substr(message.find_first_of(" ") + 1);
+
+    if (command.compare("/ban") == 0)
+        parseSlashBan(userId, message);
+    else if (command.compare("/unban") == 0)
+        parseSlashUnban(userId, parameters);
+    else if (command.compare("/mute") == 0)
+        parseSlashMute(userId, parameters);
+    else if (command.compare("/unmute") == 0)
+        parseSlashUnmute(userId, parameters);
+    else if (command.compare("/kick") == 0)
+        parseSlashKick(userId, parameters);
+    else if (command.compare("/who") == 0)
+        parseSlashWho(userId);
+    else if (command.compare("/ipban") == 0)
+        parseSlashIpban(userId, parameters);
+    else if (command.compare("/getip") == 0)
+        parseSlashGetip(userId, parameters);   
+    else if (command.compare("/warp") == 0)
+        parseSlashWarp(userId, parameters);
+    else if (command.compare("/ping") == 0)
+        parseSlashPing(userId, parameters);
+    else
+        network->sendChat(userId, "Sorry, that is not a command.");
+}
+
+void SKO_PacketHandler::parseChat(unsigned char userId, std::string message)
+{
+    // Do nothing but log message if the user is either mute or not logged in
+    if (User[userId].Mute || !User[userId].Ident)
+    {
+        printf("User[%i](%s) tried to chat: [%s]\n", (int)userId, User[userId].Nick.c_str(), message.c_str());
+        return;
+    }
+
+    // Parse slash commands in separate function
+    if (message[0] == '/') 
+    {
+        parseSlashCommand(userId, message);
+        return;
+    }
+
+    // Parse chat messages
+    //wrap long text messages
+    int max = 62;
+    std::string userTag = "";
+
+    // Add nick to the send
+    std::string chatMessage = "";
+
+    if (User[userId].Nick.compare("Paladin") != 0)
+    {
+        userTag += "<";
+        userTag += User[userId].Nick;
+        userTag += "> ";
+    }
+
+    chatMessage += userTag;
+    chatMessage += message;
+    printf(kGreen "[Chat]%s\n" kNormal, chatMessage.c_str());
+
+    // Send a short chat that fits on one line.
+    if (chatMessage.length() < max)
+    {
+        for (int i = 0; i < MAX_CLIENTS; i++)
+        {
+            if (User[i].Ident)
+                network->sendChat(i, chatMessage);
+        }
+        return;
+    }
+
+    // Wrap long chat
+    bool doneWrapping = false;
+    while (!doneWrapping)
+    {
+        std::string chatChunk = "";
+        if (chatMessage.length() > max)
+        {
+            //Break message apart on spaces if they are found in the first chunk
+            int found = chatMessage.substr(0, max).find_last_of(" ");
+            if (found > (int)userTag.length() && found > max - 6)
+            {
+                chatChunk = chatMessage.substr(0, found);
+                chatMessage = chatMessage.substr(found + 1);
+            }
+            else
+            {
+                chatChunk = chatMessage.substr(0, max - 1) + "-";
+                chatMessage = chatMessage.substr(max - 1);
+            }
+        }
+        else
+        {
+            chatChunk = chatMessage;
+            doneWrapping = true;
+        }
+
+        //Send to all clients who are logged in
+        //Send a chunk each time it is formed
+        for (int i = 0; i < MAX_CLIENTS; i++)
+        {
+            if (User[i].Ident)
+                network->sendChat(i, chatChunk);
+        }
+    }
+}
 
 void SKO_PacketHandler::parsePacket(unsigned char userId, std::string packet)
 {
@@ -334,6 +1258,34 @@ void SKO_PacketHandler::parsePacket(unsigned char userId, std::string packet)
         parseAttack(userId, parser);
         break;
 
+    case MOVE_RIGHT:
+        parseMoveRight(userId, parser);
+        break;
+
+    case MOVE_LEFT:
+        parseMoveLeft(userId, parser);
+        break;
+    
+    case MOVE_JUMP:
+        parseMoveJump(userId, parser);
+        break;
+
+    case MOVE_STOP:
+        parseMoveStop(userId, parser);
+        break;
+
+    case USE_ITEM:
+        parseUseItem(userId, parser);
+        break;
+
+    case DROP_ITEM:
+        parseDropItem(userId, parser);
+        break;
+
+    case CHAT:
+        parseChat(userId, parser->getPacketBody());
+        break;
+
     default:
         // Disconnect clients sending nonsense packets
         //TODO//User[userId].Sock->Close();
@@ -342,450 +1294,7 @@ void SKO_PacketHandler::parsePacket(unsigned char userId, std::string packet)
         break;
     }
 
-    unsigned char code = parser->getPacketType();
-    if (code == MOVE_RIGHT)
-    {
-
-        float numx, numy;
-        ((char *)&numx)[0] = User[userId].Sock->Data[2];
-        ((char *)&numx)[1] = User[userId].Sock->Data[3];
-        ((char *)&numx)[2] = User[userId].Sock->Data[4];
-        ((char *)&numx)[3] = User[userId].Sock->Data[5];
-        ((char *)&numy)[0] = User[userId].Sock->Data[6];
-        ((char *)&numy)[1] = User[userId].Sock->Data[7];
-        ((char *)&numy)[2] = User[userId].Sock->Data[8];
-        ((char *)&numy)[3] = User[userId].Sock->Data[9];
-        Right(userId, numx, numy);
-    }
-    else if (code == MOVE_LEFT)
-    {
-        float numx, numy;
-        ((char *)&numx)[0] = User[userId].Sock->Data[2];
-        ((char *)&numx)[1] = User[userId].Sock->Data[3];
-        ((char *)&numx)[2] = User[userId].Sock->Data[4];
-        ((char *)&numx)[3] = User[userId].Sock->Data[5];
-        ((char *)&numy)[0] = User[userId].Sock->Data[6];
-        ((char *)&numy)[1] = User[userId].Sock->Data[7];
-        ((char *)&numy)[2] = User[userId].Sock->Data[8];
-        ((char *)&numy)[3] = User[userId].Sock->Data[9];
-        Left(userId, numx, numy);
-    }
-    else if (code == MOVE_STOP)
-    {
-        float numx, numy;
-        ((char *)&numx)[0] = User[userId].Sock->Data[2];
-        ((char *)&numx)[1] = User[userId].Sock->Data[3];
-        ((char *)&numx)[2] = User[userId].Sock->Data[4];
-        ((char *)&numx)[3] = User[userId].Sock->Data[5];
-        ((char *)&numy)[0] = User[userId].Sock->Data[6];
-        ((char *)&numy)[1] = User[userId].Sock->Data[7];
-        ((char *)&numy)[2] = User[userId].Sock->Data[8];
-        ((char *)&numy)[3] = User[userId].Sock->Data[9];
-        Stop(userId, numx, numy);
-    } //end MOVE_STOP
-    else if (code == STAT_STR)
-    {
-        if (User[userId].stat_points > 0)
-        {
-            User[userId].stat_points--;
-            User[userId].strength++;
-
-            network->SendStatStr(userId, User[userId].strength);
-            network->SendStatPoints(userId, User[userId].stat_points);
-        }
-    }
-    else if (code == STAT_HP)
-    {
-        if (User[userId].stat_points > 0)
-        {
-            User[userId].stat_points--;
-            User[userId].regen += 1;
-            network->SendStatRegen(userId, User[userId].regen);
-            network->SendStatPoints(userId, User[userId].stat_points);
-        }
-    }
-    else if (code == STAT_DEF)
-    {
-        if (User[userId].stat_points > 0)
-        {
-            User[userId].stat_points--;
-            User[userId].defence++;
-            network->SendStatDef(userId, User[userId].strength);
-            network->SendStatPoints(userId, User[userId].stat_points);
-        }
-    }
-    else if (code == MOVE_JUMP)
-    {
-        float numx, numy;
-        ((char *)&numx)[0] = User[userId].Sock->Data[2];
-        ((char *)&numx)[1] = User[userId].Sock->Data[3];
-        ((char *)&numx)[2] = User[userId].Sock->Data[4];
-        ((char *)&numx)[3] = User[userId].Sock->Data[5];
-        ((char *)&numy)[0] = User[userId].Sock->Data[6];
-        ((char *)&numy)[1] = User[userId].Sock->Data[7];
-        ((char *)&numy)[2] = User[userId].Sock->Data[8];
-        ((char *)&numy)[3] = User[userId].Sock->Data[9];
-        Jump(userId, numx, numy);
-    }                       //end jump
-    else if (code == EQUIP) //if user sends EQUIP it means they are unequipping that item
-    {
-        unsigned char slot = User[userId].Sock->Data[2];
-
-        // TODO - sanity check on correct slot or else the server might crash
-        unsigned char item = User[userId].equip[slot];
-
-        // TODO - do not let user unequip if their inventory is full.
-        // Only unequip and transfer to inventory if it actually is equipped
-        if (item > 0)
-        {
-            //un-wear it
-            User[userId].equip[slot] = 0; //TODO refactor
-            //put it in the player's inventory
-            User[userId].inventory[item]++; //TODO refactor
-
-            //tell everyone
-            for (int uc = 0; uc < MAX_CLIENTS; uc++)
-                network->SendEquip(uc, userId, slot, (char)0, (char)0);
-
-            //update the player's inventory
-            int amount = User[userId].inventory[item];
-            network->SendPocketItem(userId, item, amount);
-        }
-    } //end EQUIP
-    else if (code == USE_ITEM)
-    {
-        printf("USE_ITEM\n");
-        int item = User[userId].Sock->Data[2];
-        int type = Item[item].type;
-        printf("type is %i\n", type);
-        unsigned char mapId = User[userId].mapId;
-
-        //only attempt to use items if the player has them
-        if (User[userId].inventory[item] > 0)
-        {
-            unsigned int amt = 0;
-            float numy, numx, numys, numxs,
-                rand_xs, rand_ys,
-                rand_x, rand_y;
-            int rand_i, rand_item;
-
-            //TODO - refactor this into use a item handler.
-            switch (type)
-            {
-            case 0:
-                break; //cosmetic
-
-            case 1: //food
-            {
-                // Do not eat food if player is full health.
-                if (User[userId].hp == User[userId].max_hp)
-                    break;
-
-                //TODO refactor
-                User[userId].hp += Item[item].hp;
-
-                if (User[userId].hp > User[userId].max_hp)
-                    User[userId].hp = User[userId].max_hp;
-
-                //tell this client
-                network->SendStatHp(userId, User[userId].hp);
-
-                //remove item
-                User[userId].inventory[item]--;
-
-                //tell them how many items they have
-                unsigned int amount = User[userId].inventory[item];
-                if (amount == 0)
-                    User[userId].inventory_index--;
-
-                // party hp notification
-                // TODO - change magic number 80 to use a config value
-                unsigned char displayHp = (int)((User[userId].hp / (float)User[userId].max_hp) * 80);
-
-                for (int pl = 0; pl < MAX_CLIENTS; pl++)
-                {
-                    if (pl != userId && User[pl].Ident && User[pl].partyStatus == PARTY && User[pl].party == User[userId].party)
-                        network->SendBuddyStatHp(pl, userId, displayHp);
-                }
-
-                //put in client players inventory
-                network->SendPocketItem(userId, item, amount);
-
-                break;
-            }
-            case 2: //weapon
-            {
-                // Does the other player have another WEAPON equipped?
-                // If so, transfer it to inventory
-                unsigned char otherItem = User[userId].equip[0];
-
-                // Transfer weapon from inventory to equipment slot
-                User[userId].equip[0] = item;
-                User[userId].inventory[item]--;
-
-                // Tranfer old weapon to users inventory
-                if (otherItem > 0)
-                {
-                    User[userId].inventory[otherItem]++;
-                    User[userId].inventory_index++;
-                    unsigned int amount = User[userId].inventory[otherItem];
-                    network->SendPocketItem(userId, otherItem, amount);
-                }
-
-                // Tell player one weapon is removed from their inventory
-                unsigned int amount = User[userId].inventory[item];
-                network->SendPocketItem(userId, item, amount);
-
-                //tell everyone the player equipped their weapon
-                for (int i1 = 0; i1 < MAX_CLIENTS; i1++)
-                {
-                    if (User[i1].Ident)
-                        network->SendEquip(i1, userId, (char)0, Item[item].equipID, item);
-                }
-                break;
-            }
-            case 3: //hat
-            {
-                // Does the other player have another HAT equipped?
-                // If so, transfer it to inventory
-                unsigned char otherItem = User[userId].equip[1];
-
-                // Transfer hat from inventory to equipment slot
-                User[userId].equip[1] = item;
-                User[userId].inventory[item]--;
-
-                // Tranfer old hat to users inventory
-                if (otherItem > 0)
-                {
-                    User[userId].inventory[otherItem]++;
-                    User[userId].inventory_index++;
-                    unsigned int amount = User[userId].inventory[otherItem];
-                    network->SendPocketItem(userId, otherItem, amount);
-                }
-
-                // Tell player one hat is removed from their inventory
-                unsigned int amount = User[userId].inventory[item];
-                network->SendPocketItem(userId, item, amount);
-
-                //tell everyone the player equipped their hat
-                for (int i1 = 0; i1 < MAX_CLIENTS; i1++)
-                {
-                    if (User[i1].Ident)
-                        network->SendEquip(i1, userId, (char)1, Item[item].equipID, item);
-                }
-                break;
-            }
-            case 4: // mystery box
-            {
-                // holiday event
-                if (HOLIDAY)
-                {
-                    ////get rid of the box
-                    int numUsed = 0;
-
-                    if (User[userId].inventory[item] >= 10)
-                    {
-                        numUsed = 10;
-                        User[userId].inventory[item] -= 10;
-                    }
-                    else
-                    {
-                        numUsed = User[userId].inventory[item];
-                        User[userId].inventory[item] = 0;
-                        User[userId].inventory_index--;
-                    }
-
-                    //tell them how many items they have
-                    unsigned int amount = User[userId].inventory[item];
-
-                    //put in players inventory
-                    network->SendPocketItem(userId, item, amount);
-
-                    for (int it = 0; it < numUsed; it++)
-                    {
-                        //spawn a hat or nothing
-                        rand_xs = 0;
-                        rand_ys = -5;
-
-                        // 1:100 chance of item
-                        rand_item = rand() % 100;
-                        if (rand_item != 1)
-                            rand_item = ITEM_GOLD;
-                        else
-                            rand_item = HOLIDAY_BOX_DROP;
-
-                        int rand_i;
-                        rand_x = User[userId].x + 32;
-                        rand_y = User[userId].y - 32;
-
-                        for (rand_i = 0; rand_i < 256; rand_i++)
-                        {
-                            if (rand_i == 255 || map[mapId].ItemObj[rand_i].status == false)
-                                break;
-                        }
-
-                        //TODO change this limit to 2 bytes (32K)
-                        if (rand_i == 255)
-                        {
-                            //If we traversed the whole item list already, start over.
-                            if (map[mapId].currentItem == 255)
-                                map[mapId].currentItem = 0;
-
-                            //use the currentItem to traverse the list whenever it overflows, so the "oldest" item gets deleted.
-                            rand_i = map[mapId].currentItem;
-                            map[mapId].currentItem++;
-                        }
-
-                        map[mapId].ItemObj[rand_i] = SKO_ItemObject(rand_item, rand_x, rand_y, rand_xs, rand_ys, 1);
-
-                        {
-                            int i = rand_i;
-                            //dont let them get stuck
-                            if (blocked(mapId, map[mapId].ItemObj[i].x + map[mapId].ItemObj[i].x_speed, map[mapId].ItemObj[i].y + map[mapId].ItemObj[i].y_speed + 0.15, map[mapId].ItemObj[i].x + Item[map[mapId].ItemObj[i].itemID].w, map[mapId].ItemObj[i].y + map[mapId].ItemObj[i].y_speed + Item[map[mapId].ItemObj[i].itemID].h, false))
-                            {
-                                //move it down a bit
-                                rand_y = User[userId].y + 1;
-                                map[mapId].ItemObj[i].y = rand_y;
-                            }
-                        }
-                        float x = rand_x;
-                        float y = rand_y;
-                        float x_speed = rand_xs;
-                        float y_speed = rand_ys;
-
-                        for (int iii = 0; iii < MAX_CLIENTS; iii++)
-                        {
-                            if (User[iii].Ident && User[iii].mapId == mapId)
-                                network->SendSpawnItem(iii, rand_i, mapId, rand_item, x, y, x_speed, y_speed);
-                        }
-                    }
-                }
-                break;
-            }
-            case 5: // trophy / spell
-            {
-                // Does the other player have another TROPHY equipped?
-                // If so, transfer it to inventory
-                unsigned char otherItem = User[userId].equip[2];
-
-                // Transfer trophy from inventory to equipment slot
-                User[userId].equip[2] = item;
-                User[userId].inventory[item]--;
-
-                // Tranfer old trophy to users inventory
-                if (otherItem > 0)
-                {
-                    User[userId].inventory[otherItem]++;
-                    User[userId].inventory_index++;
-                    unsigned int amount = User[userId].inventory[otherItem];
-                    network->SendPocketItem(userId, otherItem, amount);
-                }
-
-                // Tell player one trophy is removed from their inventory
-                unsigned int amount = User[userId].inventory[item];
-                network->SendPocketItem(userId, item, amount);
-
-                //tell everyone the player equipped their trophy
-                for (int i1 = 0; i1 < MAX_CLIENTS; i1++)
-                {
-                    if (User[i1].Ident)
-                        network->SendEquip(i1, userId, (char)2, Item[item].equipID, item);
-                }
-                break;
-            }
-            default:
-                break;
-            } //end switch
-        }     //end if you have the item
-    }         //end USE_ITEM
-    else if (code == DROP_ITEM)
-    {
-        unsigned char item = User[userId].Sock->Data[2];
-        unsigned char mapId = User[userId].mapId;
-
-        unsigned int amount = 0;
-        //build an int from 4 bytes
-        ((char *)&amount)[0] = User[userId].Sock->Data[3];
-        ((char *)&amount)[1] = User[userId].Sock->Data[4];
-        ((char *)&amount)[2] = User[userId].Sock->Data[5];
-        ((char *)&amount)[3] = User[userId].Sock->Data[6];
-
-        //if they have enough to drop
-        if (User[userId].inventory[item] >= amount && amount > 0 && User[userId].tradeStatus < 1)
-        {
-            //take the items away from the player
-            User[userId].inventory[item] -= amount;
-            int ownedAmount = User[userId].inventory[item];
-
-            //keeping track of inventory slots
-            if (User[userId].inventory[item] == 0)
-            {
-                //printf("the user has %i of Item[%i]", amt, i );
-                //prevents them from holding more than 24 items
-                User[userId].inventory_index--;
-            }
-
-            //tell the user they dropped their items.
-            network->SendPocketItem(userId, item, ownedAmount);
-
-            //TODO refactor all of this
-            //next spawn a new item for all players
-            int rand_i;
-            float rand_x = User[userId].x + 16 + (32 - Item[item].w) / 2.0;
-            float rand_y = User[userId].y - Item[item].h;
-
-            float rand_xs = 0;
-            if (User[userId].facing_right)
-            {
-                rand_xs = 2.2;
-            }
-            else
-            {
-                rand_xs = -2.2;
-            }
-
-            float rand_ys = -5;
-            for (rand_i = 0; rand_i < 255; rand_i++)
-            {
-                if (map[mapId].ItemObj[rand_i].status == false)
-                    break;
-            }
-
-            //find item object that's free
-            if (rand_i == 255)
-            {
-                if (map[mapId].currentItem == 255)
-                    map[mapId].currentItem = 0;
-
-                rand_i = map[mapId].currentItem;
-
-                map[mapId].currentItem++;
-            }
-
-            //tell everyone there's an item up for grabs
-            map[mapId].ItemObj[rand_i] = SKO_ItemObject(item, rand_x, rand_y, rand_xs, rand_ys, amount);
-
-            int i = rand_i;
-            //dont let them get stuck
-            if (blocked(mapId, map[mapId].ItemObj[i].x + map[mapId].ItemObj[i].x_speed, map[mapId].ItemObj[i].y + map[mapId].ItemObj[i].y_speed + 0.15, map[mapId].ItemObj[i].x + Item[map[mapId].ItemObj[i].itemID].w, map[mapId].ItemObj[i].y + map[mapId].ItemObj[i].y_speed + Item[map[mapId].ItemObj[i].itemID].h, false))
-            {
-                //move it down a bit
-                rand_y = User[userId].y + 1;
-                map[mapId].ItemObj[i].y = rand_y;
-            }
-
-            float x = rand_x;
-            float y = rand_y;
-            float x_speed = rand_xs;
-            float y_speed = rand_ys;
-
-            for (int iii = 0; iii < MAX_CLIENTS; iii++)
-            {
-                if (User[iii].Ident && User[iii].mapId == mapId)
-                    network->SendSpawnItem(iii, rand_i, mapId, item, x, y, x_speed, x_speed);
-            }
-        }
-    } // end DROP_ITEM
+//TODO - keep it up nate :) 
     else if (code == TRADE)
     {
         //what kind of trade action, yo?
@@ -1427,557 +1936,4 @@ void SKO_PacketHandler::parsePacket(unsigned char userId, std::string packet)
             network->sendChat(userId, "You cannot establish [" + clanTag + "] because it already exists.");
         }
     } //end make clan
-    else if (code == CAST_SPELL)
-    {
-        //What do you have equipped?
-        int spell = User[userId].equip[2];
-
-        if (spell > 0)
-        {
-            if (User[userId].inventory[spell] > 0)
-            {
-                User[userId].inventory[spell]--;
-                if (User[userId].inventory[spell] == 0)
-                    User[userId].inventory_index--;
-
-                //notify user the item was thrown
-                unsigned int amount = User[userId].inventory[spell];
-                network->SendPocketItem(userId, spell, amount);
-            }
-            else
-            {
-                //Throw the item from your hand instead of inventory if that's all you have
-                User[userId].equip[2] = 0;
-                //send packet that says you arent holding anything!
-                for (int c = 0; c < MAX_CLIENTS; c++)
-                    if (User[c].Ident)
-                        network->SendEquip(c, userId, (char)2, (char)0, (char)0);
-            }
-
-            //tell all the users that an item has been thrown...
-            //just use an item object with no value.
-            SKO_ItemObject lootItem = SKO_ItemObject();
-            lootItem.y = User[userId].y + 24;
-
-            if (User[userId].facing_right)
-            {
-                lootItem.x_speed = 10;
-                lootItem.x = User[userId].x + 50;
-            }
-            else
-            {
-                lootItem.x_speed = -10;
-                lootItem.x = User[userId].x - 32;
-            }
-
-            lootItem.y_speed = -3.2;
-            lootItem.itemID = spell;
-            lootItem.owner = userId;
-            lootItem.amount = 1;
-
-            SpawnLoot(User[userId].mapId, lootItem);
-        }
-    }
-    else if (code == CHAT)
-    {
-        if (!User[userId].Mute && User[userId].Ident)
-        {
-            std::string command = User[userId].Sock->Data.substr(2, User[userId].Sock->Data.find_first_of(" ") - 2);
-            //printf("COMMAND: [%s]", command.c_str());
-            if (command.compare("/ban") == 0)
-            {
-                // Declare message string
-                std::string Message = "";
-                std::string username = "";
-                std::string Reason = "";
-
-                //fill message with username and reason
-                Message += User[userId].Sock->Data.substr(User[userId].Sock->Data.find_first_of(" ") + 1, parser->getPacketLength() - User[userId].Sock->Data.find_first_of(" ") + 1);
-
-                //strip the appropriate data
-                username += Message.substr(0, Message.find_first_of(" "));
-                Reason += Message.substr(Message.find_first_of(" ") + 1, Message.length() - Message.find_first_of(" ") + 1);
-
-                int result = 0;
-
-                result = repository->banPlayer(userId, username, Reason, 1);
-
-                if (result == 0)
-                {
-                    for (int i = 0; i < MAX_CLIENTS; i++)
-                    {
-                        // If user is logged in
-                        if (User[i].Ident)
-                        {
-                            // Send data
-                            network->sendChat(userId, username + " has been banned. (" + Reason + ")");
-
-                            //find which socket, yo
-                            if (lower(User[i].Nick).compare(lower(username)) == 0)
-                            {
-                                User[i].Sock->Close();
-                            }
-                        }
-                    }
-                }
-                else if (result == 1)
-                {
-                    network->sendChat(userId, username + " does not exist.");
-                }
-                else if (result == 2)
-                {
-                    network->sendChat(userId, username + " cannot be banned.");
-                }
-                else if (result == 3)
-                {
-                    printf("The user [%s] tried to ban [%s] but they are not moderator!\n", User[userId].Nick.c_str(), username.c_str());
-                    network->sendChat(userId, "You re not authorized to ban a player.");
-                }
-
-            } //end "/ban"
-            else if (command.compare("/unban") == 0)
-            {
-                // Declare message string
-                std::string username = "";
-                std::string Message = "";
-
-                //fill message with username and reason
-                Message += User[userId].Sock->Data.substr(User[userId].Sock->Data.find_first_of(" ") + 1, parser->getPacketLength() - User[userId].Sock->Data.find_first_of(" ") + 1);
-
-                //strip the appropriate data
-                username += Message.substr(Message.find_first_of(" ") + 1, parser->getPacketLength() - Message.find_first_of(" ") + 1);
-
-                int result = 0;
-
-                result = repository->banPlayer(userId, username, "this will unban the player", 0);
-
-                if (result == 0)
-                {
-                    network->sendChat(userId, username + " has been unbanned.");
-                }
-                else if (result == 1)
-                {
-                    network->sendChat(userId, username + " does not exist.");
-                }
-                else if (result == 2)
-                {
-                    network->sendChat(userId, username + " cannot be unbanned.");
-                }
-                else if (result == 3)
-                {
-                    printf("The user [%s] tried to unban [%s] but they are not moderator!\n", User[userId].Nick.c_str(), username.c_str());
-                    network->sendChat(userId, "You are not authorized to unban a player.");
-                }
-
-            } //end "/unban"
-            else if (command.compare("/mute") == 0)
-            {
-                // Declare message string
-                std::string Message = "";
-                std::string username = "";
-                std::string Reason = "";
-
-                //fill message with username and reason
-                Message += User[userId].Sock->Data.substr(User[userId].Sock->Data.find_first_of(" ") + 1, parser->getPacketLength() - User[userId].Sock->Data.find_first_of(" ") + 1);
-
-                //strip the appropriate data
-                username += Message.substr(0, Message.find_first_of(" "));
-                Reason += Message.substr(Message.find_first_of(" ") + 1, Message.length() - Message.find_first_of(" ") + 1);
-
-                int result = 0;
-
-                result = network->mutePlayer(userId, username, 1);
-
-                printf("MUTE result is: %i\n", result);
-                if (result == 0)
-                {
-                    //find the sock of the username
-                    for (int i = 0; i < MAX_CLIENTS; i++)
-                    {
-                        //well, unmute the person
-                        std::string lower_username = lower(username);
-                        std::string lower_nick = lower(User[i].Nick);
-
-                        if (lower_username.compare(lower_nick) == 0)
-                            User[i].Mute = true;
-
-                        if (User[i].Ident)
-                            network->sendChat(userId, username + " has been muted.");
-                    }
-                }
-                else if (result == 1)
-                {
-                    network->sendChat(userId, username + " does not exist.");
-                }
-                else if (result == 2)
-                {
-                    network->sendChat(userId, username + " cannot be muted,");
-                }
-                else if (result == 3)
-                {
-                    printf("The user [%s] tried to mute [%s] but they are not moderator!\n", User[userId].Nick.c_str(), username.c_str());
-                    network->sendChat(userId, "You are not authorized to mute players.");
-                }
-
-            } //end "/mute"
-            else if (command.compare("/unmute") == 0)
-            {
-                // Declare message string
-                std::string username = "";
-                std::string Message = "";
-                //fill message with username and reason
-                Message += User[userId].Sock->Data.substr(User[userId].Sock->Data.find_first_of(" ") + 1, parser->getPacketLength() - User[userId].Sock->Data.find_first_of(" ") + 1);
-
-                //strip the appropriate data
-                username += Message.substr(Message.find_first_of(" ") + 1, parser->getPacketLength() - Message.find_first_of(" ") + 1);
-
-                int result = 0;
-
-                result = network->mutePlayer(userId, username, 0);
-
-                if (result == 0)
-                {
-                    //find the sock of the username
-                    for (int i = 0; i < MAX_CLIENTS; i++)
-                    {
-                        //well, unmute the person
-                        if (lower(User[i].Nick).compare(lower(username)) == 0)
-                            User[i].Mute = false;
-
-                        //well, tell everyone
-                        // If this socket is taken
-                        if (User[i].Ident)
-                            network->sendChat(userId, username + " has been unmuted.");
-                    }
-                }
-                else if (result == 1)
-                {
-                    network->sendChat(userId, username + " does not exist.");
-                }
-                else if (result == 2)
-                {
-                    network->sendChat(userId, username + " cannot be muted.");
-                }
-                else if (result == 3)
-                {
-                    printf("The user [%s] tried to unmute [%s] but they are not moderator!\n", User[userId].Nick.c_str(), username.c_str());
-                    network->sendChat(userId, "You are not authorized to mute players.");
-                }
-
-            } //end "/unmute"
-            else if (command.compare("/kick") == 0)
-            {
-                // Declare message string
-                std::string Message = "";
-                std::string username = "";
-                std::string Reason = "";
-
-                //fill message with username and reason
-                Message += User[userId].Sock->Data.substr(User[userId].Sock->Data.find_first_of(" ") + 1, parser->getPacketLength() - User[userId].Sock->Data.find_first_of(" ") + 1);
-
-                //strip the appropriate data
-                username += Message.substr(0, Message.find_first_of(" "));
-                Reason += Message.substr(Message.find_first_of(" ") + 1, Message.length() - Message.find_first_of(" ") + 1);
-
-                int result = 0;
-
-                result = network->kickPlayer(userId, username);
-
-                if (result == 0)
-                {
-                    //okay, now send
-                    for (int i = 0; i < MAX_CLIENTS; i++)
-                    {
-                        //if socket is taken
-                        if (User[i].Ident)
-                            network->sendChat(userId, username + " has been kicked. (" + Reason + ")");
-
-                        //kick the user
-                        if (lower(username).compare(lower(User[i].Nick)) == 0)
-                        {
-                            User[i].Sock->Close();
-                            User[i].Sock->Connected = false;
-                        }
-                    }
-                }
-                else if (result == 1)
-                {
-                    network->sendChat(userId, username + " is not online.");
-                }
-                else if (result == 2)
-                {
-                    printf("The user [%s] tried to kick [%s] but they are not moderator!\n", User[userId].Nick.c_str(), username.c_str());
-                    network->sendChat(userId, "You are not authorized to kick players.");
-                }
-
-            } //end "/kick"
-            else if (command.compare("/who") == 0)
-            {
-                //find how many players are online
-                //see how many people are online
-                int players = 0;
-                bool flag = false;
-                std::string strNicks = "";
-
-                for (int i = 0; i < MAX_CLIENTS; i++)
-                {
-                    //if socket is taken
-                    if (User[i].Ident && User[i].Nick.compare("Paladin") != 0)
-                    {
-                        players++;
-
-                        //formatting
-                        if (flag)
-                            strNicks += ", ";
-                        else if (User[i].Ident)
-                            flag = true;
-
-                        //add the nickname to the list
-                        if (User[i].Ident)
-                            strNicks += User[i].Nick;
-                    }
-                }
-
-                //TODO change this
-                char strPlayers[127];
-                if (players == 1)
-                    sprintf(strPlayers, "There is %i player online: ", players);
-                else
-                    sprintf(strPlayers, "There are %i players online: ", players);
-                network->sendChat(userId, strPlayers);
-
-                if (players > 0)
-                    network->sendChat(userId, strNicks);
-
-            } //end /who
-            else if (command.compare("/ipban") == 0)
-            {
-                // Declare message string
-                std::string Message = "";
-                std::string IP = "";
-                std::string Reason = "";
-
-                //fill message with username and reason
-                Message += User[userId].Sock->Data.substr(User[userId].Sock->Data.find_first_of(" ") + 1, parser->getPacketLength() - User[userId].Sock->Data.find_first_of(" ") + 1);
-
-                //strip the appropriate data
-                IP += Message.substr(0, Message.find_first_of(" "));
-                Reason += Message.substr(Message.find_first_of(" ") + 1, Message.length() - Message.find_first_of(" ") + 1);
-
-                if (User[userId].Moderator)
-                {
-                    int result = repository->banIP(User[userId].Nick, IP, Reason);
-
-                    if (result == 0)
-                    {
-                        network->sendChat(userId, "[" + IP + "] has been banned (" + Reason + ")");
-                    }
-                    else
-                    {
-                        //TODO - verify ban worked
-                        network->sendChat(userId, "Could not ban IP [" + IP + "] for unknown error.");
-                    }
-                }
-                else
-                {
-                    network->sendChat(userId, "You are not authorized to ban IP addresses.");
-                }
-            } //end /ipban
-            else if (command.compare("/getip") == 0)
-            {
-                // Declare message string
-                std::string username = "";
-                std::string Message = "";
-
-                //fill message with username
-                Message += User[userId].Sock->Data.substr(User[userId].Sock->Data.find_first_of(" ") + 1, parser->getPacketLength() - User[userId].Sock->Data.find_first_of(" ") + 1);
-
-                //strip the appropriate data
-                username += Message.substr(Message.find_first_of(" ") + 1, parser->getPacketLength() - Message.find_first_of(" ") + 1);
-
-                if (User[userId].Moderator)
-                {
-                    std::string playerIP = repository->getIP(username);
-                    network->sendChat(userId, username + " has an IP of [" + playerIP + "]");
-                }
-                else
-                {
-                    network->sendChat(userId, "You are not authorized to get IP addresses.");
-                }
-
-            } //end if /getip
-            else if (command.compare("/warp") == 0)
-            {
-                if (User[userId].Moderator)
-                {
-                    printf("warp...\n");
-                    std::string rip = User[userId].Sock->Data;
-
-                    //get parameters first
-                    rip = rip.substr(rip.find_first_of(" ") + 1);
-                    printf("rip is %s\n", rip.c_str());
-
-                    //username
-                    std::string warp_user = rip.substr(0, rip.find_first_of(" "));
-                    rip = rip.substr(rip.find_first_of(" ") + 1);
-                    printf("rip is %s\n", rip.c_str());
-
-                    //X
-                    int warp_x = atoi(rip.substr(0, rip.find_first_of(" ")).c_str());
-                    rip = rip.substr(rip.find_first_of(" ") + 1);
-                    printf("rip is %s\n", rip.c_str());
-
-                    //Y
-                    int warp_y = atoi(rip.substr(0, rip.find_first_of(" ")).c_str());
-                    rip = rip.substr(rip.find_first_of(" ") + 1);
-                    printf("rip is %s\n", rip.c_str());
-
-                    //MAP
-                    int warp_m = atoi(rip.substr(0, rip.find_first_of(" ")).c_str());
-
-                    printf("Warp %s to (%i,%i) on map [%i]\n", warp_user.c_str(), warp_x, warp_y, warp_m);
-
-                    //find user
-                    for (int wu = 0; warp_m >= NUM_MAPS && wu < MAX_CLIENTS; wu++)
-                    {
-                        if (User[wu].Ident && (lower(User[wu].Nick).compare(lower(warp_user)) == 0))
-                        {
-                            SKO_Portal warp_p = SKO_Portal();
-                            warp_p.spawn_x = warp_x;
-                            warp_p.spawn_y = warp_y;
-                            warp_p.map = warp_m;
-
-                            Warp(wu, warp_p);
-                            break;
-                        }
-                    }
-                }
-                else
-                {
-                    network->sendChat(userId, "You are not authorized to warp players.");
-                }
-            }
-            else if (command.compare("/ping") == 0)
-            {
-                // Declare message string
-                std::string username = "";
-
-                //if they are moderator
-                if (User[userId].Moderator)
-                {
-                    //find username
-                    username += User[userId].Sock->Data.substr(User[userId].Sock->Data.find_first_of(" ") + 1, parser->getPacketLength() - User[userId].Sock->Data.find_first_of(" ") + 1);
-
-                    int datUser;
-                    bool result = false;
-
-                    for (datUser = 0; datUser < MAX_CLIENTS; datUser++)
-                    {
-                        if (User[datUser].Ident && User[datUser].Nick.compare(username) == 0)
-                        {
-                            printf("Moderator inquiry of %s\n", username.c_str());
-                            result = true;
-                            break;
-                        }
-                    }
-
-                    //find user
-                    std::string pingDumpPacket = "0";
-                    pingDumpPacket += CHAT;
-
-                    if (result)
-                    {
-                        std::stringstream ss;
-                        ss << "User[" << datUser << "] " << User[datUser].Nick << " has a ping of " << User[datUser].ping;
-                        network->sendChat(userId, ss.str());
-                    }
-                    else
-                    {
-                        network->sendChat(userId, "username " + username + " was not found.");
-                    }
-                }
-
-            } //end if /ping
-            else if (command[0] == '/')
-            {
-                printf("not a command...\n");
-                network->sendChat(userId, "Sorry, that is not a command.");
-            }
-            else //just chat
-            {
-                //wrap long text messages
-                int max = 62;
-                std::string userTag = "";
-
-                // Add nick to the send
-                std::string chatMessage = "";
-
-                if (User[userId].Nick.compare("Paladin") != 0)
-                {
-                    userTag += "<";
-                    userTag += User[userId].Nick;
-                    userTag += "> ";
-                }
-
-                chatMessage += userTag;
-                chatMessage += User[userId].Sock->Data.substr(2, parser->getPacketLength());
-                printf(kGreen "[Chat]%s\n" kNormal, chatMessage.c_str());
-
-                // Send a short chat that fits on one line.
-                if (chatMessage.length() < max)
-                {
-                    for (int i = 0; i < MAX_CLIENTS; i++)
-                    {
-                        if (User[i].Ident)
-                            network->sendChat(i, chatMessage);
-                    }
-                    return;
-                }
-
-                // Wrap long chat
-                bool doneWrapping = false;
-                while (!doneWrapping)
-                {
-                    std::string chatChunk = "";
-                    if (chatMessage.length() > max)
-                    {
-                        Sleep(1000);
-                        printf("chatMessage.length=%i > max%i\n", (int)chatMessage.length(), max);
-                        //Break message apart on spaces if they are found in the first chunk
-                        int found = chatMessage.substr(0, max).find_last_of(" ");
-                        printf("found is: %i\n", found);
-                        if (found > (int)userTag.length() && found > max - 6)
-                        {
-                            printf("(found=1) chatMessage was: %s\n", chatMessage.c_str());
-                            printf("(found=1) chatChunk was: %s\n", chatChunk.c_str());
-                            chatChunk = chatMessage.substr(0, found);
-                            chatMessage = chatMessage.substr(found + 1);
-                            printf("(found=1) chatMessage is now: %s\n", chatMessage.c_str());
-                            printf("(found=1) chatChunk is now: %s\n", chatChunk.c_str());
-                        }
-                        else
-                        {
-                            printf("(found=0) chatMessage was: %s\n", chatMessage.c_str());
-                            printf("(found=0) chatChunk was: %s\n", chatChunk.c_str());
-                            chatChunk = chatMessage.substr(0, max - 1) + "-";
-                            chatMessage = chatMessage.substr(max - 1);
-                            printf("(found=0) chatMessage is now: %s\n", chatMessage.c_str());
-                            printf("(found=0) chatChunk is now: %s\n", chatChunk.c_str());
-                        }
-                    }
-                    else
-                    {
-                        chatChunk = chatMessage;
-                        doneWrapping = true;
-                    }
-
-                    for (int i = 0; i < MAX_CLIENTS; i++)
-                    {
-                        if (User[i].Ident)
-                            network->sendChat(i, chatChunk);
-                    }
-                }
-            } //end just chat
-        }     //end if not muted
-    }         //end chat
 }

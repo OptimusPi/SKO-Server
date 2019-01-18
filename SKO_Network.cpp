@@ -462,6 +462,17 @@ void SKO_Network::SendEnemyHit(unsigned char userId, unsigned char enemyId)
 	send(User[userId].Sock, TARGET_HIT, (char)0, enemyId);
 }
 
+int SKO_Network::banPlayer(int Mod_i, std::string username, std::string reason, int flag)
+{
+	if (!User[Mod_i].Moderator)
+	{
+		//not a moderator!
+		return 3;
+	}
+
+	return repository->banPlayer(Mod_i, username, reason, flag);
+}
+
 int SKO_Network::mutePlayer(int Mod_i, std::string username, int flag)
 {
 	if (!User[Mod_i].Moderator)
