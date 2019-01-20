@@ -384,7 +384,7 @@ void SKO_Network::send(GE_Socket *socket, First const &first, Rest const &... re
 	}
 }
 
-void SKO_Network::DisconnectClient(unsigned int userId)
+void SKO_Network::DisconnectClient(unsigned char userId)
 {
 	User[userId].Ident = false;
 	User[userId].Sock->Close();
@@ -418,7 +418,7 @@ void SKO_Network::DisconnectClient(unsigned int userId)
 		send(User[playerB].Sock, TRADE, CANCEL);
 
 		//set playerB to not trading at all
-		User[playerB].tradeStatus = -1;
+		User[playerB].tradeStatus = 0;
 		User[playerB].tradePlayer = 0;
 	}
 

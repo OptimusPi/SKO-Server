@@ -50,9 +50,10 @@ std::string SKO_PacketParser::toString()
 
 // Parsing functions
 char SKO_PacketParser::nextByte()
-{ 
+{
     return this->packet[position++];
 }
+
 short SKO_PacketParser::nextShort()
 {
     short value = 0;

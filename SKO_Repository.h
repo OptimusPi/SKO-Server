@@ -28,7 +28,7 @@ class SKO_Repository
 	int banPlayer(int Mod_i, std::string Username, std::string Reason, int flag);
 	int banIP(std::string moderatorName, std::string IP, std::string Reason);
 	std::string getIP(std::string username);
-	int saveServerStatus(unsigned int playersLinux, unsigned int playersWindows, unsigned int playersMac, unsigned int averagePing);
+	void saveServerStatus(unsigned int playersLinux, unsigned int playersWindows, unsigned int playersMac, unsigned int averagePing);
 
 	private:
 	OPI_MYSQL *database;

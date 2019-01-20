@@ -1596,8 +1596,6 @@ void DivideLoot(int enemy, int party)
 				if (totalLootGiven >= map[mapId].Enemy[enemy]->lootAmount)
 					return;
 
-				//printf("Total loot given so far is %i/%i so going to attempt a bonus item for %s.\n", totalLootGiven, map[mapId].Enemy[enemy]->lootAmount, User[p].Nick.c_str());
-
 				//give a possible bonus item
 				if (Roll(lootEarned - lootGiven))
 				{

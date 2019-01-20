@@ -146,7 +146,7 @@ public:
 
 	// Client socket functions
 	void RecvPacket(GE_Socket* socket);
-	void DisconnectClient(unsigned int userId);
+	void DisconnectClient(unsigned char userId);
 
 	// Helper functions
 	void despawnTarget(int target, unsigned char mapId);

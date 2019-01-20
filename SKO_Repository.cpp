@@ -499,7 +499,7 @@ int SKO_Repository::banPlayer(int Mod_i, std::string Username, std::string Reaso
 	return 0;
 }
 
-int SKO_Repository::saveServerStatus(unsigned int playersLinux, unsigned int playersWindows, unsigned int playersMac, unsigned int averagePing)
+void SKO_Repository::saveServerStatus(unsigned int playersLinux, unsigned int playersWindows, unsigned int playersMac, unsigned int averagePing)
 {
 	std::stringstream statusQuery;
 	statusQuery << "INSERT INTO status ";

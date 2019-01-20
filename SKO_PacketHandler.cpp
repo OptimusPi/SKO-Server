@@ -237,7 +237,6 @@ void SKO_PacketHandler::parseLogin(unsigned char userId, SKO_PacketParser *parse
     } //end login success
 }
 
-
 // [REGISTER][<username>][" "][<password>]
 void SKO_PacketHandler::parseRegister(unsigned char userId, SKO_PacketParser *parser)
 {
@@ -406,7 +405,7 @@ void SKO_PacketHandler::parseStatDef(unsigned char userId, SKO_PacketParser* par
 
 
 // [EQUIP][(unsigned char)equipSlot]
-void SKO_PacketHandler::parseUnequip(unsigned int userId, SKO_PacketParser *parser)
+void SKO_PacketHandler::parseUnequip(unsigned char userId, SKO_PacketParser *parser)
 {
     unsigned char slot = parser->nextByte();
     unsigned char item = User[userId].equip[slot];
@@ -677,7 +676,7 @@ void SKO_PacketHandler::parseUseItem(unsigned char userId, SKO_PacketParser *par
     }     //end if you have the item
 }
 
-// [DROP_ITEM][(unsigned char)item][]
+// [DROP_ITEM][(unsigned char)item][(unsigned int)amount]
 void SKO_PacketHandler::parseDropItem(unsigned char userId, SKO_PacketParser *parser)
 {
     unsigned char item = parser->nextByte();
@@ -761,7 +760,20 @@ void SKO_PacketHandler::parseDropItem(unsigned char userId, SKO_PacketParser *pa
     }
 }
 
-
+// Returns the next parameter from a slash command
+// Also shrinks the parameter list by one
+// Example:
+//    slash command: "/warp pifreak 2500 100 2"
+//    parameters: "pifreak 2500 100 2"
+//    nextParameter(): "pifreak"
+//    parameters: "2500 100 2"
+//    nextParameter(): "2500"
+//    parameters: "100 2"
+//    nextParameter(): "100"
+//    parameters: "2"
+//    nextParameter(): "2"
+//    parameters: ""
+//    nextParameter: ""
 std::string SKO_PacketHandler::nextParameter(std::string &parameters)
 {
     //grab first parameter from list
@@ -774,7 +786,7 @@ std::string SKO_PacketHandler::nextParameter(std::string &parameters)
     return next;
 }
 
-
+// [CHAT]["/ban"][" "]["<username>"][" "]["<reason>"]
 void SKO_PacketHandler::parseSlashBan(unsigned char userId, std::string parameters)
 {
     std::string username = nextParameter(parameters);
@@ -813,6 +825,7 @@ void SKO_PacketHandler::parseSlashBan(unsigned char userId, std::string paramete
     }
 }
 
+// [CHAT]["/ban"][" "]["<username>"][" "]["<reason>"]
 void SKO_PacketHandler::parseSlashUnban(unsigned char userId, std::string parameters)
 {
     //strip the appropriate data
@@ -839,6 +852,7 @@ void SKO_PacketHandler::parseSlashUnban(unsigned char userId, std::string parame
     }
 }
 
+// [CHAT]["/mute"][" "]["<username>"][" "]["<reason>"]
 void SKO_PacketHandler::parseSlashMute(unsigned char userId, std::string parameters)
 {
     //strip the appropriate data
@@ -877,7 +891,7 @@ void SKO_PacketHandler::parseSlashMute(unsigned char userId, std::string paramet
     }
 }
 
-
+// [CHAT]["/unmute"][" "]["<username>"]
 void SKO_PacketHandler::parseSlashUnmute(unsigned char userId, std::string parameters)
 {
     //strip the appropriate data
@@ -914,6 +928,7 @@ void SKO_PacketHandler::parseSlashUnmute(unsigned char userId, std::string param
     }
 }
 
+// [CHAT]["/ban"][" "]["<username>"][" "]["<reason>"]
 void SKO_PacketHandler::parseSlashKick(unsigned char userId, std::string parameters)
 {
     std::string username = nextParameter(parameters);
@@ -950,6 +965,7 @@ void SKO_PacketHandler::parseSlashKick(unsigned char userId, std::string paramet
     }
 }
 
+// [CHAT]["/who"]
 void SKO_PacketHandler::parseSlashWho(unsigned char userId)
 {
     //find how many players are online
@@ -988,6 +1004,7 @@ void SKO_PacketHandler::parseSlashWho(unsigned char userId)
         network->sendChat(userId, strNicks);
 }
 
+// [CHAT]["/ipban"][" "]["<player>"][" "][<reason>]
 void SKO_PacketHandler::parseSlashIpban(unsigned char userId, std::string parameters)
 {
     std::string IP = nextParameter(parameters);
@@ -1012,6 +1029,7 @@ void SKO_PacketHandler::parseSlashIpban(unsigned char userId, std::string parame
     }
 }
 
+// [CHAT]["/getip"][" "]["<player>"]
 void SKO_PacketHandler::parseSlashGetip(unsigned char userId, std::string parameters)
 {
     std::string username = nextParameter(parameters);
@@ -1028,12 +1046,12 @@ void SKO_PacketHandler::parseSlashGetip(unsigned char userId, std::string parame
     }
 }
 
+// [CHAT]["/warp"][" "]["<player>"][" "][(string)x][" "][(string)y][" "][(string)mapId]
 void SKO_PacketHandler::parseSlashWarp(unsigned char userId, std::string parameters)
 {
     //TODO create SKO_Network function to wrap repository call.
     if (User[userId].Moderator)
     {
-
         std::string warp_user = nextParameter(parameters);
         int warp_x = atoi(nextParameter(parameters).c_str());
         int warp_y = atoi(nextParameter(parameters).c_str());
@@ -1062,6 +1080,7 @@ void SKO_PacketHandler::parseSlashWarp(unsigned char userId, std::string paramet
     }
 }
 
+// [CHAT]["/ping"]
 void SKO_PacketHandler::parseSlashPing(unsigned char userId, std::string parameters)
 {
     //if they are moderator
@@ -1099,9 +1118,10 @@ void SKO_PacketHandler::parseSlashPing(unsigned char userId, std::string paramet
     }
 }
 
+// [CHAT]["/"]["<command>"][" "]["<parameters>"]
 void SKO_PacketHandler::parseSlashCommand(unsigned char userId, std::string message)
 {
-    std::string command = message.substr(0, message.find_first_of(" ") - 2);
+    std::string command = message.substr(0, message.find_first_of(" "));
     std::string parameters = message.substr(message.find_first_of(" ") + 1);
 
     if (command.compare("/ban") == 0)
@@ -1128,6 +1148,7 @@ void SKO_PacketHandler::parseSlashCommand(unsigned char userId, std::string mess
         network->sendChat(userId, "Sorry, that is not a command.");
 }
 
+// [CHAT]["<message body, either a plain string or slash command>"]
 void SKO_PacketHandler::parseChat(unsigned char userId, std::string message)
 {
     // Do nothing but log message if the user is either mute or not logged in
@@ -1210,12 +1231,697 @@ void SKO_PacketHandler::parseChat(unsigned char userId, std::string message)
     }
 }
 
+// [TRADE][INVITE][(unsigned char)playerB]
+void SKO_PacketHandler::parseTradeInvite(unsigned char userId, SKO_PacketParser *parser)
+{
+    unsigned char playerB = parser->nextByte();
+
+    if (playerB >= MAX_CLIENTS || playerB == userId || !User[playerB].Ident)
+        return;
+    
+        
+    // make sure both players aren't busy!!
+    if (User[userId].tradeStatus != 0 && User[playerB].tradeStatus != 0)
+    {
+        printf("[ERR] A trade status=%i B trade status=%i\n", User[userId].tradeStatus, User[playerB].tradeStatus);
+        return;
+    }
+
+    printf("%s trade with %s.\n", User[userId].Nick.c_str(), User[playerB].Nick.c_str());
+
+    //Send 'trade with A' to player B
+    network->sendTradeInvite(playerB, userId);
+
+    //hold status of what the players are trying to do
+    // (tentative...)
+    User[userId].tradeStatus = INVITE;
+    User[userId].tradePlayer = playerB;
+    User[playerB].tradeStatus = INVITE;
+    User[playerB].tradePlayer = userId;
+}
+
+// [TRADE][ACCEPT][(unsigned char)playerB]
+void SKO_PacketHandler::parseTradeAccept(unsigned char userId, SKO_PacketParser *parser)
+{
+    unsigned char playerB = User[userId].tradePlayer;
+
+    if (playerB >= 0 && User[userId].tradeStatus == INVITE && User[playerB].tradeStatus == INVITE)
+    {
+        User[userId].tradeStatus = ACCEPT;
+        User[playerB].tradeStatus = ACCEPT;
+    }
+
+    //Accept trade on both ends
+    network->sendTradeAccept(playerB, userId);
+    network->sendTradeAccept(userId, playerB);
+}
+
+// [TRADE][CANCEL]
+void SKO_PacketHandler::parseTradeCancel(unsigned char userId, SKO_PacketParser *parser)
+{
+    unsigned char playerB = User[userId].tradePlayer;
+
+    if (playerB < 0)
+        return;
+
+    //set them to blank state
+    User[userId].tradeStatus = 0;
+    User[playerB].tradeStatus = 0;
+
+    //set them to be trading with nobody
+    User[userId].tradePlayer = -1;
+    User[playerB].tradePlayer = -1;
+
+    //tell both players cancel trade
+    network->sendTradeCancel(playerB);
+    network->sendTradeCancel(userId);
+
+    //clear trade windows...
+    for (int i = 0; i < 256; i++)
+    {
+        User[userId].localTrade[i] = 0;
+        User[playerB].localTrade[i] = 0;
+    }
+}
+
+// [TRADE][OFFER]
+void SKO_PacketHandler::parseTradeOffer(unsigned char userId, SKO_PacketParser *parser)
+{
+    unsigned char playerA = 0;
+    unsigned char playerB = 0;
+    playerB = User[userId].tradePlayer;
+    //only do something if both parties are in accept trade mode
+    if (User[userId].tradeStatus == ACCEPT && User[User[userId].tradePlayer].tradeStatus == ACCEPT)
+    {
+        unsigned char item = parser->nextByte();
+        unsigned int amount = parser->nextInt();
+
+        printf("offer!\n ITEM: [%i]\nAMOUNT [%i/%i]\n...", item, amount, User[userId].inventory[item]);
+        //check if you have that item
+        if (User[userId].inventory[item] >= amount)
+        {
+            User[userId].localTrade[item] = amount;
+
+            //send to both players!
+            network->sendTradeOffer(userId, (char)1, item, amount);
+
+            //send to playerB
+            network->sendTradeOffer(playerB, (char)2, item, amount);
+        }
+    }
+}
+
+// [TRADE][CONFIRM]
+void SKO_PacketHandler::parseTradeConfirm(unsigned char userId, SKO_PacketParser *parser)
+{
+    unsigned char playerA = userId;
+    unsigned char playerB = User[userId].tradePlayer;
+
+    if (playerB < 0)
+    {
+        network->sendTradeCancel(userId);
+        User[userId].tradeStatus = 0;
+        User[userId].tradePlayer = 0;
+        return;
+    }
+
+    //make sure playerA is in accept mode before confirming
+    if (User[playerA].tradeStatus == ACCEPT)
+        User[playerA].tradeStatus = CONFIRM;
+
+    //tell both players :)
+    network->sendTradeReady(playerA, (char)1);
+    network->sendTradeReady(playerB, (char)2);
+
+    //if both players are now confirm, transact and reset!
+    if (User[playerA].tradeStatus != CONFIRM || User[playerB].tradeStatus != CONFIRM)
+        return;
+    
+    //lets make sure players have that many items
+    bool error = false;
+    for (int i = 0; i < 256; i++)
+    {
+        //compare the offer to the owned items
+        if (User[playerA].inventory[i] < User[playerA].localTrade[i])
+        {
+            printf("Trade error: User: %s, item: %i", User[playerA].Nick.c_str(), i);
+            error = true;
+            break;
+        }
+        //compare the offer to the owned items
+        if (User[playerB].inventory[i] < User[playerB].localTrade[i])
+        {
+            printf("Trade error: User: %s, item: %i", User[playerB].Nick.c_str(), i);
+            error = true;
+            break;
+        }
+    }
+
+    //tell them the trade is over!!!
+    User[playerA].tradeStatus = 0;
+    User[playerB].tradeStatus = 0;
+
+    //set them to be trading with nobody
+    User[playerA].tradePlayer = -1;
+    User[playerB].tradePlayer = -1;
+
+    //tell both players cancel trade
+    network->sendTradeCancel(playerA);
+    network->sendTradeCancel(playerB);
+
+    //make the transaction!
+    if (error)
+    {
+        printf("Error in trade.");
+        return;
+    }
+    
+    printf("trade transaction!\n");
+
+    //go through each item and add them
+    for (int i = 0; i < 256; i++)
+    {
+        unsigned char itemId = (unsigned char)i;
+
+        //easy to follow with these variables broski :P
+        int aOffer = User[playerA].localTrade[itemId];
+        int bOffer = User[playerB].localTrade[itemId];
+        
+        //give A's stuff  to B
+        if (aOffer > 0)
+        {
+            printf(kGreen "%s gives %itemId of item %itemId to %s\n" kNormal, User[playerA].Nick.c_str(), aOffer, itemId, User[playerB].Nick.c_str());
+            //trade the item and tell the player!
+            User[playerB].inventory[itemId] += aOffer;
+            User[playerA].inventory[itemId] -= aOffer;
+
+            //put in players inventory
+            unsigned int amount = User[playerB].inventory[itemId];
+            network->SendPocketItem(playerB, itemId, amount);
+
+            //take it out of A's inventory
+            amount = User[playerA].inventory[itemId];
+            network->SendPocketItem(playerA, itemId, amount);
+        }
+
+        //give B's stuff  to A
+        if (bOffer > 0)
+        {
+            printf(kGreen "%s gives %itemId of item %itemId to %s\n" kNormal, User[playerB].Nick.c_str(), aOffer, itemId, User[playerA].Nick.c_str());
+            //trade the item and tell the player!
+            User[playerA].inventory[itemId] += bOffer;
+            User[playerB].inventory[itemId] -= bOffer;
+
+            //put in players inventory
+            unsigned int amount = User[playerA].inventory[itemId];
+            network->SendPocketItem(playerA, itemId, amount);
+
+            //take it away from B
+            amount = User[playerB].inventory[itemId];
+            network->SendPocketItem(playerB, itemId, amount);
+        }
+
+        //clear the items
+        User[playerA].localTrade[itemId] = 0;
+        User[playerB].localTrade[itemId] = 0;
+    }
+
+    //Save all profiles after a trade
+    network->saveAllProfiles();
+}
+
+// [TRADE][(unsigned char)tradeAction][...]
+void SKO_PacketHandler::parseTrade(unsigned char userId, SKO_PacketParser *parser)
+{
+    unsigned char tradeAction = parser->nextByte();
+    switch (tradeAction)
+    {
+    case INVITE:
+        parseTradeInvite(userId, parser);
+        break; //end INVITE
+
+    case ACCEPT:
+        parseTradeAccept(userId, parser);
+        break;
+
+    case CANCEL:
+        parseTradeCancel(userId, parser);
+
+    case OFFER:
+        parseTradeOffer(userId, parser);
+        break;
+
+    case CONFIRM:
+        parseTradeConfirm(userId, parser);
+        break;
+
+    default:
+        break;
+    } //end trade action switch
+}
+
+
+// [PARTY][INVITE][(unsigned char)playerId]
+void SKO_PacketHandler::parsePartyInvite(unsigned char userId, SKO_PacketParser *parser)
+{
+    unsigned char playerB = parser->nextByte();
+
+    //invite the other user
+    //if the other user is not in your party
+    if (User[playerB].partyStatus != 0)
+        return;
+        
+    int partyID = User[userId].party;
+
+    //set their party
+    if (User[userId].party == -1)
+    {
+        for (partyID = 0; partyID <= MAX_CLIENTS; partyID++)
+        {
+            //look for an open partyID
+            bool taken = false;
+            for (int i = 0; i < MAX_CLIENTS; i++)
+            {
+                if (User[i].Ident && User[i].party == partyID)
+                {
+                    taken = true;
+                    break;
+                }
+            }
+            if (!taken)
+                break;
+        } //find oepn party id
+    }     //end if party is null
+
+    //make the parties equal
+    User[userId].party = partyID;
+    User[playerB].party = partyID;
+
+    //set the party status of the invited person
+    User[playerB].partyStatus = INVITE;
+    User[userId].partyStatus = ACCEPT;
+
+    //ask the user to party
+    network->sendTradeInvite(playerB, userId);   
+}
+
+// [PARTY][ACCEPT]
+void SKO_PacketHandler::parsePartyAccept(unsigned char userId)
+{
+    //only if I was invited :)
+    if (User[userId].partyStatus != INVITE)
+        return;
+
+    //tell the user about all the players in the party
+    for (int pl = 0; pl < MAX_CLIENTS; pl++)
+    {
+        if (!User[pl].Ident || pl == userId || User[pl].partyStatus != PARTY || User[pl].party != User[userId].party)
+            continue;
+        //
+        // Notify all members in the party that player is joining
+        //
+        network->sendPartyAccept(pl, userId, User[userId].party);
+        //tell existing party members the new player's stats
+        unsigned char hp = (int)((User[userId].hp / (float)User[userId].max_hp) * 80);
+        unsigned char xp = (int)((User[userId].xp / (float)User[userId].max_xp) * 80);
+        unsigned char level = User[userId].level;
+
+        network->SendBuddyStatHp(pl, userId, hp);
+        network->SendBuddyStatXp(pl, userId, xp);
+        network->SendBuddyStatLevel(pl, userId, level);
+
+        //
+        // Notify player of each existing party member
+        //
+        network->sendPartyAccept(userId, pl, User[pl].party);
+        // Send player the current party member stats
+        hp = (int)((User[pl].hp / (float)User[pl].max_hp) * 80);
+        xp = (int)((User[pl].xp / (float)User[pl].max_xp) * 80);
+        level = User[pl].level;
+
+        // Update party stats for client party player list
+        network->SendBuddyStatHp(userId, pl, hp);
+        network->SendBuddyStatXp(userId, pl, xp);
+        network->SendBuddyStatLevel(userId, pl, level);
+    }
+        
+}
+
+// [PARTY][(unsigned char)partyAction]
+void SKO_PacketHandler::parseParty(unsigned char userId, SKO_PacketParser *parser)
+{
+    int partyAction = parser->nextByte();
+    switch (partyAction)
+    {
+
+    case INVITE:
+        parsePartyInvite(userId, parser);
+        break;
+
+    case ACCEPT:
+        parsePartyAccept(userId);
+        break;
+
+    case CANCEL:
+        //quit them out of this party
+        quitParty(userId);
+        break;
+
+    default:
+        break;
+    } //end switch mode
+}
+
+// [MAKE_CLAN]["<clanTag>"]
+void SKO_PacketHandler::parseClanCreate(unsigned char userId, SKO_PacketParser *parser)
+{
+    //check if the player has enough money.
+    if (User[userId].inventory[ITEM_GOLD] < 100000) // 100000 TODO make a const for this
+    {
+        network->sendChat(userId, "You cannot afford to establish a clan. It costs 100K gold pieces.");
+        return;
+    } //end you did not have enough $$
+
+    std::string clanTag = parser->getPacketBody();
+    int result = repository->createClan(User[userId].Nick, clanTag);
+    if (result == 0)
+    {
+        //send to all players so everyone knows a new clan was formed!
+        for (int cu1 = 0; cu1 < MAX_CLIENTS; cu1++)
+        {
+            if (User[cu1].Ident)
+                network->sendChat(cu1, "Clan (" + clanTag + ") has been established by owner " + User[userId].Nick + ".");
+        } //end loop all clients
+
+        User[userId].inventory[ITEM_GOLD] -= 100000;
+
+        // TODO - when below fix is complete, notify player their gold has decreased by 100K
+        //TODO do not rely on client reconnect when forming or joining a clan
+        User[userId].Sock->Close();
+        User[userId].Sock->Connected = false;
+    }
+    else if (result == 1)
+    {
+        //Clan already exists
+        network->sendChat(userId, "You cannot establish [" + clanTag + "] because it already exists.");
+    }
+}
+
+void SKO_PacketHandler::parseClanAccept(unsigned char userId, SKO_PacketParser *parser)
+{
+
+}
+
+void SKO_PacketHandler::parseClanInvite(unsigned char userId, SKO_PacketParser *parser)
+{
+    unsigned char playerB = parser->nextByte(); 
+    std::string clanId = repository->getOwnerClanId(User[userId].Nick);
+
+    if (User[userId].Clan[0] == '(')
+    {
+        network->sendChat(userId, "You are not in a clan.");
+        return;
+    }
+
+    if (User[playerB].Clan[0] != '(')
+    {
+        network->sendChat(userId, "Sorry, " + User[playerB].Nick + " Is already in a clan.");
+        return;
+    }
+
+    if (!clanId.length())
+    {
+        network->sendChat(userId, "Sorry, only the clan owner can invite new members.");
+        return;
+    }
+
+    //set the clan status of the invited person
+    User[playerB].clanStatus = INVITE;
+    User[playerB].tempClanId = clanId;
+
+    //ask the user to clan
+    network->sendClanInvite(playerB, userId);
+}
+
+// [CLAN][(unsigned char)clanAction][...]
+void SKO_PacketHandler::parseClan(unsigned char userId, SKO_PacketParser *parser)
+{
+    unsigned char clanAction = parser->nextByte();
+
+    switch (clanAction)
+    {
+
+    case INVITE:
+        parseClanInvite(userId, parser);
+        break;
+
+    case ACCEPT:
+        if (User[userId].clanStatus == INVITE)
+        {
+            repository->setClanId(User[userId].Nick, User[userId].tempClanId);
+
+            // TODO - make new packet type to update clan instead of booting player
+            // This relies on client to automatically reconnect
+            User[userId].Sock->Close();
+            User[userId].Sock->Connected = false;
+        }
+
+        break;
+
+    case CANCEL:
+        //quit them out of this clan
+        User[userId].clanStatus = -1;
+        break;
+
+    default:
+        break;
+    }
+}
+
+// [INVENTORY]["<base64 encoded inventory order>"]
+void SKO_PacketHandler::parseInventory(unsigned char userId, SKO_PacketParser *parser)
+{
+    std::string inventory_order = parser->getPacketBody();
+    User[userId].inventory_order = inventory_order;
+}
+
+// [SHOP][INVITE][(unsigned char)itemId)][(unsigned int)amount]
+void SKO_PacketHandler::parseShopInvite(unsigned char userId, SKO_PacketParser *parser)
+{
+    unsigned char mapId = User[userId].mapId;
+    unsigned char stallId = parser->nextByte();
+
+    if (stallId >= map[mapId].num_stalls)
+        return;
+
+    //open bank
+    if (map[mapId].Stall[stallId].shopid == 0)
+    {
+        if (User[userId].tradeStatus < 1)
+        {
+            //set trade status to banking
+            User[userId].tradeStatus = BANK;
+            network->sendBankOpen(userId);
+        }
+    }
+
+    //open shop
+    if (map[mapId].Stall[stallId].shopid > 0)
+    {
+        //tell the user "shop[shopId] opened up"
+        unsigned char shopId = map[mapId].Stall[stallId].shopid;
+        network->sendShopOpen(userId, shopId);
+
+        //set trade status to shopping
+        User[userId].tradeStatus = SHOP;
+        User[userId].tradePlayer = map[mapId].Stall[stallId].shopid;
+    }
+}
+
+// [SHOP][BUY][(unsigned char)itemId)][(unsigned int)amount]
+void SKO_PacketHandler::parseShopBuy(unsigned char userId, SKO_PacketParser *parser)
+{
+    unsigned char mapId = User[userId].mapId;
+    unsigned char shopItem = parser->nextByte();
+    unsigned int amount = parser->nextInt();
+    int i = 0, item = 0, price = 0;
+
+    //Shops are a 6x4 grid
+    for (int y = 0; y < 4; y++)
+        for (int x = 0; x < 6; x++)
+        {
+            if (i == shopItem)
+            {
+                item = map[mapId].Shop[User[userId].tradePlayer].item[x][y][0];
+                price = map[mapId].Shop[User[userId].tradePlayer].item[x][y][1];
+            }
+            i++;
+        }
+
+    //if the player can afford it
+    if (item <= 0 || User[userId].inventory[ITEM_GOLD] < price * amount)
+    {
+        network->sendChat(userId, "Sorry, but you cannot afford this item.");
+        return;
+    }
+
+    //take away gold
+    User[userId].inventory[ITEM_GOLD] -= price * amount;
+
+    //give them the item
+    User[userId].inventory[item] += amount;
+
+    //put in client players inventory
+    amount = User[userId].inventory[item];
+    network->SendPocketItem(userId, item, amount);
+
+    //Take gold out of player's inventory
+    amount = User[userId].inventory[ITEM_GOLD];
+    network->SendPocketItem(userId, (unsigned char)ITEM_GOLD, amount);
+}
+
+// [SHOP][SELL][(unsigned char)itemId)][(unsigned int)amount]
+void SKO_PacketHandler::parseShopSell(unsigned char userId, SKO_PacketParser *parser)
+{
+    unsigned char mapId = User[userId].mapId;
+    unsigned char item = parser->nextByte();
+    unsigned int price = Item[item].price;
+    unsigned int amount = parser->nextInt();
+
+    //if they even have the item to sell
+    if (price <= 0 || User[userId].inventory[item] < amount)
+    {
+        network->sendChat(userId, "Sorry, but you cannot sell this item.");
+        return;
+    }
+
+    //take away gold
+    User[userId].inventory[item] -= amount;
+
+    //give them the item
+    User[userId].inventory[ITEM_GOLD] += price * amount;
+
+    //take out of client player's inventory
+    amount = User[userId].inventory[item];
+    network->SendPocketItem(userId, item, amount);
+
+    //put gold into player's inventory
+    amount = User[userId].inventory[ITEM_GOLD];
+    network->SendPocketItem(userId, (char)ITEM_GOLD, amount);
+}
+
+// [SHOP][(unsigned char)shopAction)][...]
+void SKO_PacketHandler::parseShop(unsigned char userId, SKO_PacketParser *parser)
+{
+    int shopAction = parser->nextByte();
+
+    switch (shopAction)
+    {
+    case INVITE:
+        parseShopInvite(userId, parser);
+        break;
+
+    case BUY:
+        parseShopBuy(userId, parser);
+        break;
+
+    case SELL:
+        parseShopSell(userId, parser);
+        break;      
+      
+    case CANCEL:
+        User[userId].tradeStatus = 0;
+        User[userId].tradePlayer = 0;
+        break;
+
+    default:
+        break;
+    }
+}
+
+// [BANK][BANK_ITEM][(unsigned char)itemId)][(unsigned int)amount]
+void SKO_PacketHandler::parseBankDeposit(unsigned char userId, SKO_PacketParser *parser)
+{
+    //get item type and amount
+    unsigned char item = parser->nextByte();
+    unsigned int amount = parser->nextInt();
+
+    if (item >= NUM_ITEMS || User[userId].inventory[item] < amount)
+    {
+        network->sendChat(userId, "Sorry, but you may cannot deposit this item.");
+        return;
+    }
+
+    User[userId].inventory[item] -= amount;
+    User[userId].bank[item] += amount;
+
+    //send deposit notification to user
+    unsigned int deposit = User[userId].bank[item];
+    network->SendBankItem(userId, item, deposit);
+
+    //update client player's inventory
+    unsigned int withdrawal = User[userId].inventory[item];
+    network->SendPocketItem(userId, item, withdrawal);
+}
+
+// [BANK][DEBANK_ITEM][(unsigned char)itemId)][(unsigned int)amount]
+void SKO_PacketHandler::parseBankWithdrawal(unsigned char userId, SKO_PacketParser *parser)
+{
+    unsigned char item = parser->nextByte();
+    unsigned int amount = parser->nextInt();
+
+    if (item >= NUM_ITEMS || User[userId].bank[item] < amount)
+    {
+        network->sendChat(userId, "Sorry, but you cannot withdrawal this item.");
+        return;
+    }
+    
+    User[userId].bank[item] -= amount;
+    User[userId].inventory[item] += amount;
+
+    //send deposit notification to user
+    unsigned int deposit = User[userId].bank[item];
+    network->SendBankItem(userId, item, amount);
+
+    //update client player's inventory
+    unsigned int withdrawal = User[userId].inventory[item];
+    network->SendPocketItem(userId, item, withdrawal);
+}
+
+// [BANK][(unsigned char)bankAction]
+void SKO_PacketHandler::parseBank(unsigned char userId, SKO_PacketParser *parser)
+{
+    // Only proceed if player is using the bank
+    if (User[userId].tradeStatus != BANK)
+        return;
+
+    unsigned char bankAction = parser->nextByte();
+    switch (bankAction)
+    {
+    case CANCEL:
+        User[userId].tradeStatus = 0;
+        break;
+
+    case BANK_ITEM:
+        parseBankDeposit(userId, parser);
+        break;
+
+    case DEBANK_ITEM:
+        break;
+
+    default:
+        break;
+    }
+}
+
+
+// [(unsigned char)packetLength][(unsigned char)packetType][...]
 void SKO_PacketHandler::parsePacket(unsigned char userId, std::string packet)
 {
     // Construct a packet parser from this packet
     SKO_PacketParser *parser = new SKO_PacketParser(packet);
     
-    //Check packet sanity
+    // Ensure packet has length and types
     if (packet.length() < 2)
     {
         printf(kRed "[FATAL] SKO_PacketHandler::parsePacket() called with incomplete packet!\n" kNormal);
@@ -1223,19 +1929,22 @@ void SKO_PacketHandler::parsePacket(unsigned char userId, std::string packet)
         return;
     }
 
-    //Check packet sanity
+    // Ensure packet is complete
     if (packet.length() < parser->getPacketLength())
     {
         printf(kRed "[FATAL] SKO_PacketHandler::parsePacket() called with incomplete packet!\n" kNormal);
         printf(kRed "[       SKO_PacketHandler::parsePacket(%i, %s)] \n" kNormal, userId, parser->toString().c_str());
         return;
     }
+
+    // Ensure this was not calle dwith multiple packets
     if (packet.length() > parser->getPacketLength())
     {
         printf(kRed "[FATAL] SKO_PacketHandler::parsePacket() called with too many packets!\n" kNormal);
         printf(kRed "[       SKO_PacketHandler::parsePacket(%i, %s)] \n" kNormal, userId, parser->toString().c_str());
         return;
     }
+
     switch (parser->getPacketType())
     {
     case PING:
@@ -1286,6 +1995,34 @@ void SKO_PacketHandler::parsePacket(unsigned char userId, std::string packet)
         parseChat(userId, parser->getPacketBody());
         break;
 
+    case TRADE:
+        parseTrade(userId, parser);
+        break;
+
+    case SHOP:
+        parseShop(userId, parser);
+        break;
+
+    case BANK:
+        parseBank(userId, parser);
+        break;
+
+    case INVENTORY:
+        parseInventory(userId, parser);
+        break;
+
+    case PARTY:
+        parseParty(userId, parser);
+        break;
+
+    case CLAN:
+        parseClan(userId, parser);
+        break;
+
+    case MAKE_CLAN:
+        parseClanCreate(userId, parser);
+        break;
+ 
     default:
         // Disconnect clients sending nonsense packets
         //TODO//User[userId].Sock->Close();
@@ -1294,646 +2031,6 @@ void SKO_PacketHandler::parsePacket(unsigned char userId, std::string packet)
         break;
     }
 
-//TODO - keep it up nate :) 
-    else if (code == TRADE)
-    {
-        //what kind of trade action, yo?
-        char action = User[userId].Sock->Data[2];
-        char playerA = 0;
-        char playerB = 0;
-
-        switch (action)
-        {
-
-        //TODO: don't let a player confirm without checking trade statuses
-        case INVITE:
-
-            playerB = User[userId].Sock->Data[3];
-            printf("userId=%i playerB=%i\n", userId, playerB);
-            //FFFF, don't troll me. Is playerB even real? >___>
-            if (playerB < MAX_CLIENTS && playerB != userId && User[playerB].Ident)
-            {
-                printf("someone wants to trade...legit?\n");
-                // make sure both players aren't busy!!
-                if (User[userId].tradeStatus == 0 && User[playerB].tradeStatus == 0)
-                {
-                    printf("%s trade with %s.\n", User[userId].Nick.c_str(), User[playerB].Nick.c_str());
-
-                    //Send 'trade with A' to player B
-                    network->sendTradeInvite(playerB, userId);
-
-                    //hold status of what the players are trying to do
-                    // (tentative...)
-                    User[userId].tradeStatus = INVITE;
-                    User[userId].tradePlayer = playerB;
-                    User[playerB].tradeStatus = INVITE;
-                    User[playerB].tradePlayer = userId;
-                } // end not busy, lets request, bro!
-                else
-                {
-                    printf("[ERR] A trade status=%i B trade status=%i\n", User[userId].tradeStatus, User[playerB].tradeStatus);
-                }
-            } //end invite trade
-
-            break; //end INVITE
-
-        case ACCEPT:
-            //hold status of what the players are trying to do
-            // (trading)
-            playerB = User[userId].tradePlayer;
-
-            if (playerB >= 0 && User[userId].tradeStatus == INVITE && User[playerB].tradeStatus == INVITE)
-            {
-                User[userId].tradeStatus = ACCEPT;
-                User[playerB].tradeStatus = ACCEPT;
-            }
-
-            //tell both parties that they are now trading
-
-            //Send 'trade with A' to player B
-            network->sendTradeAccept(playerB, userId);
-
-            //Send 'trade with B' to player A
-            network->sendTradeAccept(userId, playerB);
-
-            break;
-
-        case CANCEL:
-
-            //okay, kill the trade for this player and the sellected player
-            playerB = User[userId].tradePlayer;
-
-            if (playerB < 0)
-                return;
-
-            //set them to blank state
-            User[userId].tradeStatus = 0;
-            User[playerB].tradeStatus = 0;
-
-            //set them to be trading with nobody
-            User[userId].tradePlayer = -1;
-            User[playerB].tradePlayer = -1;
-
-            //tell both players cancel trade
-            network->sendTradeCancel(playerB);
-            network->sendTradeCancel(userId);
-
-            //clear trade windows...
-            for (int i = 0; i < 256; i++)
-            {
-                User[userId].localTrade[i] = 0;
-                User[playerB].localTrade[i] = 0;
-            }
-
-            break;
-
-        case OFFER:
-
-            playerB = User[userId].tradePlayer;
-            //only do something if both parties are in accept trade mode
-            if (User[userId].tradeStatus == ACCEPT && User[User[userId].tradePlayer].tradeStatus == ACCEPT)
-            {
-                unsigned char item = User[userId].Sock->Data[3];
-
-                int amount = 0;
-                ((char *)&amount)[0] = User[userId].Sock->Data[4];
-                ((char *)&amount)[1] = User[userId].Sock->Data[5];
-                ((char *)&amount)[2] = User[userId].Sock->Data[6];
-                ((char *)&amount)[3] = User[userId].Sock->Data[7];
-
-                printf("offer!\n ITEM: [%i]\nAMOUNT [%i/%i]\n...", item, amount, User[userId].inventory[item]);
-                //check if you have that item
-                if (User[userId].inventory[item] >= amount)
-                {
-                    User[userId].localTrade[item] = amount;
-
-                    //send to both players!
-                    network->sendTradeOffer(userId, (char)1, item, amount);
-
-                    //send to playerB
-                    network->sendTradeOffer(playerB, (char)2, item, amount);
-                }
-            }
-
-            break;
-
-        case CONFIRM:
-            //easy to understand if we use A & B
-            playerA = userId;
-            playerB = User[userId].tradePlayer;
-
-            if (playerB < 0)
-            {
-                //tell both players cancel trade
-                network->sendTradeCancel(userId);
-                User[userId].tradeStatus = -1;
-                User[userId].tradePlayer = 0;
-                break;
-            }
-
-            //make sure playerA is in accept mode before confirming
-            if (User[playerA].tradeStatus == ACCEPT)
-                User[playerA].tradeStatus = CONFIRM;
-
-            //tell both players :)
-            network->sendTradeReady(playerA, (char)1);
-            network->sendTradeReady(playerB, (char)2);
-
-            //if both players are now confirm, transact and reset!
-            if (User[playerA].tradeStatus == CONFIRM && User[playerB].tradeStatus == CONFIRM)
-            {
-                //lets make sure players have that many items
-                bool error = false;
-                for (int i = 0; i < 256; i++)
-                {
-                    //compare the offer to the owned items
-                    if (User[playerA].inventory[i] < User[playerA].localTrade[i])
-                    {
-                        error = true;
-                        break;
-                    }
-                    //compare the offer to the owned items
-                    if (User[playerB].inventory[i] < User[playerB].localTrade[i])
-                    {
-                        error = true;
-                        break;
-                    }
-                }
-
-                //tell them the trade is over!!!
-                User[playerA].tradeStatus = 0;
-                User[playerB].tradeStatus = 0;
-
-                //set them to be trading with nobody
-                User[playerA].tradePlayer = -1;
-                User[playerB].tradePlayer = -1;
-
-                //tell both players cancel trade
-                network->sendTradeCancel(playerA);
-                network->sendTradeCancel(playerB);
-
-                //make the transaction!
-                if (!error)
-                {
-                    printf("trade transaction!\n");
-
-                    //go through each item and add them
-                    for (unsigned char i = 0; i < 256; i++)
-                    {
-                        //easy to follow with these variables broski :P
-                        int aOffer = User[playerA].localTrade[i];
-                        int bOffer = User[playerB].localTrade[i];
-
-                        //give A's stuff  to B
-                        if (aOffer > 0)
-                        {
-                            printf(kGreen "%s gives %i of item %i to %s\n" kNormal, User[playerA].Nick.c_str(), aOffer, i, User[playerB].Nick.c_str());
-                            //trade the item and tell the player!
-                            User[playerB].inventory[i] += aOffer;
-                            User[playerA].inventory[i] -= aOffer;
-
-                            //put in players inventory
-                            unsigned int amount = User[playerB].inventory[i];
-                            network->SendPocketItem(playerB, i, amount);
-
-                            //take it out of A's inventory
-                            amount = User[playerA].inventory[i];
-                            network->SendPocketItem(playerA, i, amount);
-                        }
-
-                        //give B's stuff  to A
-                        if (bOffer > 0)
-                        {
-                            printf(kGreen "%s gives %i of item %i to %s\n" kNormal, User[playerB].Nick.c_str(), aOffer, i, User[playerA].Nick.c_str());
-                            //trade the item and tell the player!
-                            User[playerA].inventory[i] += bOffer;
-                            User[playerB].inventory[i] -= bOffer;
-
-                            //put in players inventory
-                            unsigned int amount = User[playerA].inventory[i];
-                            network->SendPocketItem(playerA, i, amount);
-
-                            //take it away from B
-                            amount = User[playerB].inventory[i];
-                            network->SendPocketItem(playerB, i, amount);
-                        }
-
-                        //clear the items
-                        User[playerA].localTrade[i] = 0;
-                        User[playerB].localTrade[i] = 0;
-                    }
-
-                    //Save all profiles after a trade
-                    network->saveAllProfiles();
-                }
-            }
-            break;
-        } //end trade action switch
-
-    } //invite to trade
-    else if (code == PARTY)
-    {
-        int mode = User[userId].Sock->Data[2];
-        unsigned char playerB = 0;
-        int partyID = -1;
-
-        switch (mode)
-        {
-
-        case INVITE:
-
-            playerB = User[userId].Sock->Data[3];
-
-            //invite the other user
-            //if the other user is not in your party
-            if (User[playerB].partyStatus == 0)
-            {
-                partyID = User[userId].party;
-
-                //set their party
-                if (User[userId].party == -1)
-                {
-                    for (partyID = 0; partyID <= MAX_CLIENTS; partyID++)
-                    {
-                        //look for an open partyID
-                        bool taken = false;
-                        for (int i = 0; i < MAX_CLIENTS; i++)
-                        {
-                            if (User[i].Ident && User[i].party == partyID)
-                            {
-                                taken = true;
-                                break;
-                            }
-                        }
-                        if (!taken)
-                            break;
-                    } //find oepn party id
-                }     //end if party is null
-
-                //make the parties equal
-                User[userId].party = partyID;
-                User[playerB].party = partyID;
-
-                //set the party status of the invited person
-                User[playerB].partyStatus = INVITE;
-                User[userId].partyStatus = ACCEPT;
-
-                //ask the user to party
-                network->sendTradeInvite(playerB, userId);
-            }
-            break;
-
-        case ACCEPT:
-            //only if I was invited :)
-            if (User[userId].partyStatus == INVITE)
-            {
-                //tell everyone in the party that player has joined
-                for (int pl = 0; pl < MAX_CLIENTS; pl++)
-                    //tell the user about all the players in the party
-                    if (User[pl].Ident && pl != userId && User[pl].partyStatus == PARTY && User[pl].party == User[userId].party)
-                    {
-                        //
-                        // Notify all members in the party that player is joining
-                        //
-                        network->sendPartyAccept(pl, userId, User[userId].party);
-                        //tell existing party members the new player's stats
-                        unsigned char hp = (int)((User[userId].hp / (float)User[userId].max_hp) * 80);
-                        unsigned char xp = (int)((User[userId].xp / (float)User[userId].max_xp) * 80);
-                        unsigned char level = User[userId].level;
-
-                        network->SendBuddyStatHp(pl, userId, hp);
-                        network->SendBuddyStatXp(pl, userId, xp);
-                        network->SendBuddyStatLevel(pl, userId, level);
-
-                        //
-                        // Notify player of each existing party member
-                        //
-                        network->sendPartyAccept(userId, pl, User[pl].party);
-                        // Send player the current party member stats
-                        hp = (int)((User[pl].hp / (float)User[pl].max_hp) * 80);
-                        xp = (int)((User[pl].xp / (float)User[pl].max_xp) * 80);
-                        level = User[pl].level;
-
-                        // Update party stats for client party player list
-                        network->SendBuddyStatHp(userId, pl, hp);
-                        network->SendBuddyStatXp(userId, pl, xp);
-                        network->SendBuddyStatLevel(userId, pl, level);
-                    }
-            }
-            break;
-
-        case CANCEL:
-            //quit them out of this party
-            quitParty(userId);
-            break;
-
-        default:
-            break;
-        } //end switch mode
-    }     //invite to party
-    else if (code == CLAN)
-    {
-        int mode = User[userId].Sock->Data[2];
-        int playerB = 0;
-        std::string clanId = "";
-
-        printf("Clan mode is %i\n", mode);
-        switch (mode)
-        {
-
-        case INVITE:
-
-            if (User[userId].Clan[0] == '(')
-            {
-                network->sendChat(userId, "You are not in a clan.");
-                return;
-            }
-
-            if (User[playerB].Clan[0] != '(')
-            {
-                network->sendChat(userId, "Sorry, " + User[playerB].Nick + " Is already in a clan.");
-                return;
-            }
-
-            playerB = User[userId].Sock->Data[3];
-            clanId = repository->getOwnerClanId(User[userId].Nick);
-
-            if (!clanId.length())
-            {
-                network->sendChat(userId, "Sorry, only the clan owner can invite new members.");
-                return;
-            }
-
-            //set the clan status of the invited person
-            User[playerB].clanStatus = INVITE;
-            User[playerB].tempClanId = clanId;
-
-            //ask the user to clan
-            network->sendClanInvite(playerB, userId);
-
-            break;
-
-        case ACCEPT:
-            //TODO do not disconnect the player when they accept clan invites
-            //only if I was invited :)
-            if (User[userId].clanStatus == INVITE)
-            {
-                repository->setClanId(User[userId].Nick, User[userId].tempClanId);
-
-                // TODO - make new packet type to update clan instead of booting player
-                // This relies on client to automatically reconnect
-                User[userId].Sock->Close();
-                User[userId].Sock->Connected = false;
-            }
-
-            break;
-
-        case CANCEL:
-            //quit them out of this clan
-            User[userId].clanStatus = -1;
-            break;
-
-        default:
-            break;
-        } //end switch mode
-    }     //invite to clan
-    else if (code == SHOP)
-    {
-        int action = User[userId].Sock->Data[2];
-        int stallId = 0;
-        unsigned char mapId = User[userId].mapId;
-
-        switch (action)
-        {
-        case INVITE:
-            stallId = User[userId].Sock->Data[3];
-            if (stallId < map[mapId].num_stalls)
-            {
-                if (map[mapId].Stall[stallId].shopid == 0)
-                {
-                    if (User[userId].tradeStatus < 1)
-                    {
-                        network->sendBankOpen(userId);
-
-                        //set trade status to banking
-                        User[userId].tradeStatus = BANK;
-                    }
-                }
-                if (map[mapId].Stall[stallId].shopid > 0)
-                {
-                    //tell the user "hey, shop #? opened up"
-                    unsigned char shopId = map[mapId].Stall[stallId].shopid;
-                    network->sendShopOpen(userId, shopId);
-
-                    //set trade status to shopping
-                    User[userId].tradeStatus = SHOP;
-                    User[userId].tradePlayer = map[mapId].Stall[stallId].shopid;
-                }
-            }
-            break;
-
-        case BUY:
-        {
-            int sitem, amount;
-            sitem = User[userId].Sock->Data[3];
-            //hold the result...
-            //build an int from 4 bytes
-            ((char *)&amount)[0] = User[userId].Sock->Data[4];
-            ((char *)&amount)[1] = User[userId].Sock->Data[5];
-            ((char *)&amount)[2] = User[userId].Sock->Data[6];
-            ((char *)&amount)[3] = User[userId].Sock->Data[7];
-
-            int i = 0, item = 0, price = 0;
-            for (int y = 0; y < 4; y++)
-                for (int x = 0; x < 6; x++)
-                {
-                    if (i == sitem)
-                    {
-                        item = map[mapId].Shop[User[userId].tradePlayer].item[x][y][0];
-                        price = map[mapId].Shop[User[userId].tradePlayer].item[x][y][1];
-                    }
-                    i++;
-                }
-
-            //printf("%s wants to buy %d of item #%d\n", User[userId].Nick.c_str(), amount, item);
-
-            //if the player can afford it
-            if (item > 0 && User[userId].inventory[ITEM_GOLD] >= price * amount)
-            {
-                //take away gold
-                User[userId].inventory[ITEM_GOLD] -= price * amount;
-
-                //give them the item
-                User[userId].inventory[item] += amount;
-
-                //put in client players inventory
-                unsigned int amount = User[userId].inventory[item];
-                network->SendPocketItem(userId, item, amount);
-
-                //Take gold out of player's inventory
-                amount = User[userId].inventory[ITEM_GOLD];
-                network->SendPocketItem(userId, (unsigned char)ITEM_GOLD, amount);
-            }
-        }
-
-        break;
-
-        case SELL:
-        {
-            printf("SELL baby!\n");
-            int item = 0, amount = 0, price = 0;
-            item = User[userId].Sock->Data[3];
-            price = Item[item].price;
-
-            //hold the result...
-            //build an int from 4 bytes
-            ((char *)&amount)[0] = User[userId].Sock->Data[4];
-            ((char *)&amount)[1] = User[userId].Sock->Data[5];
-            ((char *)&amount)[2] = User[userId].Sock->Data[6];
-            ((char *)&amount)[3] = User[userId].Sock->Data[7];
-
-            //if they even have the item to sell
-            if (price > 0 && User[userId].inventory[item] >= amount)
-            {
-                //take away gold
-                User[userId].inventory[item] -= amount;
-
-                //give them the item
-                User[userId].inventory[ITEM_GOLD] += price * amount;
-
-                //take out of client player's inventory
-                unsigned int amount = User[userId].inventory[item];
-                network->SendPocketItem(userId, item, amount);
-
-                //put gold into player's inventory
-                amount = User[userId].inventory[ITEM_GOLD];
-                network->SendPocketItem(userId, (char)ITEM_GOLD, amount);
-            }
-        }
-
-        break;
-
-        case CANCEL:
-            printf("CANCEL, BABY!\n");
-            User[userId].tradeStatus = 0;
-            User[userId].tradePlayer = 0;
-            break;
-
-        default:
-            printf("DEFAULT BABY!\n");
-            break;
-        }
-        printf("\n");
-    } //end shop
-    else if (code == BANK)
-    {
-        int action = User[userId].Sock->Data[2];
-        std::string packet;
-        switch (action)
-        {
-        case CANCEL:
-            if (User[userId].tradeStatus == BANK)
-            {
-                User[userId].tradeStatus = 0;
-            }
-            break;
-
-        case BANK_ITEM:
-            if (User[userId].tradeStatus == BANK)
-            { //TODO sanity check for packet length
-                //get item type and amount
-                unsigned char item = User[userId].Sock->Data[3];
-                unsigned int amount = 0;
-                ((char *)&amount)[0] = User[userId].Sock->Data[4];
-                ((char *)&amount)[1] = User[userId].Sock->Data[5];
-                ((char *)&amount)[2] = User[userId].Sock->Data[6];
-                ((char *)&amount)[3] = User[userId].Sock->Data[7];
-
-                if (item < NUM_ITEMS && User[userId].inventory[item] >= amount)
-                {
-                    User[userId].inventory[item] -= amount;
-                    User[userId].bank[item] += amount;
-
-                    //send deposit notification to user
-                    unsigned int deposit = User[userId].bank[item];
-                    network->SendBankItem(userId, item, deposit);
-
-                    //update client player's inventory
-                    unsigned int withdrawal = User[userId].inventory[item];
-                    network->SendPocketItem(userId, item, withdrawal);
-                }
-            }
-            break;
-
-        case DEBANK_ITEM:
-            if (User[userId].tradeStatus == BANK)
-            { //TODO sanity check on packet length
-                unsigned char item = User[userId].Sock->Data[3];
-                unsigned int amount = 0;
-                ((char *)&amount)[0] = User[userId].Sock->Data[4];
-                ((char *)&amount)[1] = User[userId].Sock->Data[5];
-                ((char *)&amount)[2] = User[userId].Sock->Data[6];
-                ((char *)&amount)[3] = User[userId].Sock->Data[7];
-
-                if (item < NUM_ITEMS && User[userId].bank[item] >= amount)
-                {
-                    User[userId].bank[item] -= amount;
-                    User[userId].inventory[item] += amount;
-
-                    //send deposit notification to user
-                    unsigned int deposit = User[userId].bank[item];
-                    network->SendBankItem(userId, item, amount);
-
-                    //update client player's inventory
-                    unsigned int withdrawal = User[userId].inventory[item];
-                    network->SendPocketItem(userId, item, withdrawal);
-                }
-            }
-            break;
-
-        //shouldn't happen
-        default:
-            break;
-        }
-    } //end bank
-    else if (code == INVENTORY)
-    {
-        printf("inventory order!\n");
-        std::string inventory_order = User[userId].Sock->Data.substr(2);
-        User[userId].inventory_order = inventory_order;
-    }
-    else if (code == MAKE_CLAN)
-    {
-        //check if the player has enough money.
-        if (User[userId].inventory[ITEM_GOLD] < 100000) // 100000 TODO make a const for this
-        {
-            network->sendChat(userId, "You cannot afford to establish a clan. It costs 100K gold pieces.");
-            return;
-        } //end you did not have enough $$
-
-        std::string clanTag = trim(User[userId].Sock->Data.substr(2));
-        int result = repository->createClan(User[userId].Nick, clanTag);
-
-        if (result == 0)
-        {
-            //send to all players so everyone knows a new clan was formed!
-            for (int cu1 = 0; cu1 < MAX_CLIENTS; cu1++)
-            {
-                if (User[cu1].Ident)
-                    network->sendChat(cu1, "Clan (" + clanTag + ") has been established by owner " + User[userId].Nick + ".");
-            } //end loop all clients
-
-            User[userId].inventory[ITEM_GOLD] -= 100000;
-
-            // TODO - when below fix is complete, notify player their gold has decreased by 100K
-            //TODO do not rely on client reconnect when forming or joining a clan
-            User[userId].Sock->Close();
-            User[userId].Sock->Connected = false;
-        }
-        else if (result == 1)
-        {
-            //Clan already exists
-            network->sendChat(userId, "You cannot establish [" + clanTag + "] because it already exists.");
-        }
-    } //end make clan
+    //Clean up memory used by parser
+    delete parser;
 }
