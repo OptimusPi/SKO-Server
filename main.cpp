@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <errno.h>
 #include <stdint.h>
+#include <thread>
 
 #include "Global.h"
 #include "SKO_Player.h"
@@ -81,8 +82,8 @@ void SpawnItem(unsigned char mapId, unsigned char itemObjId, unsigned char itemI
 void DespawnItem(unsigned char itemId, unsigned char mapId);
 void PocketItem(unsigned char userId, unsigned char itemID, unsigned int amount);
 void EnemyAttack(int i, unsigned char mapId);
-void Warp(int userId, SKO_Portal portal);
-void Respawn(unsigned char mapId, int userId);
+void Warp(unsigned char userId, SKO_Portal portal);
+void Respawn(unsigned char mapId, unsigned char userId);
 void SpawnLoot(unsigned char mapId, SKO_ItemObject lootItem);
 
 static void *Physics(void *Arg);
@@ -120,6 +121,7 @@ int snap_distance = 64;
 /* CODE */
 int main()
 {
+	
 	//stdout buffer so we can tail -f the logs
 	//setbuf(stdout, NULL);
 	//setbuf(stderr, NULL);
@@ -401,7 +403,7 @@ void *TargetLoop(void *arg)
 				if (!map[mapId].Target[i].active && Clock() - map[mapId].Target[i].respawn_ticker > 5000)
 				{
 					map[mapId].Target[i].active = true;
-					network->SendSpawnTarget(i, mapId);
+					network->sendSpawnTarget(i, mapId);
 				}
 			}
 		}
@@ -446,7 +448,7 @@ void *EnemyLoop(void *arg)
 					if (Clock() - map[mapId].Enemy[i]->respawn_ticker >= 7000)
 					{
 						map[mapId].Enemy[i]->Respawn();
-						network->SendSpawnEnemy(map[mapId].Enemy[i], i, mapId);
+						network->sendSpawnEnemy(map[mapId].Enemy[i], i, mapId);
 						map[mapId].Enemy[i]->dead = false;
 					}
 				} //end if dead
@@ -644,7 +646,7 @@ void *EnemyLoop(void *arg)
 						if (!redundant)
 						{
 							//if it wasn't redundant, reset the ticker
-							network->SendEnemyAction(map[mapId].Enemy[i], next_action, i, mapId);
+							network->sendEnemyAction(map[mapId].Enemy[i], next_action, i, mapId);
 							map[mapId].Enemy[i]->AI_ticker = Clock();
 						} //end no spam
 
@@ -719,7 +721,7 @@ void *EnemyLoop(void *arg)
 					{
 						//if it wasn't redundant, reset the ticker
 						map[mapId].NPC[i]->AI_ticker = Clock();
-						network->SendNpcAction(map[mapId].NPC[i], next_action, i, mapId);
+						network->sendNpcAction(map[mapId].NPC[i], next_action, i, mapId);
 					} //end no spam
 
 				} //end enemy AI
@@ -986,12 +988,12 @@ void *Physics(void *arg)
 									for (int pl = 0; pl < MAX_CLIENTS; pl++)
 									{
 										if (pl != i && User[pl].Ident && User[pl].partyStatus == PARTY && User[pl].party == User[i].party)
-											network->SendBuddyStatHp(pl, i, displayHp);
+											network->sendBuddyStatHp(pl, i, displayHp);
 									}
 								}
 
 								//Send changed HP stat to client player
-								network->SendStatHp(i, User[i].hp);
+								network->sendStatHp(i, User[i].hp);
 								User[i].regen_ticker = Clock();
 							}
 						}
@@ -1209,7 +1211,7 @@ void Attack(unsigned char userId, float numx, float numy)
 		numy = (int)User[userId].y;
 	}
 
-	network->SendPlayerAction(true, ATTACK, userId, numx, numy);
+	network->sendPlayerAction(true, ATTACK, userId, numx, numy);
 
 	//loop all players to check for collisions
 	printf("Looping all players.\n");
@@ -1318,7 +1320,7 @@ void Attack(unsigned char userId, float numx, float numy)
 			//make this target disappear
 			map[mapId].Target[i].respawn_ticker = Clock();
 			map[mapId].Target[i].active = false;
-			network->SendDespawnTarget(i, mapId);
+			network->sendDespawnTarget(i, mapId);
 
 			//spawn some loot
 			if (map[mapId].Target[i].loot >= 0)
@@ -1425,7 +1427,7 @@ void Stop(unsigned char userId, float numx, float numy)
 	}
 
 	bool isCorrection = !good;
-	network->SendPlayerAction(isCorrection, MOVE_STOP, userId, numx, numy);
+	network->sendPlayerAction(isCorrection, MOVE_STOP, userId, numx, numy);
 }
 
 void Right(unsigned char userId, float numx, float numy)
@@ -1464,7 +1466,7 @@ void Right(unsigned char userId, float numx, float numy)
 		isCorrection = true;
 	}
 
-	network->SendPlayerAction(isCorrection, MOVE_RIGHT, userId, numx, numy);
+	network->sendPlayerAction(isCorrection, MOVE_RIGHT, userId, numx, numy);
 }
 
 void Left(unsigned char userId, float numx, float numy)
@@ -1503,7 +1505,7 @@ void Left(unsigned char userId, float numx, float numy)
 		isCorrection = true;
 	}
 
-	network->SendPlayerAction(isCorrection, MOVE_LEFT, userId, numx, numy);
+	network->sendPlayerAction(isCorrection, MOVE_LEFT, userId, numx, numy);
 }
 
 void Jump(unsigned char userId, float numx, float numy)
@@ -1541,7 +1543,7 @@ void Jump(unsigned char userId, float numx, float numy)
 		isCorrection = true;
 	}
 
-	network->SendPlayerAction(isCorrection, MOVE_JUMP, userId, numx, numy);
+	network->sendPlayerAction(isCorrection, MOVE_JUMP, userId, numx, numy);
 }
 
 void DivideLoot(int enemy, int party)
@@ -1630,7 +1632,7 @@ void RespawnEnemy(unsigned char mapId, int enemy)
 	map[mapId].Enemy[enemy]->x = -100000;
 	map[mapId].Enemy[enemy]->y = -100000;
 
-	network->SendEnemyAction(map[mapId].Enemy[enemy], ENEMY_MOVE_STOP, enemy, mapId);
+	network->sendEnemyAction(map[mapId].Enemy[enemy], ENEMY_MOVE_STOP, enemy, mapId);
 }
 
 void SpawnLoot(unsigned char mapId, SKO_ItemObject lootItem)
@@ -1756,7 +1758,7 @@ void EnemyAttack(int i, unsigned char mapId)
 	} //end loop everyone
 }
 
-void Warp(int userId, SKO_Portal portal)
+void Warp(unsigned char userId, SKO_Portal portal)
 {
 	//move the player to this spot
 	unsigned char oldMap = User[userId].mapId;
@@ -1767,7 +1769,7 @@ void Warp(int userId, SKO_Portal portal)
 	for (int c = 0; c < MAX_CLIENTS; c++)
 	{
 		if (User[c].Ident && (User[c].mapId == User[userId].mapId || User[c].mapId == oldMap))
-			network->SendWarpPlayer(c, userId, User[userId].mapId, User[userId].x, User[userId].y);
+			network->sendWarpPlayer(c, userId, User[userId].mapId, User[userId].x, User[userId].y);
 	}
 
 	//TODO show all items and targets on warp?
@@ -1786,22 +1788,22 @@ void GiveXP(unsigned char userId, int xp)
 	{
 		//you leveled up, send all stats
 		//level
-		network->SendStatLevel(userId, User[userId].level);
+		network->sendStatLevel(userId, User[userId].level);
 
 		//hp
-		network->SendStatHp(userId, User[userId].hp);
+		network->sendStatHp(userId, User[userId].hp);
 
 		//hp max
-		network->SendStatHpMax(userId, User[userId].max_hp);
+		network->sendStatHpMax(userId, User[userId].max_hp);
 
 		//stat_points
-		network->SendStatPoints(userId, User[userId].stat_points);
+		network->sendStatPoints(userId, User[userId].stat_points);
 
 		//xp
-		network->SendStatXp(userId, User[userId].xp);
+		network->sendStatXp(userId, User[userId].xp);
 
 		//max xp
-		network->SendStatXpMax(userId, User[userId].max_xp);
+		network->sendStatXpMax(userId, User[userId].max_xp);
 
 		//tell party members my new stats - TODO - make these cosmetic stat bar calls into a function
 		unsigned char displayXp = (int)((User[userId].xp / (float)User[userId].max_xp) * 80);
@@ -1811,27 +1813,27 @@ void GiveXP(unsigned char userId, int xp)
 		{
 			if (pl != userId && User[pl].Ident && User[pl].partyStatus == PARTY && User[pl].party == User[userId].party)
 			{
-				network->SendBuddyStatHp(pl, userId, User[userId].hp);
-				network->SendBuddyStatXp(pl, userId, User[userId].xp);
-				network->SendBuddyStatLevel(pl, userId, User[userId].level);
+				network->sendBuddyStatHp(pl, userId, User[userId].hp);
+				network->sendBuddyStatXp(pl, userId, User[userId].xp);
+				network->sendBuddyStatLevel(pl, userId, User[userId].level);
 			}
 		}
 		return;
 	} //end gain xp
 
 	//xp
-	network->SendStatXp(userId, User[userId].xp);
+	network->sendStatXp(userId, User[userId].xp);
 
 	//tell party members my xp
 	unsigned char displayXp = (int)((User[userId].xp / (float)User[userId].max_xp) * 80);
 	for (int c = 0; c < MAX_CLIENTS; c++)
 	{
 		if (c != userId && User[c].Ident && User[c].partyStatus == PARTY && User[c].party == User[userId].party)
-			network->SendBuddyStatXp(c, userId, displayXp);
+			network->sendBuddyStatXp(c, userId, displayXp);
 	}
 }
 
-void Respawn(unsigned char mapId, int userId)
+void Respawn(unsigned char mapId, unsigned char userId)
 {
 	//place their coords
 	User[userId].x = map[mapId].spawn_x;
@@ -1843,7 +1845,7 @@ void Respawn(unsigned char mapId, int userId)
 	for (int c = 0; c < MAX_CLIENTS; c++)
 	{
 		if (User[c].Ident && User[c].mapId == mapId)
-			network->SendPlayerRespawn(c, userId, User[userId].x, User[userId].y);
+			network->sendPlayerRespawn(c, userId, User[userId].x, User[userId].y);
 	}
 }
 
@@ -1894,10 +1896,10 @@ void quitParty(unsigned char userId)
 void DespawnItem(unsigned char itemObjId, unsigned char mapId)
 {
 	//remove from map
-	for (int userId = 0; userId < MAX_CLIENTS; userId++)
+	for (unsigned char userId = 0; userId < MAX_CLIENTS; userId++)
 	{
 		if (User[userId].Ident && User[userId].mapId == mapId)
-			network->SendDespawnItem(userId, itemObjId, mapId);
+			network->sendDespawnItem(userId, itemObjId, mapId);
 	} 
 
 	map[mapId].ItemObj[itemObjId].remove();
@@ -1906,10 +1908,10 @@ void DespawnItem(unsigned char itemObjId, unsigned char mapId)
 void SpawnItem(unsigned char mapId, unsigned char itemObjId, unsigned char itemId, float x, float y, float x_speed, float y_speed)
 {
 	//remove from map
-	for (int userId = 0; userId < MAX_CLIENTS; userId++)
+	for (unsigned char userId = 0; userId < MAX_CLIENTS; userId++)
 	{
 		if (User[userId].Ident && User[userId].mapId == mapId)
-			network->SendSpawnItem(userId, itemObjId, mapId, itemId, x, y, x_speed, y_speed);
+			network->sendSpawnItem(userId, itemObjId, mapId, itemId, x, y, x_speed, y_speed);
 	}
 } 
 
@@ -1927,14 +1929,14 @@ void PocketItem(unsigned char userId, unsigned char itemId, unsigned int amount)
 	User[userId].inventory[itemId] = amount;
 
 	//put in client player's inventory
-	network->SendPocketItem(userId, itemId, amount);
+	network->sendPocketItem(userId, itemId, amount);
 }
 
 void PlayerDamaged(unsigned char userId, unsigned char damage)
 {
 	//Notify client player about their new HP
 	User[userId].hp -= damage;
-	network->SendStatHp(userId, User[userId].hp);
+	network->sendStatHp(userId, User[userId].hp);
 
 	//party hp notification
 	unsigned char displayHp = (int)((User[userId].hp / (float)User[userId].max_hp) * 80);
@@ -1943,9 +1945,9 @@ void PlayerDamaged(unsigned char userId, unsigned char damage)
 	{
 		if (User[c].Ident && User[c].mapId == User[c].mapId)
 		{
-			network->SendPlayerHit(c, userId);
+			network->sendPlayerHit(c, userId);
 			if (userId != c && User[c].partyStatus == PARTY && User[c].party == User[userId].party)
-				network->SendBuddyStatHp(c, userId, displayHp);
+				network->sendBuddyStatHp(c, userId, displayHp);
 		}
 	}
 }
@@ -2085,7 +2087,7 @@ void EnemyHit(unsigned char enemyId, unsigned char mapId, unsigned char userId)
 	for (int c = 0; c < MAX_CLIENTS; c++)
 	{
 		if (User[c].Ident && User[c].mapId == mapId)
-			network->SendEnemyHit(c, enemyId);
+			network->sendEnemyHit(c, enemyId);
 	}
 
 	if (map[mapId].Enemy[enemyId]->hp <= damage)
@@ -2106,7 +2108,7 @@ void EnemyHit(unsigned char enemyId, unsigned char mapId, unsigned char userId)
 		for (int c = 0; c < MAX_CLIENTS; c++)
 		{
 			if (User[c].Ident)
-				network->SendEnemyHp(c, enemyId, mapId, displayHp);
+				network->sendEnemyHp(c, enemyId, mapId, displayHp);
 		}
 	}
 }

@@ -23,10 +23,10 @@ class SKO_Repository
 	void setClanId(std::string username, std::string clanId);
 	int createClan(std::string username, std::string clanId);
 
-	//TODO change Mod_i to moderatorName like in banIP
-	int mutePlayer(int Mod_i, std::string Username, int flag);
-	int banPlayer(int Mod_i, std::string Username, std::string Reason, int flag);
-	int banIP(std::string moderatorName, std::string IP, std::string Reason);
+	//TODO change userId to moderatorName like in banIP
+	int mutePlayer(unsigned char userId, std::string username, std::string reason, int flag);
+	int banPlayer(unsigned char userId, std::string username, std::string reason, int flag);
+	int banIP(std::string moderatorName, std::string IP, std::string reason);
 	std::string getIP(std::string username);
 	void saveServerStatus(unsigned int playersLinux, unsigned int playersWindows, unsigned int playersMac, unsigned int averagePing);
 

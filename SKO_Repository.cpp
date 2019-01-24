@@ -361,10 +361,10 @@ int SKO_Repository::createPlayer(std::string Username, std::string Password, std
 	return 0;
 }
 
-int SKO_Repository::mutePlayer(int Mod_i, std::string Username, int flag)
+int SKO_Repository::mutePlayer(unsigned char userId, std::string username, std::string reason, int flag)
 {
 	std::string sql = "SELECT * FROM player WHERE username LIKE '";
-	sql += database->clean(Username);
+	sql += database->clean(username);
 	sql += "'";
 	printf("%s", sql.c_str());;
 	database->query(sql);
@@ -393,10 +393,11 @@ int SKO_Repository::mutePlayer(int Mod_i, std::string Username, int flag)
 			//mute
 			if (flag == 1)
 			{
+				// TODO insert reason why the player was muted
 				sql = "INSERT INTO mute (player_id, muted_by) VALUES('";
 				sql += database->clean(player_id);
 				sql += "', '";
-				sql += database->clean(User[Mod_i].Nick);
+				sql += database->clean(User[userId].Nick);
 				sql += "')";
 
 				printf("%s", sql.c_str());;
@@ -424,8 +425,9 @@ int SKO_Repository::mutePlayer(int Mod_i, std::string Username, int flag)
 	return 0;
 }
 
-int SKO_Repository::banPlayer(int Mod_i, std::string Username, std::string Reason, int flag)
+int SKO_Repository::banPlayer(unsigned char userId, std::string Username, std::string Reason, int flag)
 {
+	//TODO, if unban, remove ipbans from this player as well.
 	std::string sql = "SELECT * FROM player WHERE username LIKE '";
 	sql += database->clean(Username);
 	sql += "'";
@@ -438,12 +440,6 @@ int SKO_Repository::banPlayer(int Mod_i, std::string Username, std::string Reaso
 		//get noob id
 		database->nextRow();
 		std::string player_id = database->getString(0);
-
-		if (!User[Mod_i].Moderator)
-		{
-			//fool, you aren't even a moderator.
-			return 3;
-		}
 
 		//see if the noob is a mod
 		sql = "SELECT * FROM moderator WHERE player_id like '";
@@ -468,7 +464,7 @@ int SKO_Repository::banPlayer(int Mod_i, std::string Username, std::string Reaso
 				sql = "INSERT INTO ban (player_id, banned_by, ban_reason) VALUES('";
 				sql += database->clean(player_id);
 				sql += "', '";
-				sql += database->clean(User[Mod_i].Nick);
+				sql += database->clean(User[userId].Nick);
 				sql += "', '";
 				sql += database->clean(Reason);
 				sql += "')";

@@ -43,7 +43,7 @@ extern void Right(unsigned char userId, float x, float y);
 extern void Stop(unsigned char userId, float x, float y);
 extern void GiveXP(unsigned char userId, int xp);
 extern void quitParty(unsigned char userId);
-extern void Warp(int userId, SKO_Portal portal);
+extern void Warp(unsigned char userId, SKO_Portal portal);
 extern void SpawnLoot(unsigned char mapId, SKO_ItemObject lootItem);
 
 //Utilities

@@ -1,4 +1,5 @@
-#pragma once
+#ifndef __SKO_PACKETTYPES_
+#define __SKO_PACKETTYPES_
 
 const unsigned char
 	VERSION_CHECK = 255,
@@ -7,6 +8,7 @@ const unsigned char
 
 	PING = 0,
 	PONG = 252,
+	DISCONNECT = 251,
 
 	VERSION_MAJOR = 1,
 	VERSION_MINOR = 2,
@@ -93,4 +95,7 @@ const unsigned char
 	NPC_MOVE_STOP = 61,
 	NPC_TALK = 62,
 	MAKE_CLAN = 63,
-	CAST_SPELL = 64;
+	CAST_SPELL = 64
+	;
+
+#endif

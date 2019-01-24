@@ -10,6 +10,7 @@ SKO_PacketParser::SKO_PacketParser(std::string packet)
 
     this->packetLength = packet[0];
     this->packetType = packet[1];
+    position = 2;
 }
 
 std::string SKO_PacketParser::getPacketBody()
@@ -38,6 +39,10 @@ std::string SKO_PacketParser::toString()
     prettyString << "{";
     for (int i = 0; i < packet.length(); i++) 
     {
+        if (i == 0)
+            prettyString << "packetLength:";
+        if (i == 1)
+            prettyString << "packetType:";    
         prettyString << (int)this->packet[i];
 
         if (i < packet.length() - 1)

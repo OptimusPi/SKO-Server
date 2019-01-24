@@ -8,21 +8,21 @@
 #include "SKO_PacketParser.h"
 #include "SKO_PacketTypes.h"
 
+// Forward-declare SKO_Network so I can call its functions.
 class SKO_Network;
 
+// Class to handle packets
 class SKO_PacketHandler
 {
 
 public:
     //SKO_PacketHandler(SKO_GameState gameState);
-    SKO_PacketHandler(SKO_Network *network, SKO_Repository *repository);
+    SKO_PacketHandler(SKO_Network *network);
     void parsePacket(unsigned char userId, std::string packet);
     
 private:
     //SKO_GameState gameState;
     SKO_Network *network;
-    SKO_Repository *repository;
-    
 
     // Health check packet types
     void parsePing(unsigned char userId);

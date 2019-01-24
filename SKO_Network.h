@@ -32,54 +32,57 @@ public:
 
 	// Handle all network functions of a client
 	void HandleClient(unsigned char userId);
-	void SendPlayerLoaded(unsigned char userId);
-	void SendPlayerJoin(unsigned char userId, unsigned char playerId);
-	void SendSpawnEnemy(SKO_Enemy *enemy, unsigned char enemyId, unsigned char mapId);
-	void SendEnemyAction(SKO_Enemy* enemy, unsigned char action, unsigned char enemyId, unsigned char mapId);
-	void SendNpcAction(SKO_NPC* npc, unsigned char action, unsigned char npcId, unsigned char mapId);
-	void SendPlayerAction(bool isCorrection, unsigned char action, unsigned char userId, float x, float y);
-	void SendPlayerRespawn(unsigned char userId, unsigned char deadUserId, float x, float y);
-	void SendSpawnTarget(unsigned char targetId, unsigned char mapId);
-	void SendDespawnTarget(unsigned char targetId, unsigned char mapId);
-	void SendPlayerHit(unsigned char userId, unsigned char hitUserId);
-	void SendEnemyHit(unsigned char userId, unsigned char enemyId);
-	void SendEnemyHp(unsigned char userId, unsigned char enemyId, unsigned char mapId, unsigned char displayHp);
-	void SendWarpPlayer(unsigned char userId, unsigned char warpUserId, unsigned char mapId, float x, float y);
+
+	//Login and loading helper functions
+	void sendVersionSuccess(unsigned char userId);
+	void sendPlayerLoaded(unsigned char userId);
+	void sendPlayerJoin(unsigned char userId, unsigned char playerId);
+	void sendSpawnEnemy(SKO_Enemy *enemy, unsigned char enemyId, unsigned char mapId);
+	void sendEnemyAction(SKO_Enemy* enemy, unsigned char action, unsigned char enemyId, unsigned char mapId);
+	void sendNpcAction(SKO_NPC* npc, unsigned char action, unsigned char npcId, unsigned char mapId);
+	void sendPlayerAction(bool isCorrection, unsigned char action, unsigned char userId, float x, float y);
+	void sendPlayerRespawn(unsigned char userId, unsigned char deadUserId, float x, float y);
+	void sendSpawnTarget(unsigned char targetId, unsigned char mapId);
+	void sendDespawnTarget(unsigned char targetId, unsigned char mapId);
+	void sendPlayerHit(unsigned char userId, unsigned char hitUserId);
+	void sendEnemyHit(unsigned char userId, unsigned char enemyId);
+	void sendEnemyHp(unsigned char userId, unsigned char enemyId, unsigned char mapId, unsigned char displayHp);
+	void sendWarpPlayer(unsigned char userId, unsigned char warpUserId, unsigned char mapId, float x, float y);
 
 	// Item related functions
-	void SendSpawnItem(unsigned char userId, unsigned char itemObjId, unsigned char mapId, unsigned char itemType, float x, float y, float x_speed, float y_speed);
-	void SendDespawnItem(unsigned char userId, unsigned char itemObjId, unsigned char mapId);
-	void SendPocketItem(unsigned char userId, unsigned char itemId, unsigned int amount);
-	void SendBankItem(unsigned char userId, unsigned char itemId, unsigned int amount);
+	void sendSpawnItem(unsigned char userId, unsigned char itemObjId, unsigned char mapId, unsigned char itemType, float x, float y, float x_speed, float y_speed);
+	void sendDespawnItem(unsigned char userId, unsigned char itemObjId, unsigned char mapId);
+	void sendPocketItem(unsigned char userId, unsigned char itemId, unsigned int amount);
+	void sendBankItem(unsigned char userId, unsigned char itemId, unsigned int amount);
 
 	//TODO- equipId is a cosmetic information for the client. This could be done on the client side. It is only used to choose which image to draw.
-	void SendEquip(unsigned char userId, unsigned char playerId, unsigned char equipSlot, unsigned char equipId, unsigned char itemId);
-	void SendInventoryOrder(unsigned char userId, std::string inventoryOrder);
+	void sendEquip(unsigned char userId, unsigned char playerId, unsigned char equipSlot, unsigned char equipId, unsigned char itemId);
+	void sendInventoryOrder(unsigned char userId, std::string inventoryOrder);
 
 	// Update client player's own stat points 
-	void SendStatRegen(unsigned char userId, unsigned char regen);
-	void SendStatHp(unsigned char userId, unsigned char hp);
-	void SendStatHpMax(unsigned char userId, unsigned char hp_max);
-	void SendStatStr(unsigned char userId, unsigned char str);
-	void SendStatDef(unsigned char userId, unsigned char def);
-	void SendStatPoints(unsigned char userId, unsigned char points);
-	void SendStatXp(unsigned char userId, unsigned int xp);
-	void SendStatXpMax(unsigned char userId, unsigned int xp_max);
-	void SendStatLevel(unsigned char userId, unsigned char level);
+	void sendStatRegen(unsigned char userId, unsigned char regen);
+	void sendStatHp(unsigned char userId, unsigned char hp);
+	void sendStatHpMax(unsigned char userId, unsigned char hp_max);
+	void sendStatStr(unsigned char userId, unsigned char str);
+	void sendStatDef(unsigned char userId, unsigned char def);
+	void sendStatPoints(unsigned char userId, unsigned char points);
+	void sendStatXp(unsigned char userId, unsigned int xp);
+	void sendStatXpMax(unsigned char userId, unsigned int xp_max);
+	void sendStatLevel(unsigned char userId, unsigned char level);
 
 	// Update party stats for client party player list
-	void SendBuddyStatXp(unsigned char userId, unsigned char partyMemberId, unsigned char displayXp); 
-	void SendBuddyStatHp(unsigned char userId, unsigned char partyMemberId, unsigned char displayHp); 
-	void SendBuddyStatLevel(unsigned char userId, unsigned char partyMemberId, unsigned char displayLevel); 
+	void sendBuddyStatXp(unsigned char userId, unsigned char partyMemberId, unsigned char displayXp); 
+	void sendBuddyStatHp(unsigned char userId, unsigned char partyMemberId, unsigned char displayHp); 
+	void sendBuddyStatLevel(unsigned char userId, unsigned char partyMemberId, unsigned char displayLevel); 
 
 	//When PING is received, reply immediately with PONG
-	void SendPong(unsigned char userId);
-	void SendRegisterResponse_Success(unsigned char userId);
-	void SendRegisterResponse_AlreadyRegistered(unsigned char userId);
-	void SendLoginResponse_Success(unsigned char userId); 
-	void SendLoginResponse_AlreadyOnline(unsigned char userId);
-	void SendLoginResponse_PlayerBanned(unsigned char userId); 
-	void SendLoginResponse_PasswordFailed(unsigned char userId); 
+	void sendPong(unsigned char userId);
+	void sendRegisterResponse_Success(unsigned char userId);
+	void sendRegisterResponse_AlreadyRegistered(unsigned char userId);
+	void sendLoginResponse_Success(unsigned char userId); 
+	void sendLoginResponse_AlreadyOnline(unsigned char userId);
+	void sendLoginResponse_PlayerBanned(unsigned char userId); 
+	void sendLoginResponse_PasswordFailed(unsigned char userId); 
 
 	//Save all profiles
 	void saveAllProfiles();
@@ -108,11 +111,15 @@ public:
 	// Shop actions
 	void sendShopOpen(unsigned char userId, unsigned char shopId);
 
-
 	// Admin commands
-	int kickPlayer(int Mod_i, std::string username);
-	int mutePlayer(int Mod_i, std::string username, int flag);
-	int banPlayer(int Mod_i, std::string username, std::string reason, int flag);
+	bool isPlayerOnline(std::string username);
+	bool verifyAdmin(unsigned char userId);
+	void kickPlayer(unsigned char userId, std::string username, std::string reason);
+	void mutePlayer(unsigned char userId, std::string username, std::string reason);
+	void unmutePlayer(unsigned char userId, std::string username);
+	void ipbanPlayer(unsigned char userId, std::string username, std::string IP, std::string reason);
+	void banPlayer(unsigned char userId, std::string username, std::string reason);
+	void unbanPlayer(unsigned char userId, std::string username);
  private:
 	
 	// Bind to this port and accept incoming connections.
@@ -123,7 +130,8 @@ public:
 
 	// How often to save all valid players.
 	unsigned long int saveRateSeconds;
-
+	unsigned long int lastSaveTime;
+	
 	// Do not spam the database status table if there have been 0 players online for some time.
 	bool pauseSavingStatus = false;
 

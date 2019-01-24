@@ -1,17 +1,16 @@
 #include "SKO_PacketHandler.h"
 
 //constructor
-SKO_PacketHandler::SKO_PacketHandler(SKO_Network *network, SKO_Repository *repository)
-{
+SKO_PacketHandler::SKO_PacketHandler(SKO_Network *network)
+{ 
     this->network = network;
-    this->repository = repository;
 }
 // When server receives PING,
 // It immediately replies to the client with PONG
 // [PING]
 void SKO_PacketHandler::parsePing(unsigned char userId)
 {
-    network->SendPong(userId);
+    network->sendPong(userId);
 }
 
 // [PONG]
@@ -49,7 +48,7 @@ void SKO_PacketHandler::parseLogin(unsigned char userId, SKO_PacketParser *parse
         if (lower(User[i].Nick).compare(lower(username)) == 0)
         {
             printf("User that is you already is: %s x is %i i is %i\n", User[i].Nick.c_str(), (int)User[i].x, i);
-            network->SendLoginResponse_AlreadyOnline(userId);
+            network->sendLoginResponse_AlreadyOnline(userId);
             return;
         }
     }
@@ -59,7 +58,7 @@ void SKO_PacketHandler::parseLogin(unsigned char userId, SKO_PacketParser *parse
 
     if (result == 1) //wrong password
     {
-        network->SendLoginResponse_PasswordFailed(userId);
+        network->sendLoginResponse_PasswordFailed(userId);
 
         //TODO kick server after several failed login attempts
         //warn the server, possible bruteforce hack attempt
@@ -67,12 +66,12 @@ void SKO_PacketHandler::parseLogin(unsigned char userId, SKO_PacketParser *parse
     }
     else if (result == 3) //character is banned
     {
-        network->SendLoginResponse_PlayerBanned(userId);
+        network->sendLoginResponse_PlayerBanned(userId);
         printf("%s is banned and tried to login!\n", username.c_str());
     }
     else if (result == 4)
     {
-        network->SendLoginResponse_PasswordFailed(userId);
+        network->sendLoginResponse_PasswordFailed(userId);
         printf("%s tried to login but doesn't exist!\n", username.c_str());
     }
 
@@ -85,7 +84,7 @@ void SKO_PacketHandler::parseLogin(unsigned char userId, SKO_PacketParser *parse
             User[userId].Mute = false;
 
         //successful login
-        network->SendLoginResponse_Success(userId);
+        network->sendLoginResponse_Success(userId);
 
         //set display name
         User[userId].Nick = username;
@@ -118,27 +117,27 @@ void SKO_PacketHandler::parseLogin(unsigned char userId, SKO_PacketParser *parse
         printf(kGreen "max xp: %i\n" kNormal, (int)User[userId].max_xp);
 
         // HP
-        network->SendStatHp(userId, User[userId].hp);
-        network->SendStatHpMax(userId, User[userId].max_hp);
-        network->SendStatRegen(userId, User[userId].regen);
+        network->sendStatHp(userId, User[userId].hp);
+        network->sendStatHpMax(userId, User[userId].max_hp);
+        network->sendStatRegen(userId, User[userId].regen);
 
         // XP
-        network->SendStatXp(userId, User[userId].xp);
-        network->SendStatXpMax(userId, User[userId].max_xp);
+        network->sendStatXp(userId, User[userId].xp);
+        network->sendStatXpMax(userId, User[userId].max_xp);
 
         //STATS
-        network->SendStatLevel(userId, User[userId].level);
-        network->SendStatStr(userId, User[userId].strength);
-        network->SendStatDef(userId, User[userId].defence);
-        network->SendStatPoints(userId, User[userId].stat_points);
+        network->sendStatLevel(userId, User[userId].level);
+        network->sendStatStr(userId, User[userId].strength);
+        network->sendStatDef(userId, User[userId].defence);
+        network->sendStatPoints(userId, User[userId].stat_points);
 
         //equipment
-        network->SendEquip(userId, userId, (char)0, Item[User[userId].equip[0]].equipID, User[userId].equip[0]);
-        network->SendEquip(userId, userId, (char)1, Item[User[userId].equip[1]].equipID, User[userId].equip[1]);
-        network->SendEquip(userId, userId, (char)2, Item[User[userId].equip[2]].equipID, User[userId].equip[2]);
+        network->sendEquip(userId, userId, (char)0, Item[User[userId].equip[0]].equipID, User[userId].equip[0]);
+        network->sendEquip(userId, userId, (char)1, Item[User[userId].equip[1]].equipID, User[userId].equip[1]);
+        network->sendEquip(userId, userId, (char)2, Item[User[userId].equip[2]].equipID, User[userId].equip[2]);
 
         //cosmetic inventory order
-        network->SendInventoryOrder(userId, User[userId].getInventoryOrder());
+        network->sendInventoryOrder(userId, User[userId].getInventoryOrder());
 
         //inventory
         for (unsigned char i = 0; i < NUM_ITEMS; i++)
@@ -149,7 +148,7 @@ void SKO_PacketHandler::parseLogin(unsigned char userId, SKO_PacketParser *parse
             if (amount > 0)
             {
                 User[userId].inventory_index++;
-                network->SendPocketItem(userId, i, amount);
+                network->sendPocketItem(userId, i, amount);
             }
 
             amount = User[userId].bank[i];
@@ -158,7 +157,7 @@ void SKO_PacketHandler::parseLogin(unsigned char userId, SKO_PacketParser *parse
             {
                 //TODO: remove this bank index or change how the bank works!
                 User[userId].bank_index++;
-                network->SendBankItem(userId, i, amount);
+                network->sendBankItem(userId, i, amount);
             }
         } //end loop 256 for items in inventory and map
 
@@ -173,7 +172,7 @@ void SKO_PacketHandler::parseLogin(unsigned char userId, SKO_PacketParser *parse
                 float numy = map[mapId].ItemObj[i].y;
                 float numxs = map[mapId].ItemObj[i].x_speed;
                 float numys = map[mapId].ItemObj[i].y_speed;
-                network->SendSpawnItem(userId, i, mapId, itemId, numx, numy, numxs, numys);
+                network->sendSpawnItem(userId, i, mapId, itemId, numx, numy, numxs, numys);
             }
         }
 
@@ -181,7 +180,7 @@ void SKO_PacketHandler::parseLogin(unsigned char userId, SKO_PacketParser *parse
         for (int i = 0; i < map[mapId].num_targets; i++)
         {
             if (map[mapId].Target[i].active)
-                network->SendSpawnTarget(i, mapId);
+                network->sendSpawnTarget(i, mapId);
         }
 
         //npcs
@@ -194,7 +193,7 @@ void SKO_PacketHandler::parseLogin(unsigned char userId, SKO_PacketParser *parse
             if (map[mapId].NPC[i]->x_speed > 0)
                 action = NPC_MOVE_RIGHT;
 
-            network->SendNpcAction(map[mapId].NPC[i], action, i, mapId);
+            network->sendNpcAction(map[mapId].NPC[i], action, i, mapId);
         }
 
         // load all enemies
@@ -206,11 +205,11 @@ void SKO_PacketHandler::parseLogin(unsigned char userId, SKO_PacketParser *parse
             if (map[mapId].Enemy[i]->x_speed > 0)
                 action = ENEMY_MOVE_RIGHT;
 
-            network->SendEnemyAction(map[mapId].Enemy[i], action, i, mapId);
+            network->sendEnemyAction(map[mapId].Enemy[i], action, i, mapId);
 
             //enemy health bars
             int hp = (unsigned char)((float)map[mapId].Enemy[i]->hp / map[mapId].Enemy[i]->hp_max * hpBar);
-            network->SendEnemyHp(userId, i, mapId, hp);
+            network->sendEnemyHp(userId, i, mapId, hp);
         }
 
         // inform all players
@@ -219,17 +218,17 @@ void SKO_PacketHandler::parseLogin(unsigned char userId, SKO_PacketParser *parse
             // Tell the new user about existing players
             if (i == userId && User[i].Nick.compare("Paladin") != 0)
             {
-                network->SendPlayerJoin(userId, i);
+                network->sendPlayerJoin(userId, i);
             }
             // Tell existing players about new user
             else if (User[i].Ident)
             {
-                network->SendPlayerJoin(i, userId);
+                network->sendPlayerJoin(i, userId);
             }
         }
 
         // Trigger loading complete on client.
-        network->SendPlayerLoaded(userId);
+        network->sendPlayerLoaded(userId);
 
         //mark this client to save when they disconnect..since Send/Recv change Ident!!
         User[userId].Save = true;
@@ -253,12 +252,12 @@ void SKO_PacketHandler::parseRegister(unsigned char userId, SKO_PacketParser *pa
 
     if (result == 1) // user already exists
     {
-        network->SendRegisterResponse_AlreadyRegistered(userId);
+        network->sendRegisterResponse_AlreadyRegistered(userId);
         printf("%s tried to double-register!\n", username.c_str());
     }
     else if (result == 0) // user created successfully
     {
-        network->SendRegisterResponse_Success(userId);
+        network->sendRegisterResponse_Success(userId);
         printf("%s has been registered!\n", username.c_str());
     }
     else if (result == 2) // user is banned
@@ -327,7 +326,7 @@ void SKO_PacketHandler::parseCastSpell(unsigned char userId)
 
             //notify user the item was thrown
             unsigned int amount = User[userId].inventory[spell];
-            network->SendPocketItem(userId, spell, amount);
+            network->sendPocketItem(userId, spell, amount);
         }
         else
         {
@@ -336,7 +335,7 @@ void SKO_PacketHandler::parseCastSpell(unsigned char userId)
             //send packet that says you arent holding anything!
             for (int c = 0; c < MAX_CLIENTS; c++)
                 if (User[c].Ident)
-                    network->SendEquip(c, userId, (char)2, (char)0, (char)0);
+                    network->sendEquip(c, userId, (char)2, (char)0, (char)0);
         }
 
         //tell all the users that an item has been thrown...
@@ -372,8 +371,8 @@ void SKO_PacketHandler::parseStatHp(unsigned char userId, SKO_PacketParser* pars
         User[userId].stat_points--;
         User[userId].regen++;
 
-        network->SendStatRegen(userId, User[userId].regen);
-        network->SendStatPoints(userId, User[userId].stat_points);
+        network->sendStatRegen(userId, User[userId].regen);
+        network->sendStatPoints(userId, User[userId].stat_points);
     }
 }
 
@@ -385,8 +384,8 @@ void SKO_PacketHandler::parseStatStr(unsigned char userId, SKO_PacketParser* par
         User[userId].stat_points--;
         User[userId].strength++;
 
-        network->SendStatStr(userId, User[userId].strength);
-        network->SendStatPoints(userId, User[userId].stat_points);
+        network->sendStatStr(userId, User[userId].strength);
+        network->sendStatPoints(userId, User[userId].stat_points);
     }
 }
 
@@ -398,8 +397,8 @@ void SKO_PacketHandler::parseStatDef(unsigned char userId, SKO_PacketParser* par
         User[userId].stat_points--;
         User[userId].defence++;
 
-        network->SendStatDef(userId, User[userId].defence);
-        network->SendStatPoints(userId, User[userId].stat_points);
+        network->sendStatDef(userId, User[userId].defence);
+        network->sendStatPoints(userId, User[userId].stat_points);
     }
 }
 
@@ -421,11 +420,11 @@ void SKO_PacketHandler::parseUnequip(unsigned char userId, SKO_PacketParser *par
 
         //tell everyone
         for (int uc = 0; uc < MAX_CLIENTS; uc++)
-            network->SendEquip(uc, userId, slot, (char)0, (char)0);
+            network->sendEquip(uc, userId, slot, (char)0, (char)0);
 
         //update the player's inventory
         int amount = User[userId].inventory[item];
-        network->SendPocketItem(userId, item, amount);
+        network->sendPocketItem(userId, item, amount);
     }
 }
 
@@ -465,7 +464,7 @@ void SKO_PacketHandler::parseUseItem(unsigned char userId, SKO_PacketParser *par
                 User[userId].hp = User[userId].max_hp;
 
             //tell this client
-            network->SendStatHp(userId, User[userId].hp);
+            network->sendStatHp(userId, User[userId].hp);
 
             //remove item
             User[userId].inventory[item]--;
@@ -482,11 +481,11 @@ void SKO_PacketHandler::parseUseItem(unsigned char userId, SKO_PacketParser *par
             for (int pl = 0; pl < MAX_CLIENTS; pl++)
             {
                 if (pl != userId && User[pl].Ident && User[pl].partyStatus == PARTY && User[pl].party == User[userId].party)
-                    network->SendBuddyStatHp(pl, userId, displayHp);
+                    network->sendBuddyStatHp(pl, userId, displayHp);
             }
 
             //put in client players inventory
-            network->SendPocketItem(userId, item, amount);
+            network->sendPocketItem(userId, item, amount);
 
             break;
         }
@@ -506,18 +505,18 @@ void SKO_PacketHandler::parseUseItem(unsigned char userId, SKO_PacketParser *par
                 User[userId].inventory[otherItem]++;
                 User[userId].inventory_index++;
                 unsigned int amount = User[userId].inventory[otherItem];
-                network->SendPocketItem(userId, otherItem, amount);
+                network->sendPocketItem(userId, otherItem, amount);
             }
 
             // Tell player one weapon is removed from their inventory
             unsigned int amount = User[userId].inventory[item];
-            network->SendPocketItem(userId, item, amount);
+            network->sendPocketItem(userId, item, amount);
 
             //tell everyone the player equipped their weapon
             for (int i1 = 0; i1 < MAX_CLIENTS; i1++)
             {
                 if (User[i1].Ident)
-                    network->SendEquip(i1, userId, (char)0, Item[item].equipID, item);
+                    network->sendEquip(i1, userId, (char)0, Item[item].equipID, item);
             }
             break;
         }
@@ -537,18 +536,18 @@ void SKO_PacketHandler::parseUseItem(unsigned char userId, SKO_PacketParser *par
                 User[userId].inventory[otherItem]++;
                 User[userId].inventory_index++;
                 unsigned int amount = User[userId].inventory[otherItem];
-                network->SendPocketItem(userId, otherItem, amount);
+                network->sendPocketItem(userId, otherItem, amount);
             }
 
             // Tell player one hat is removed from their inventory
             unsigned int amount = User[userId].inventory[item];
-            network->SendPocketItem(userId, item, amount);
+            network->sendPocketItem(userId, item, amount);
 
             //tell everyone the player equipped their hat
             for (int i1 = 0; i1 < MAX_CLIENTS; i1++)
             {
                 if (User[i1].Ident)
-                    network->SendEquip(i1, userId, (char)1, Item[item].equipID, item);
+                    network->sendEquip(i1, userId, (char)1, Item[item].equipID, item);
             }
             break;
         }
@@ -576,7 +575,7 @@ void SKO_PacketHandler::parseUseItem(unsigned char userId, SKO_PacketParser *par
                 unsigned int amount = User[userId].inventory[item];
 
                 //put in players inventory
-                network->SendPocketItem(userId, item, amount);
+                network->sendPocketItem(userId, item, amount);
 
                 for (int it = 0; it < numUsed; it++)
                 {
@@ -633,7 +632,7 @@ void SKO_PacketHandler::parseUseItem(unsigned char userId, SKO_PacketParser *par
                     for (int iii = 0; iii < MAX_CLIENTS; iii++)
                     {
                         if (User[iii].Ident && User[iii].mapId == mapId)
-                            network->SendSpawnItem(iii, rand_i, mapId, rand_item, x, y, x_speed, y_speed);
+                            network->sendSpawnItem(iii, rand_i, mapId, rand_item, x, y, x_speed, y_speed);
                     }
                 }
             }
@@ -655,18 +654,18 @@ void SKO_PacketHandler::parseUseItem(unsigned char userId, SKO_PacketParser *par
                 User[userId].inventory[otherItem]++;
                 User[userId].inventory_index++;
                 unsigned int amount = User[userId].inventory[otherItem];
-                network->SendPocketItem(userId, otherItem, amount);
+                network->sendPocketItem(userId, otherItem, amount);
             }
 
             // Tell player one trophy is removed from their inventory
             unsigned int amount = User[userId].inventory[item];
-            network->SendPocketItem(userId, item, amount);
+            network->sendPocketItem(userId, item, amount);
 
             //tell everyone the player equipped their trophy
             for (int i1 = 0; i1 < MAX_CLIENTS; i1++)
             {
                 if (User[i1].Ident)
-                    network->SendEquip(i1, userId, (char)2, Item[item].equipID, item);
+                    network->sendEquip(i1, userId, (char)2, Item[item].equipID, item);
             }
             break;
         }
@@ -699,7 +698,7 @@ void SKO_PacketHandler::parseDropItem(unsigned char userId, SKO_PacketParser *pa
         }
 
         //tell the user they dropped their items.
-        network->SendPocketItem(userId, item, ownedAmount);
+        network->sendPocketItem(userId, item, ownedAmount);
 
         //TODO refactor all of this
         //next spawn a new item for all players
@@ -755,7 +754,7 @@ void SKO_PacketHandler::parseDropItem(unsigned char userId, SKO_PacketParser *pa
         for (int iii = 0; iii < MAX_CLIENTS; iii++)
         {
             if (User[iii].Ident && User[iii].mapId == mapId)
-                network->SendSpawnItem(iii, rand_i, mapId, item, x, y, x_speed, x_speed);
+                network->sendSpawnItem(iii, rand_i, mapId, item, x, y, x_speed, x_speed);
         }
     }
 }
@@ -792,37 +791,7 @@ void SKO_PacketHandler::parseSlashBan(unsigned char userId, std::string paramete
     std::string username = nextParameter(parameters);
     std::string reason = parameters;
 
-    int result = network->banPlayer(userId, username, reason, 1);
-    if (result == 0)
-    {
-        for (int i = 0; i < MAX_CLIENTS; i++)
-        {
-            if (User[i].Ident)
-            {
-                // Send data
-                network->sendChat(userId, username + " has been banned. (" + reason + ")");
-
-                //find which socket, yo
-                if (lower(User[i].Nick).compare(lower(username)) == 0)
-                {
-                    User[i].Sock->Close();
-                }
-            }
-        }
-    }
-    else if (result == 1)
-    {
-        network->sendChat(userId, username + " does not exist.");
-    }
-    else if (result == 2)
-    {
-        network->sendChat(userId, username + " cannot be banned.");
-    }
-    else if (result == 3)
-    {
-        printf("The user [%s] tried to ban [%s] but they are not moderator!\n", User[userId].Nick.c_str(), username.c_str());
-        network->sendChat(userId, "You re not authorized to ban a player.");
-    }
+    network->banPlayer(userId, username, reason, 1);
 }
 
 // [CHAT]["/ban"][" "]["<username>"][" "]["<reason>"]
@@ -830,26 +799,7 @@ void SKO_PacketHandler::parseSlashUnban(unsigned char userId, std::string parame
 {
     //strip the appropriate data
     std::string username = parameters;
-
-    int result = repository->banPlayer(userId, username, "unban the player :)", 0);
-
-    if (result == 0)
-    {
-        network->sendChat(userId, username + " has been unbanned.");
-    }
-    else if (result == 1)
-    {
-        network->sendChat(userId, username + " does not exist.");
-    }
-    else if (result == 2)
-    {
-        network->sendChat(userId, username + " cannot be unbanned.");
-    }
-    else if (result == 3)
-    {
-        printf("The user [%s] tried to unban [%s] but they are not moderator!\n", User[userId].Nick.c_str(), username.c_str());
-        network->sendChat(userId, "You are not authorized to unban a player.");
-    }
+    network->unbanPlayer(userId, username);
 }
 
 // [CHAT]["/mute"][" "]["<username>"][" "]["<reason>"]
@@ -858,111 +808,22 @@ void SKO_PacketHandler::parseSlashMute(unsigned char userId, std::string paramet
     //strip the appropriate data
     std::string username = nextParameter(parameters);
     std::string reason = parameters;
-
-    int result = network->mutePlayer(userId, username, 1);
-    if (result == 0)
-    {
-        //find the sock of the username
-        for (int i = 0; i < MAX_CLIENTS; i++)
-        {
-            //well, unmute the person
-            std::string lower_username = lower(username);
-            std::string lower_nick = lower(User[i].Nick);
-
-            if (lower_username.compare(lower_nick) == 0)
-                User[i].Mute = true;
-
-            if (User[i].Ident)
-                network->sendChat(userId, username + " has been muted.");
-        }
-    }
-    else if (result == 1)
-    {
-        network->sendChat(userId, username + " does not exist.");
-    }
-    else if (result == 2)
-    {
-        network->sendChat(userId, username + " cannot be muted,");
-    }
-    else if (result == 3)
-    {
-        printf("The user [%s] tried to mute [%s] but they are not moderator!\n", User[userId].Nick.c_str(), username.c_str());
-        network->sendChat(userId, "You are not authorized to mute players.");
-    }
+    network->mutePlayer(userId, username, reason);
 }
-
+ 
 // [CHAT]["/unmute"][" "]["<username>"]
 void SKO_PacketHandler::parseSlashUnmute(unsigned char userId, std::string parameters)
 {
-    //strip the appropriate data
     std::string username = nextParameter(parameters);
-    
-    int result = network->mutePlayer(userId, username, 0);
-    if (result == 0)
-    {
-        //find the sock of the username
-        for (int i = 0; i < MAX_CLIENTS; i++)
-        {
-            // well, unmute the person
-            if (lower(User[i].Nick).compare(lower(username)) == 0)
-                User[i].Mute = false;
-
-            // well, tell everyone
-            // If this socket is taken
-            if (User[i].Ident)
-                network->sendChat(userId, username + " has been unmuted.");
-        }
-    }
-    else if (result == 1)
-    {
-        network->sendChat(userId, username + " does not exist.");
-    }
-    else if (result == 2)
-    {
-        network->sendChat(userId, username + " cannot be muted.");
-    }
-    else if (result == 3)
-    {
-        printf("The user [%s] tried to unmute [%s] but they are not moderator!\n", User[userId].Nick.c_str(), username.c_str());
-        network->sendChat(userId, "You are not authorized to mute players.");
-    }
+    network->unmutePlayer(userId, username);
 }
 
 // [CHAT]["/ban"][" "]["<username>"][" "]["<reason>"]
 void SKO_PacketHandler::parseSlashKick(unsigned char userId, std::string parameters)
 {
     std::string username = nextParameter(parameters);
-    std::string Reason = parameters;
-    
-    int result = 0;
-    result = network->kickPlayer(userId, username);
-
-    if (result == 0)
-    {
-        //okay, now send
-        for (int i = 0; i < MAX_CLIENTS; i++)
-        {
-            //if socket is taken
-            if (User[i].Ident)
-                network->sendChat(userId, username + " has been kicked. (" + Reason + ")");
-
-            //kick the user
-            if (lower(username).compare(lower(User[i].Nick)) == 0)
-            {
-                User[i].Sock->Close();
-                User[i].Sock->Connected = false;
-            }
-        }
-    }
-    else if (result == 1)
-    {
-        network->sendChat(userId, username + " is not online.");
-    }
-    else if (result == 2)
-    {
-        printf("The user [%s] tried to kick [%s] but they are not moderator!\n", User[userId].Nick.c_str(), username.c_str());
-        network->sendChat(userId, "You are not authorized to kick players.");
-    }
+    std::string reason = parameters;
+    network->kickPlayer(userId, username, reason);
 }
 
 // [CHAT]["/who"]
@@ -1008,25 +869,8 @@ void SKO_PacketHandler::parseSlashWho(unsigned char userId)
 void SKO_PacketHandler::parseSlashIpban(unsigned char userId, std::string parameters)
 {
     std::string IP = nextParameter(parameters);
-    std::string Reason = parameters;
-
-    //TODO create SKO_Network function to wrap repository call.
-    if (User[userId].Moderator)
-    {
-        int result = repository->banIP(User[userId].Nick, IP, Reason);
-        if (result == 0)
-        {
-            network->sendChat(userId, "[" + IP + "] has been banned (" + Reason + ")");
-        }
-        else
-        {
-            network->sendChat(userId, "Could not ban IP [" + IP + "] for unknown error.");
-        }
-    }
-    else
-    {
-        network->sendChat(userId, "You are not authorized to ban IP addresses.");
-    }
+    std::string reason = parameters;
+    network->ipbanPlayer(userId, IP, reason);
 }
 
 // [CHAT]["/getip"][" "]["<player>"]
@@ -1417,11 +1261,11 @@ void SKO_PacketHandler::parseTradeConfirm(unsigned char userId, SKO_PacketParser
 
             //put in players inventory
             unsigned int amount = User[playerB].inventory[itemId];
-            network->SendPocketItem(playerB, itemId, amount);
+            network->sendPocketItem(playerB, itemId, amount);
 
             //take it out of A's inventory
             amount = User[playerA].inventory[itemId];
-            network->SendPocketItem(playerA, itemId, amount);
+            network->sendPocketItem(playerA, itemId, amount);
         }
 
         //give B's stuff  to A
@@ -1434,11 +1278,11 @@ void SKO_PacketHandler::parseTradeConfirm(unsigned char userId, SKO_PacketParser
 
             //put in players inventory
             unsigned int amount = User[playerA].inventory[itemId];
-            network->SendPocketItem(playerA, itemId, amount);
+            network->sendPocketItem(playerA, itemId, amount);
 
             //take it away from B
             amount = User[playerB].inventory[itemId];
-            network->SendPocketItem(playerB, itemId, amount);
+            network->sendPocketItem(playerB, itemId, amount);
         }
 
         //clear the items
@@ -1546,9 +1390,9 @@ void SKO_PacketHandler::parsePartyAccept(unsigned char userId)
         unsigned char xp = (int)((User[userId].xp / (float)User[userId].max_xp) * 80);
         unsigned char level = User[userId].level;
 
-        network->SendBuddyStatHp(pl, userId, hp);
-        network->SendBuddyStatXp(pl, userId, xp);
-        network->SendBuddyStatLevel(pl, userId, level);
+        network->sendBuddyStatHp(pl, userId, hp);
+        network->sendBuddyStatXp(pl, userId, xp);
+        network->sendBuddyStatLevel(pl, userId, level);
 
         //
         // Notify player of each existing party member
@@ -1560,9 +1404,9 @@ void SKO_PacketHandler::parsePartyAccept(unsigned char userId)
         level = User[pl].level;
 
         // Update party stats for client party player list
-        network->SendBuddyStatHp(userId, pl, hp);
-        network->SendBuddyStatXp(userId, pl, xp);
-        network->SendBuddyStatLevel(userId, pl, level);
+        network->sendBuddyStatHp(userId, pl, hp);
+        network->sendBuddyStatXp(userId, pl, xp);
+        network->sendBuddyStatLevel(userId, pl, level);
     }
         
 }
@@ -1773,11 +1617,11 @@ void SKO_PacketHandler::parseShopBuy(unsigned char userId, SKO_PacketParser *par
 
     //put in client players inventory
     amount = User[userId].inventory[item];
-    network->SendPocketItem(userId, item, amount);
+    network->sendPocketItem(userId, item, amount);
 
     //Take gold out of player's inventory
     amount = User[userId].inventory[ITEM_GOLD];
-    network->SendPocketItem(userId, (unsigned char)ITEM_GOLD, amount);
+    network->sendPocketItem(userId, (unsigned char)ITEM_GOLD, amount);
 }
 
 // [SHOP][SELL][(unsigned char)itemId)][(unsigned int)amount]
@@ -1803,11 +1647,11 @@ void SKO_PacketHandler::parseShopSell(unsigned char userId, SKO_PacketParser *pa
 
     //take out of client player's inventory
     amount = User[userId].inventory[item];
-    network->SendPocketItem(userId, item, amount);
+    network->sendPocketItem(userId, item, amount);
 
     //put gold into player's inventory
     amount = User[userId].inventory[ITEM_GOLD];
-    network->SendPocketItem(userId, (char)ITEM_GOLD, amount);
+    network->sendPocketItem(userId, (char)ITEM_GOLD, amount);
 }
 
 // [SHOP][(unsigned char)shopAction)][...]
@@ -1857,11 +1701,11 @@ void SKO_PacketHandler::parseBankDeposit(unsigned char userId, SKO_PacketParser 
 
     //send deposit notification to user
     unsigned int deposit = User[userId].bank[item];
-    network->SendBankItem(userId, item, deposit);
+    network->sendBankItem(userId, item, deposit);
 
     //update client player's inventory
     unsigned int withdrawal = User[userId].inventory[item];
-    network->SendPocketItem(userId, item, withdrawal);
+    network->sendPocketItem(userId, item, withdrawal);
 }
 
 // [BANK][DEBANK_ITEM][(unsigned char)itemId)][(unsigned int)amount]
@@ -1881,11 +1725,11 @@ void SKO_PacketHandler::parseBankWithdrawal(unsigned char userId, SKO_PacketPars
 
     //send deposit notification to user
     unsigned int deposit = User[userId].bank[item];
-    network->SendBankItem(userId, item, amount);
+    network->sendBankItem(userId, item, amount);
 
     //update client player's inventory
     unsigned int withdrawal = User[userId].inventory[item];
-    network->SendPocketItem(userId, item, withdrawal);
+    network->sendPocketItem(userId, item, withdrawal);
 }
 
 // [BANK][(unsigned char)bankAction]
