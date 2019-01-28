@@ -25,19 +25,9 @@ void SKO_PacketHandler::parsePong(unsigned char userId)
 void SKO_PacketHandler::parseLogin(unsigned char userId, SKO_PacketParser *parser)
 {
     // Declare message string
-    std::string loginRequest = "";
-    std::string username = "";
-    std::string password = "";
-
-    // Declare temp string
-    std::string Temp;
-
-    //fill message with username and password
-    loginRequest = parser->getPacketBody();;
-
-    //strip the appropriate data
-    username += loginRequest.substr(0, loginRequest.find_first_of(" "));
-    password += loginRequest.substr(loginRequest.find_first_of(" ") + 1);
+    std::string loginRequest = parser->getPacketBody();;
+    std::string username = loginRequest.substr(0, loginRequest.find_first_of(" "));
+    std::string password = loginRequest.substr(loginRequest.find_first_of(" ") + 1);
 
     printf("\n::LOGIN::\nUsername[%s]\nPassword[%s]\n", username.c_str(), password.c_str());
 
