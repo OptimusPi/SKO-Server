@@ -5,7 +5,7 @@ void SKO_Player::init()
 	Sock = new GE_Socket();
 	Sock->Connected = false;
 	Nick = "";
-	Mute = true;
+	Mute = false;
 	Moderator = false;
 	Ident = false;
 	Status = false;

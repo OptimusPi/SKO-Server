@@ -12,13 +12,13 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h> 
+#include <mutex>
 #include "OPI_Clock.h"
-#include <semaphore.h>
 
 class OPI_MYSQL
 {
 	public:
-		sem_t queryMutex, cleanMutex;
+		std::mutex queryMutex, cleanMutex;
 		//constructor
 		OPI_MYSQL();
 
@@ -41,7 +41,7 @@ class OPI_MYSQL
 		std::string clean(std::string dirty_str);
 
 		//get a row/advance
-		int nextRow();    
+		void nextRow();    
 		char * getData(int i);
 		int getNumOfFields();
 		int count();

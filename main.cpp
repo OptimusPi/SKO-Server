@@ -86,10 +86,10 @@ void Warp(unsigned char userId, SKO_Portal portal);
 void Respawn(unsigned char mapId, unsigned char userId);
 void SpawnLoot(unsigned char mapId, SKO_ItemObject lootItem);
 
-static void *Physics(void *Arg);
-static void *TargetLoop(void *Arg);
-static void *EnemyLoop(void *arg);
-static void *UserLoop(void *arg);
+void Physics();
+void TargetLoop();
+void EnemyLoop();
+void UserLoop();
 
 std::string trim(std::string str)
 {
@@ -281,7 +281,7 @@ int main()
 	printf("Initialized SKO_Network.\n");
 
 	printf("Starting up SKO_Network...\n");
-	std::string networkStatus = network->Startup();
+	std::string networkStatus = network->startup();
 	printf("SKO_Network status is: %s\n", networkStatus.c_str());
 
 	if (networkStatus == "success")
@@ -292,7 +292,7 @@ int main()
 	else
 	{
 		printf(kRed "Could not initialize SKO_Network. Here is the status: [%s]\n", networkStatus.c_str());
-		network->Cleanup();
+		network->cleanup();
 		return 1;
 	}
 
@@ -300,44 +300,20 @@ int main()
 	srand(Clock());
 
 	//multi threading
-	pthread_t physicsThread, enemyThread, targetThread;
-	pthread_t mainThread;
+	std::thread physicsThread (Physics);
+	std::thread enemyThread (EnemyLoop);
+	std::thread targetThread (TargetLoop);
+	std::thread mainThread (UserLoop);
 
-	if (pthread_create(&physicsThread, NULL, Physics, NULL))
-	{
-		printf("Could not create thread for physics...\n");
-		return 1;
-	}
-
-	if (pthread_create(&enemyThread, NULL, EnemyLoop, NULL))
-	{
-		printf("Could not create thread for enemys...\n");
-		return 1;
-	}
-
-	if (pthread_create(&targetThread, NULL, TargetLoop, NULL))
-	{
-		printf("Could not create thread for targets...\n");
-		return 1;
-	}
-
-	if (pthread_create(&mainThread, NULL, UserLoop, NULL))
-	{
-		printf("Could not create thread for UserLoop...\n");
-		return 1;
-	}
-	
-
-	printf("Done loading!\nStopping main, threads will continue.\n");
-	if (pthread_join(mainThread, NULL))
-	{
-		printf("Could not join thread for que...\n");
-	}
+	mainThread.join();
+	targetThread.join();
+	enemyThread.join();
+	physicsThread.join();
 
 	return 0;
 }
 
-void *UserLoop(void *arg)
+void UserLoop()
 {
 	while (!SERVER_QUIT)
 	{
@@ -347,7 +323,7 @@ void *UserLoop(void *arg)
 			if (!User[userId].Status)
 				continue;
 				
-			network->HandleClient(userId);
+			network->handleClient(userId);
 		}
 
 		// Sleep a bit
@@ -388,10 +364,8 @@ bool blocked(unsigned char mapId, float box1_x1, float box1_y1, float box1_x2, f
 	return false;
 }
  
-void *TargetLoop(void *arg)
+void TargetLoop()
 {
-	char *p;
-
 	while (!SERVER_QUIT)
 	{
 		for (unsigned char mapId = 0; mapId < NUM_MAPS; mapId++)
@@ -411,16 +385,10 @@ void *TargetLoop(void *arg)
 	}
 }
 
-void *EnemyLoop(void *arg)
+void EnemyLoop()
 {
-	char *p;
-	long int timea;
-	unsigned char mapId = (intptr_t)arg;
-
 	while (!SERVER_QUIT)
 	{
-		timea = Clock();
-
 		for (unsigned char mapId = 0; mapId < NUM_MAPS; mapId++)
 		{
 			//enemy
@@ -732,13 +700,12 @@ void *EnemyLoop(void *arg)
 	}
 }
 
-void *Physics(void *arg)
+void Physics()
 {
 	//initialize the timestep
 	KE_Timestep *timestep = new KE_Timestep(60);
 
 	int a = 0;
-	char *p;
 	bool block_y;
 	bool block_x;
 	unsigned char itemId = 0;
@@ -1762,7 +1729,7 @@ void Warp(unsigned char userId, SKO_Portal portal)
 {
 	//move the player to this spot
 	unsigned char oldMap = User[userId].mapId;
-	User[userId].mapId = portal.map;
+	User[userId].mapId = portal.mapId;
 	User[userId].x = portal.spawn_x;
 	User[userId].y = portal.spawn_y;
 
@@ -1773,6 +1740,7 @@ void Warp(unsigned char userId, SKO_Portal portal)
 	}
 
 	//TODO show all items and targets on warp?
+
 }
 
 void GiveXP(unsigned char userId, int xp)

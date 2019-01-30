@@ -9,13 +9,14 @@ public:
 
 	//this portal rect
 	int x, y, w, h;
+	
 	//level requirement
 	int level_required;
 
 	//where does this portal throw you?
 	int spawn_x, spawn_y;
 	//what map does it throw you to?
-	int map;
+	unsigned char mapId;
 };
 
 #endif

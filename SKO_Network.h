@@ -7,7 +7,6 @@
 #define LINUX_OS 	2
 #define MAC_OS 		3
 
-#include <semaphore.h>
 #include <string>
 #include <thread>
 
@@ -18,6 +17,7 @@
 #include "GE_Socket.h"
 #include "base64.h"
 #include "Global.h"
+#include <mutex>
 
 class SKO_PacketHandler;
 
@@ -27,11 +27,11 @@ class SKO_Network
 public:
 
 	SKO_Network(SKO_Repository * repository, int port, unsigned long int saveRateSeconds);
-	std::string Startup();
-	void Cleanup();
+	std::string startup();
+	void cleanup();
 
 	// Handle all network functions of a client
-	void HandleClient(unsigned char userId);
+	void handleClient(unsigned char userId);
 
 	//Login and loading helper functions
 	void sendVersionSuccess(unsigned char userId);
@@ -87,8 +87,16 @@ public:
 	//Save all profiles
 	void saveAllProfiles();
 	
+	// Player account actions
+	void attemptLogin(unsigned char userId, std::string username, std::string password);
+	void attemptRegister(unsigned char userId, std::string username, std::string password);
+	void createClan(unsigned char userId, std::string clanTag);
+	void acceptClanInvite(unsigned char userId);
+	void clanInvite(unsigned char userId, unsigned char playerId);
+
 	// Player chat and server messages
 	void sendChat(unsigned char userId, std::string message);
+	void sendWho(unsigned char userId);
 
 	// Trade actions
 	void sendTradeInvite(unsigned char userId, unsigned char playerId);
@@ -114,19 +122,21 @@ public:
 	// Admin commands
 	bool isPlayerOnline(std::string username);
 	bool verifyAdmin(unsigned char userId);
+	void getIp(unsigned char userId, std::string username);
 	void kickPlayer(unsigned char userId, std::string username, std::string reason);
 	void mutePlayer(unsigned char userId, std::string username, std::string reason);
 	void unmutePlayer(unsigned char userId, std::string username);
-	void ipbanPlayer(unsigned char userId, std::string username, std::string IP, std::string reason);
+	void banAddress(unsigned char userId, std::string ip, std::string reason);
 	void banPlayer(unsigned char userId, std::string username, std::string reason);
 	void unbanPlayer(unsigned char userId, std::string username);
+	void warpPlayer(unsigned char userId, std::string usernamne, int x, int y, unsigned char mapId);
  private:
 	
 	// Bind to this port and accept incoming connections.
 	unsigned int port = 0;
 
 	// Allow only one save call at a time.
-	sem_t saveMutex;
+	std::mutex saveMutex;
 
 	// How often to save all valid players.
 	unsigned long int saveRateSeconds;
@@ -151,18 +161,19 @@ public:
 	void QueueLoop();
 	void ConnectLoop();
 	void SaveLoop();
-
+ 
 	// Client socket functions
-	void RecvPacket(GE_Socket* socket);
-	void DisconnectClient(unsigned char userId);
+	void recvPacket(GE_Socket* socket);
+	void disconnectClient(unsigned char userId);
 
 	// Helper functions
+	void attemptLogin(std::string username, std::string password);
 	void despawnTarget(int target, unsigned char mapId);
-	void Respawn(unsigned char mapId, int i);
-	void DivideLoot(int enemy, int party); 
-	void KillEnemy(unsigned char mapId, int enemy);
-	void GiveLoot(int enemy, int player);
-	void GiveXP(unsigned char userId, int xp);
+	void respawn(unsigned char mapId, int i);
+	void divideLoot(int enemy, int party); 
+	void killEnemy(unsigned char mapId, int enemy);
+	void giveLoot(int enemy, int player);
+	void giveXP(unsigned char userId, int xp);
 
     // Socket send (variadic arguments)
 	template<typename First, typename ... Rest>

@@ -30,7 +30,7 @@ private:
 
     // Login and Register player account
     void parseLogin(unsigned char userId, SKO_PacketParser *parser);
-    void parseRegister(unsigned char userId, SKO_PacketParser *parser);    
+    void parseRegister(unsigned char userId, std::string parameters);    
     
     // Player actions
     void parseAttack(unsigned char userId, SKO_PacketParser *parser);    
@@ -82,7 +82,7 @@ private:
     void parseClan(unsigned char userId, SKO_PacketParser *parser);
     void parseClanCreate(unsigned char userId, SKO_PacketParser *parser);
     void parseClanInvite(unsigned char userId, SKO_PacketParser *parser);
-    void parseClanAccept(unsigned char userId, SKO_PacketParser *parser);
+    void parseClanAccept(unsigned char userId);
 
 
     // Chat and slash commands

@@ -1,7 +1,6 @@
 /* INCLUDES */
 #include "library.h"
 #include "GE_Socket.h"
-#include <pthread.h>
 
 #ifndef __SKO_PLAYER_H_
 #define __SKO_PLAYER_H_
@@ -40,8 +39,8 @@ class SKO_Player
         std::string Nick, Clan;
 
         // Status
-        bool Mute;
-        bool Moderator;
+        bool Mute = false;
+        bool Moderator = false;
 
         //player id in database
         std::string ID;

@@ -40,6 +40,8 @@
         "tuple": "cpp",
         "typeinfo": "cpp",
         "utility": "cpp",
-        "algorithm": "cpp"
+        "algorithm": "cpp",
+        "condition_variable": "cpp",
+        "mutex": "cpp"
     }
 }

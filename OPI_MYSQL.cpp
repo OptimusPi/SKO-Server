@@ -27,9 +27,6 @@ void OPI_MYSQL::cleanup()
 
 OPI_MYSQL::OPI_MYSQL()
 {
-	sem_init(&queryMutex, 0, 1);
-	sem_init(&cleanMutex, 0, 1);    
- 
 	conn = new MYSQL();
 
 	//just initialize the connection
@@ -131,7 +128,7 @@ int OPI_MYSQL::query(std::string statement)
 
 int OPI_MYSQL::query(std::string statement, bool once)
 {
-    sem_wait(&queryMutex);
+    std::lock_guard<std::mutex> lock(queryMutex);
 	
     log("OPI_MYSQL::query()\n\t");
     log(statement);
@@ -208,13 +205,12 @@ int OPI_MYSQL::query(std::string statement, bool once)
     }while (fail && !once);
     
     mysql_close(conn);
-    sem_post(&queryMutex);
 
     //return error/success
     return returnVal;
 }
 
-int OPI_MYSQL::nextRow()
+void OPI_MYSQL::nextRow()
 {
     row = mysql_fetch_row(result);
     length = mysql_fetch_lengths(result);
@@ -266,7 +262,7 @@ int OPI_MYSQL::count()
 
 std::string OPI_MYSQL::clean(std::string dirty_str)
 {
-    sem_wait(&cleanMutex);
+   std::lock_guard<std::mutex> lock(cleanMutex);
     
     conn = mysql_init(NULL);
     
@@ -277,8 +273,6 @@ std::string OPI_MYSQL::clean(std::string dirty_str)
     printf("mysql_real_escape_string(%lu, [clean_char], [%s], %i);", 
 		(unsigned long)conn, dirty_str.c_str(), (int)dirty_str.size());
     mysql_real_escape_string(conn, clean_char, dirty_str.c_str(), dirty_str.size());
-    
-    sem_post(&cleanMutex);
 
     //return the value
     return (const char*)clean_char;

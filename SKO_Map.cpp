@@ -217,7 +217,7 @@ SKO_Map::SKO_Map (std::string FileName)
                 Portal[portal].y = configFile.GetInteger(ss.str(), "y", 0);
                 Portal[portal].w = configFile.GetInteger(ss.str(), "w", 0);
                 Portal[portal].h = configFile.GetInteger(ss.str(), "h", 0);
-                Portal[portal].map = configFile.GetInteger(ss.str(), "map", 0);
+                Portal[portal].mapId = configFile.GetInteger(ss.str(), "map", 0);
                 Portal[portal].spawn_x = configFile.GetInteger(ss.str(), "spawn_x", 0);
                 Portal[portal].spawn_y = configFile.GetInteger(ss.str(), "spawn_y", 0);
                 Portal[portal].level_required = configFile.GetInteger(ss.str(), "level_required", 0);

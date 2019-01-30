@@ -25,240 +25,18 @@ void SKO_PacketHandler::parsePong(unsigned char userId)
 void SKO_PacketHandler::parseLogin(unsigned char userId, SKO_PacketParser *parser)
 {
     // Declare message string
-    std::string loginRequest = parser->getPacketBody();;
+    std::string loginRequest = parser->getPacketBody();
     std::string username = loginRequest.substr(0, loginRequest.find_first_of(" "));
     std::string password = loginRequest.substr(loginRequest.find_first_of(" ") + 1);
-
-    printf("\n::LOGIN::\nUsername[%s]\nPassword[%s]\n", username.c_str(), password.c_str());
-
-    //go through and see if you are logged in already
-    for (int i = 0; i < MAX_CLIENTS; i++)
-    {
-        //tell the client if you are logged in already
-        if (lower(User[i].Nick).compare(lower(username)) == 0)
-        {
-            printf("User that is you already is: %s x is %i i is %i\n", User[i].Nick.c_str(), (int)User[i].x, i);
-            network->sendLoginResponse_AlreadyOnline(userId);
-            return;
-        }
-    }
-
-    //Login and load some status such as is mute, is banned
-    int result = repository->loginPlayer(username, password);
-
-    if (result == 1) //wrong password
-    {
-        network->sendLoginResponse_PasswordFailed(userId);
-
-        //TODO kick server after several failed login attempts
-        //warn the server, possible bruteforce hack attempt
-        printf("%s has entered the wrong password!\n", username.c_str());
-    }
-    else if (result == 3) //character is banned
-    {
-        network->sendLoginResponse_PlayerBanned(userId);
-        printf("%s is banned and tried to login!\n", username.c_str());
-    }
-    else if (result == 4)
-    {
-        network->sendLoginResponse_PasswordFailed(userId);
-        printf("%s tried to login but doesn't exist!\n", username.c_str());
-    }
-
-    if (result == 0 || result == 5) //login with no problems or with 1 problem: user is mute
-    {                               //login success
-
-        printf("(login success) User %i %s socket status: %i\n", userId, username.c_str(), User[userId].Sock->GetStatus());
-
-        if (result == 0)
-            User[userId].Mute = false;
-
-        //successful login
-        network->sendLoginResponse_Success(userId);
-
-        //set display name
-        User[userId].Nick = username;
-
-        std::string clanTag = repository->GetClanTag(username, "(noob)");
-
-        printf("Clan: %s\n", clanTag.c_str());
-        User[userId].Clan = clanTag;
-
-        printf(">>>about to load data.\n");
-        if (repository->loadPlayerData(userId) != 0)
-        {
-            printf("couldn't load data. KILL!\n");
-            User[userId].Save = false;
-            User[userId].Sock->Close();
-            return;
-        }
-
-        //set identified
-        User[userId].Ident = true;
-
-        //the current map of this user
-        unsigned char mapId = User[userId].mapId;
-
-        printf("going to tell client stats\n");
-
-        printf(kGreen "hp: %i\n" kNormal, (int)User[userId].hp);
-        printf(kGreen "max hp: %i\n" kNormal, (int)User[userId].max_hp);
-        printf(kGreen "xp: %i\n" kNormal, (int)User[userId].xp);
-        printf(kGreen "max xp: %i\n" kNormal, (int)User[userId].max_xp);
-
-        // HP
-        network->sendStatHp(userId, User[userId].hp);
-        network->sendStatHpMax(userId, User[userId].max_hp);
-        network->sendStatRegen(userId, User[userId].regen);
-
-        // XP
-        network->sendStatXp(userId, User[userId].xp);
-        network->sendStatXpMax(userId, User[userId].max_xp);
-
-        //STATS
-        network->sendStatLevel(userId, User[userId].level);
-        network->sendStatStr(userId, User[userId].strength);
-        network->sendStatDef(userId, User[userId].defence);
-        network->sendStatPoints(userId, User[userId].stat_points);
-
-        //equipment
-        network->sendEquip(userId, userId, (char)0, Item[User[userId].equip[0]].equipID, User[userId].equip[0]);
-        network->sendEquip(userId, userId, (char)1, Item[User[userId].equip[1]].equipID, User[userId].equip[1]);
-        network->sendEquip(userId, userId, (char)2, Item[User[userId].equip[2]].equipID, User[userId].equip[2]);
-
-        //cosmetic inventory order
-        network->sendInventoryOrder(userId, User[userId].getInventoryOrder());
-
-        //inventory
-        for (unsigned char i = 0; i < NUM_ITEMS; i++)
-        {
-            //if they own this item, tell them how many they own.
-            unsigned int amount = User[userId].inventory[i];
-            //prevents them from holding more than 24 items
-            if (amount > 0)
-            {
-                User[userId].inventory_index++;
-                network->sendPocketItem(userId, i, amount);
-            }
-
-            amount = User[userId].bank[i];
-            //printf("this player owns [%i] of item %i\n", amt, i);
-            if (amount > 0)
-            {
-                //TODO: remove this bank index or change how the bank works!
-                User[userId].bank_index++;
-                network->sendBankItem(userId, i, amount);
-            }
-        } //end loop 256 for items in inventory and map
-
-        //bank
-        for (int i = 0; i < 256; i++)
-        {
-            //go through all the ItemObjects since we're already looping
-            if (map[mapId].ItemObj[i].status)
-            {
-                unsigned char itemId = map[mapId].ItemObj[i].itemID;
-                float numx = map[mapId].ItemObj[i].x;
-                float numy = map[mapId].ItemObj[i].y;
-                float numxs = map[mapId].ItemObj[i].x_speed;
-                float numys = map[mapId].ItemObj[i].y_speed;
-                network->sendSpawnItem(userId, i, mapId, itemId, numx, numy, numxs, numys);
-            }
-        }
-
-        //targets
-        for (int i = 0; i < map[mapId].num_targets; i++)
-        {
-            if (map[mapId].Target[i].active)
-                network->sendSpawnTarget(i, mapId);
-        }
-
-        //npcs
-        for (int i = 0; i < map[mapId].num_npcs; i++)
-        {
-            unsigned char action = NPC_MOVE_STOP;
-
-            if (map[mapId].NPC[i]->x_speed < 0)
-                action = NPC_MOVE_LEFT;
-            if (map[mapId].NPC[i]->x_speed > 0)
-                action = NPC_MOVE_RIGHT;
-
-            network->sendNpcAction(map[mapId].NPC[i], action, i, mapId);
-        }
-
-        // load all enemies
-        for (int i = 0; i < map[mapId].num_enemies; i++)
-        {
-            unsigned char action = ENEMY_MOVE_STOP;
-            if (map[mapId].Enemy[i]->x_speed < 0)
-                action = ENEMY_MOVE_LEFT;
-            if (map[mapId].Enemy[i]->x_speed > 0)
-                action = ENEMY_MOVE_RIGHT;
-
-            network->sendEnemyAction(map[mapId].Enemy[i], action, i, mapId);
-
-            //enemy health bars
-            int hp = (unsigned char)((float)map[mapId].Enemy[i]->hp / map[mapId].Enemy[i]->hp_max * hpBar);
-            network->sendEnemyHp(userId, i, mapId, hp);
-        }
-
-        // inform all players
-        for (unsigned char i = 0; i < MAX_CLIENTS; i++)
-        {
-            // Tell the new user about existing players
-            if (i == userId && User[i].Nick.compare("Paladin") != 0)
-            {
-                network->sendPlayerJoin(userId, i);
-            }
-            // Tell existing players about new user
-            else if (User[i].Ident)
-            {
-                network->sendPlayerJoin(i, userId);
-            }
-        }
-
-        // Trigger loading complete on client.
-        network->sendPlayerLoaded(userId);
-
-        //mark this client to save when they disconnect..since Send/Recv change Ident!!
-        User[userId].Save = true;
-        network->saveAllProfiles();
-    } //end login success
+    network->attemptLogin(userId, username, password);
 }
 
 // [REGISTER][<username>][" "][<password>]
-void SKO_PacketHandler::parseRegister(unsigned char userId, SKO_PacketParser *parser)
+void SKO_PacketHandler::parseRegister(unsigned char userId, std::string parameters)
 {
-    std::string username = "";
-    std::string password = "";
-    std::string packetData = parser->getPacketBody();
-
-    //strip the appropriate data
-    username += packetData.substr(0, packetData.find_first_of(" "));
-    password += packetData.substr(packetData.find_first_of(" ") + 1);
-
-    //try to create new player account
-    int result = repository->createPlayer(username, password, User[userId].Sock->IP);
-
-    if (result == 1) // user already exists
-    {
-        network->sendRegisterResponse_AlreadyRegistered(userId);
-        printf("%s tried to double-register!\n", username.c_str());
-    }
-    else if (result == 0) // user created successfully
-    {
-        network->sendRegisterResponse_Success(userId);
-        printf("%s has been registered!\n", username.c_str());
-    }
-    else if (result == 2) // user is banned
-    {
-        User[userId].Sock->Close();
-    }
-    else if (result == 3) // fatal error occurred
-    {
-        printf(kRed "[FATAL] Unable to create player.\n" kNormal);
-        User[userId].Sock->Close();
-    }
+    std::string username = nextParameter(parameters);
+    std::string password = parameters;//do not use nextParameter to get password, just use remaining
+    network->attemptRegister(userId, username, password);      
 }
 
 // [ATTACK][(float)x][(float)y]
@@ -780,8 +558,7 @@ void SKO_PacketHandler::parseSlashBan(unsigned char userId, std::string paramete
 {
     std::string username = nextParameter(parameters);
     std::string reason = parameters;
-
-    network->banPlayer(userId, username, reason, 1);
+    network->banPlayer(userId, username, reason);
 }
 
 // [CHAT]["/ban"][" "]["<username>"][" "]["<reason>"]
@@ -819,99 +596,32 @@ void SKO_PacketHandler::parseSlashKick(unsigned char userId, std::string paramet
 // [CHAT]["/who"]
 void SKO_PacketHandler::parseSlashWho(unsigned char userId)
 {
-    //find how many players are online
-    int players = 0;
-    bool flag = false;
-    std::string strNicks = "";
-
-    for (int i = 0; i < MAX_CLIENTS; i++)
-    {
-        //if socket is taken
-        if (User[i].Ident && User[i].Nick.compare("Paladin") != 0)
-        {
-            players++;
-
-            //formatting
-            if (flag)
-                strNicks += ", ";
-            else if (User[i].Ident)
-                flag = true;
-
-            //add the nickname to the list
-            if (User[i].Ident)
-                strNicks += User[i].Nick;
-        }
-    }
-
-    //TODO change this
-    char strPlayers[127];
-    if (players == 1)
-        sprintf(strPlayers, "There is %i player online: ", players);
-    else
-        sprintf(strPlayers, "There are %i players online: ", players);
-    network->sendChat(userId, strPlayers);
-
-    if (players > 0)
-        network->sendChat(userId, strNicks);
+    //nothing special to parse here!
+    network->sendWho(userId);
 }
 
-// [CHAT]["/ipban"][" "]["<player>"][" "][<reason>]
+// [CHAT]["/ipban"][" "]["<ipv4 address>"][" "][<reason>]
 void SKO_PacketHandler::parseSlashIpban(unsigned char userId, std::string parameters)
 {
-    std::string IP = nextParameter(parameters);
+    std::string ip = nextParameter(parameters);
     std::string reason = parameters;
-    network->ipbanPlayer(userId, IP, reason);
+    network->banAddress(userId, ip, reason);
 }
 
 // [CHAT]["/getip"][" "]["<player>"]
 void SKO_PacketHandler::parseSlashGetip(unsigned char userId, std::string parameters)
 {
     std::string username = nextParameter(parameters);
-
-    //TODO create SKO_Network function to wrap repository call.
-    if (User[userId].Moderator)
-    {
-        std::string playerIP = repository->getIP(username);
-        network->sendChat(userId, username + " has an IP of [" + playerIP + "]");
-    }
-    else
-    {
-        network->sendChat(userId, "You are not authorized to get IP addresses.");
-    }
+    network->getIp(userId, username);
 }
-
 // [CHAT]["/warp"][" "]["<player>"][" "][(string)x][" "][(string)y][" "][(string)mapId]
 void SKO_PacketHandler::parseSlashWarp(unsigned char userId, std::string parameters)
 {
-    //TODO create SKO_Network function to wrap repository call.
-    if (User[userId].Moderator)
-    {
-        std::string warp_user = nextParameter(parameters);
-        int warp_x = atoi(nextParameter(parameters).c_str());
-        int warp_y = atoi(nextParameter(parameters).c_str());
-        int warp_m = atoi(nextParameter(parameters).c_str());
-
-        printf("Warp %s to (%i,%i) on map [%i]\n", warp_user.c_str(), warp_x, warp_y, warp_m);
-
-        //find user
-        for (int wu = 0; warp_m >= NUM_MAPS && wu < MAX_CLIENTS; wu++)
-        {
-            if (User[wu].Ident && (lower(User[wu].Nick).compare(lower(warp_user)) == 0))
-            {
-                SKO_Portal warp_p = SKO_Portal();
-                warp_p.spawn_x = warp_x;
-                warp_p.spawn_y = warp_y;
-                warp_p.map = warp_m;
-
-                Warp(wu, warp_p);
-                break;
-            }
-        }
-    }
-    else
-    {
-        network->sendChat(userId, "You are not authorized to warp players.");
-    }
+    std::string username = nextParameter(parameters);
+    int x = atoi(nextParameter(parameters).c_str());
+    int y = atoi(nextParameter(parameters).c_str());
+    int mapId = atoi(nextParameter(parameters).c_str());
+    network->warpPlayer(userId, username, x, y, mapId);                
 }
 
 // [CHAT]["/ping"]
@@ -1429,72 +1139,22 @@ void SKO_PacketHandler::parseParty(unsigned char userId, SKO_PacketParser *parse
 // [MAKE_CLAN]["<clanTag>"]
 void SKO_PacketHandler::parseClanCreate(unsigned char userId, SKO_PacketParser *parser)
 {
-    //check if the player has enough money.
-    if (User[userId].inventory[ITEM_GOLD] < 100000) // 100000 TODO make a const for this
-    {
-        network->sendChat(userId, "You cannot afford to establish a clan. It costs 100K gold pieces.");
-        return;
-    } //end you did not have enough $$
-
     std::string clanTag = parser->getPacketBody();
-    int result = repository->createClan(User[userId].Nick, clanTag);
-    if (result == 0)
-    {
-        //send to all players so everyone knows a new clan was formed!
-        for (int cu1 = 0; cu1 < MAX_CLIENTS; cu1++)
-        {
-            if (User[cu1].Ident)
-                network->sendChat(cu1, "Clan (" + clanTag + ") has been established by owner " + User[userId].Nick + ".");
-        } //end loop all clients
-
-        User[userId].inventory[ITEM_GOLD] -= 100000;
-
-        // TODO - when below fix is complete, notify player their gold has decreased by 100K
-        //TODO do not rely on client reconnect when forming or joining a clan
-        User[userId].Sock->Close();
-        User[userId].Sock->Connected = false;
-    }
-    else if (result == 1)
-    {
-        //Clan already exists
-        network->sendChat(userId, "You cannot establish [" + clanTag + "] because it already exists.");
-    }
+    network->createClan(userId, clanTag);
 }
 
-void SKO_PacketHandler::parseClanAccept(unsigned char userId, SKO_PacketParser *parser)
+// [CLAN][ACCEPT]
+void SKO_PacketHandler::parseClanAccept(unsigned char userId)
 {
-
+    //nothing to parse here
+    network->acceptClanInvite(userId);
 }
 
+// [CLAN][INVITE][(unsigned char)playerId]
 void SKO_PacketHandler::parseClanInvite(unsigned char userId, SKO_PacketParser *parser)
 {
     unsigned char playerB = parser->nextByte(); 
-    std::string clanId = repository->getOwnerClanId(User[userId].Nick);
-
-    if (User[userId].Clan[0] == '(')
-    {
-        network->sendChat(userId, "You are not in a clan.");
-        return;
-    }
-
-    if (User[playerB].Clan[0] != '(')
-    {
-        network->sendChat(userId, "Sorry, " + User[playerB].Nick + " Is already in a clan.");
-        return;
-    }
-
-    if (!clanId.length())
-    {
-        network->sendChat(userId, "Sorry, only the clan owner can invite new members.");
-        return;
-    }
-
-    //set the clan status of the invited person
-    User[playerB].clanStatus = INVITE;
-    User[playerB].tempClanId = clanId;
-
-    //ask the user to clan
-    network->sendClanInvite(playerB, userId);
+    network->clanInvite(userId, playerB);
 }
 
 // [CLAN][(unsigned char)clanAction][...]
@@ -1510,16 +1170,7 @@ void SKO_PacketHandler::parseClan(unsigned char userId, SKO_PacketParser *parser
         break;
 
     case ACCEPT:
-        if (User[userId].clanStatus == INVITE)
-        {
-            repository->setClanId(User[userId].Nick, User[userId].tempClanId);
-
-            // TODO - make new packet type to update clan instead of booting player
-            // This relies on client to automatically reconnect
-            User[userId].Sock->Close();
-            User[userId].Sock->Connected = false;
-        }
-
+        parseClanAccept(userId);
         break;
 
     case CANCEL:
@@ -1794,7 +1445,7 @@ void SKO_PacketHandler::parsePacket(unsigned char userId, std::string packet)
         break;
 
     case REGISTER:
-        parseRegister(userId, parser);
+        parseRegister(userId, parser->getPacketBody());
         break;
 
     case ATTACK:

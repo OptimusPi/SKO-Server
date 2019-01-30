@@ -91,20 +91,20 @@ int SKO_Repository::loginPlayer(std::string username, std::string password)
 	sql += "'";
 	database->query(sql);
 
-	if (!database->count()) //&& Password != "389663e912c6f954c00aeb2343aee4e2")
+	if (!database->count())
 	{
 		printf("[%s] had no result.\n", sql.c_str());
 		//wrong credentials
 		return 1;
 	}
 
-	//server shutdown command
-	if (username == "SHUTDOWN")
-		SERVER_QUIT = true;
-
 	//mute or not
 	if (mute)
 		return 5;
+
+	//server shutdown command
+	if (username == "SHUTDOWN")
+		return 2;
 
 	//not mute, logged in
 	return 0;
