@@ -26,8 +26,8 @@ void SKO_PacketHandler::parseLogin(unsigned char userId, SKO_PacketParser *parse
 {
     // Declare message string
     std::string loginRequest = parser->getPacketBody();
-    std::string username = loginRequest.substr(0, loginRequest.find_first_of(" "));
-    std::string password = loginRequest.substr(loginRequest.find_first_of(" ") + 1);
+    std::string username = nextParameter(loginRequest);
+    std::string password = loginRequest;
     network->attemptLogin(userId, username, password);
 }
 
@@ -544,7 +544,7 @@ void SKO_PacketHandler::parseDropItem(unsigned char userId, SKO_PacketParser *pa
 std::string SKO_PacketHandler::nextParameter(std::string &parameters)
 {
     //grab first parameter from list
-    std::string next = parameters.substr(0, parameters.find_first_of(" ") + 1);
+    std::string next = parameters.substr(0, parameters.find_first_of(" "));
 
     //shrink list of parameters 
     parameters = parameters.substr(parameters.find_first_of(" ") + 1);
@@ -590,6 +590,7 @@ void SKO_PacketHandler::parseSlashKick(unsigned char userId, std::string paramet
 {
     std::string username = nextParameter(parameters);
     std::string reason = parameters;
+    printf("network->kickPlayer(%i, %s, %s);\n", userId, username.c_str(), reason.c_str());
     network->kickPlayer(userId, username, reason);
 }
 

@@ -9,7 +9,6 @@
 
 #include <string>
 #include <thread>
-
 #include "SKO_Repository.h"
 #include "SKO_PacketHandler.h" 
 #include "SKO_item_defs.h"
