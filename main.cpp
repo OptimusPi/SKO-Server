@@ -1101,7 +1101,7 @@ void Physics()
 								if (User[c].Ident && isMine)
 								{
 									//if user doesnt have it, can only pick up if they dont have a full inventory
-									if (User[c].inventory[itemId] == 0 && User[c].inventory_index <= 23)
+									if (User[c].inventory[itemId] != 0 && User[c].inventory_index <= 23)
 									{
 										DespawnItem(i, mapId);
 										unsigned int amount = map[mapId].ItemObj[i].amount + User[c].inventory[itemId];
