@@ -63,9 +63,9 @@ class SKO_Enemy
 
 		//AI
 		bool dead;
-		unsigned int respawn_ticker;
-		unsigned int AI_ticker;
-		unsigned int AI_period;
+		unsigned long long int respawn_ticker;
+		unsigned long long int AI_ticker;
+		unsigned long long int AI_period;
 		int      AI_pos;      
       
 };
