@@ -691,10 +691,10 @@ void EnemyLoop()
 					} //end no spam
 
 				} //end enemy AI
-			} // end enemy for loop
+			} // end npc for loop
 		}
-		//Sleep for 1 tick
-		OPI_Sleep::milliseconds(15);
+		//Sleep for 2 ticks
+		OPI_Sleep::milliseconds(32);
 	}
 }
 
@@ -876,12 +876,12 @@ void Physics()
 							User[i].attacking = false;
 
 							//if you made an action during an attack, it is saved utnil now. Execute
-							if (User[i].que_action != 0)
+							if (User[i].queue_action != 0)
 							{
 								printf("Glitched user is %s :O\n", User[i].Nick.c_str());
 								float numx = User[i].x;
 								float numy = User[i].y;
-								switch (User[i].que_action)
+								switch (User[i].queue_action)
 								{
 								case MOVE_LEFT:
 									Left(i, numx, numy);
@@ -913,13 +913,13 @@ void Physics()
 									break;
 
 								default:
-									printf("\e[0;32mCorrection! que action glitch: %i\e[m\n", User[i].que_action);
+									printf("\e[0;32mCorrection! que action glitch: %i\e[m\n", User[i].queue_action);
 
 									break;
 								} //end switch
 
 								//reset the cue
-								User[i].que_action = 0;
+								User[i].queue_action = 0;
 
 							} // end que actions
 						}	 //end attack ticker
@@ -1137,7 +1137,7 @@ void Attack(unsigned char userId, float numx, float numy)
 	if (User[userId].attacking)
 	{
 		printf("%s tried to attack while attacking...\7\7\n", User[userId].Nick.c_str());
-		User[userId].que_action = ATTACK;
+		User[userId].queue_action = ATTACK;
 		return;
 	}
 
@@ -1361,7 +1361,7 @@ void Stop(unsigned char userId, float numx, float numy)
 	//you cant move when attacking!
 	if (User[userId].attacking)
 	{
-		User[userId].que_action = MOVE_STOP;
+		User[userId].queue_action = MOVE_STOP;
 
 		return;
 	}
@@ -1400,7 +1400,7 @@ void Right(unsigned char userId, float numx, float numy)
 	//you cant move when attacking!
 	if (User[userId].attacking)
 	{
-		User[userId].que_action = MOVE_RIGHT;
+		User[userId].queue_action = MOVE_RIGHT;
 		return;
 	}
 
@@ -1439,7 +1439,7 @@ void Left(unsigned char userId, float numx, float numy)
 	//you cant move when attacking!
 	if (User[userId].attacking)
 	{
-		User[userId].que_action = MOVE_LEFT;
+		User[userId].queue_action = MOVE_LEFT;
 		return;
 	}
 
@@ -1478,7 +1478,7 @@ void Jump(unsigned char userId, float numx, float numy)
 	//you cant move when attacking!
 	if (User[userId].attacking)
 	{
-		User[userId].que_action = MOVE_JUMP;
+		User[userId].queue_action = MOVE_JUMP;
 		return;
 	}
 	

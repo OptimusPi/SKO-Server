@@ -54,7 +54,7 @@ class SKO_Player
         bool facing_right;
         unsigned long long int attack_ticker;
         unsigned long long int regen_ticker;
-        int que_action;
+        int queue_action;
 
         void setX();
         void addToX();

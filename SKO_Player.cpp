@@ -31,7 +31,7 @@ void SKO_Player::init()
 	attacking = false;
 	y_speed = 0;
 	x_speed = 0;
-	que_action = 0;
+	queue_action = 0;
 	stat_points = 0;
 	ping = 0;
 
