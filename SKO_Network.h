@@ -27,7 +27,7 @@ class SKO_Network
  
 public:
 
-	SKO_Network(SKO_Repository * repository, int port, unsigned long long int saveRateSeconds);
+	SKO_Network(SKO_Repository * repository, int port, unsigned long int saveRateSeconds);
 	std::string startup();
 	void cleanup();
 
