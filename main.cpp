@@ -11,7 +11,6 @@
 #include "SKO_ItemObject.h"
 #include "SKO_Enemy.h"
 #include "OPI_MYSQL.h"
-#include "KE_Timestep.h"
 #include "SKO_Stall.h"
 #include "SKO_Shop.h"
 #include "OPI_Clock.h"
@@ -27,8 +26,6 @@ SKO_Network *network;
 SKO_Repository *repository;
 
 /* DEFINES */
-// Maximum number of clients allowed to connect
-#include "KE_Timestep.h"
 
 //HIT_LOOPS is how many for loop iterations to follow during collisions
 #define HIT_LOOPS 100
@@ -703,7 +700,7 @@ void EnemyLoop()
 void Physics()
 {
 	//initialize the timestep
-	KE_Timestep *timestep = new KE_Timestep(60);
+	OPI_Timestep *timestep = new OPI_Timestep(60);
 
 	int a = 0;
 	bool block_y;
