@@ -50,7 +50,7 @@ unsigned char hpBar = 25;
 //gravity
 const float GRAVITY = 0.169;
 
-//holiday events TODO use a config not hard coded magic 
+//holiday events TODO use a config not hard coded magic
 unsigned const char HOLIDAY_NPC_DROP = ITEM_EASTER_EGG, HOLIDAY_BOX_DROP = ITEM_BUNNY_EARS;
 const bool HOLIDAY = false;
 
@@ -62,7 +62,6 @@ int attack_speed = 40 * 6;
 //this waits for auto-save
 unsigned int persistTicker;
 bool persistLock = false;
-
 
 void GiveLoot(int enemy, int player);
 void Attack(unsigned char userId, float x, float y);
@@ -91,41 +90,39 @@ void UserLoop();
 
 std::string trim(std::string str)
 {
-    std::size_t first = str.find_first_not_of(' ');
+	std::size_t first = str.find_first_not_of(' ');
 
-    // If there is no non-whitespace character, both first and last will be std::string::npos (-1)
-    // There is no point in checking both, since if either doesn't work, the
-    // other won't work, either.
-    if(first == std::string::npos)
-        return "";
+	// If there is no non-whitespace character, both first and last will be std::string::npos (-1)
+	// There is no point in checking both, since if either doesn't work, the
+	// other won't work, either.
+	if (first == std::string::npos)
+		return "";
 
-    std::size_t last  = str.find_last_not_of(' ');
+	std::size_t last = str.find_last_not_of(' ');
 
-    std::string returnVal =  str.substr(first, last-first+1);
+	std::string returnVal = str.substr(first, last - first + 1);
 	return returnVal;
 }
-  
-std::string lower(std::string myString) 
-{ 
-  for(int i=0; i < myString.length(); ++i)
-    myString[i] = std::tolower(myString[i]);
-  
-  return myString;
+
+std::string lower(std::string myString)
+{
+	for (int i = 0; i < myString.length(); ++i)
+		myString[i] = std::tolower(myString[i]);
+
+	return myString;
 }
 
 int snap_distance = 64;
 
-
 /* CODE */
 int main()
 {
-	
+
 	//stdout buffer so we can tail -f the logs
 	//setbuf(stdout, NULL);
 	//setbuf(stderr, NULL);
 
 	printf("Starting Server...\n");
-
 
 	//load maps and stuff
 	for (int mp = 0; mp < NUM_MAPS; mp++)
@@ -202,13 +199,13 @@ int main()
 	printf("About to connect to database.\n");
 
 	repository = new SKO_Repository();
-	
+
 	if (repository->Connect(databaseHostname, databaseSchema, databaseUsername, databasePassword) == "error")
 		return 1;
 
 	//items                    width,  height, type, def,  str,  hp,  reach, equipID
 	//values                   w	h   t   d	s   h   r   e   s = sell
-	Item[ITEM_GOLD] = SKO_Item(8, 	8,	0, 	0,	0,	0,	0,	0,	0);
+	Item[ITEM_GOLD] = SKO_Item(8, 8, 0, 0, 0, 0, 0, 0, 0);
 	Item[ITEM_DIAMOND] = SKO_Item(15, 14, 0, 0, 0, 0, 0, 0, 100);
 	Item[ITEM_MYSTERY_BOX] = SKO_Item(16, 15, 4, 0, 0, 0, 0, 0, 0);
 	//food
@@ -298,10 +295,10 @@ int main()
 	srand(OPI_Clock::nanoseconds());
 
 	//multi threading
-	std::thread physicsThread (Physics);
-	std::thread enemyThread (EnemyLoop);
-	std::thread targetThread (TargetLoop);
-	std::thread mainThread (UserLoop);
+	std::thread physicsThread(Physics);
+	std::thread enemyThread(EnemyLoop);
+	std::thread targetThread(TargetLoop);
+	std::thread mainThread(UserLoop);
 
 	mainThread.join();
 	targetThread.join();
@@ -320,7 +317,7 @@ void UserLoop()
 			// Ignore socket if it is not connected
 			if (!User[userId].Status)
 				continue;
-				
+
 			network->handleClient(userId);
 		}
 
@@ -361,7 +358,7 @@ bool blocked(unsigned char mapId, float box1_x1, float box1_y1, float box1_x2, f
 
 	return false;
 }
- 
+
 void TargetLoop()
 {
 	while (!SERVER_QUIT)
@@ -400,7 +397,6 @@ void EnemyLoop()
 					map[mapId].Enemy[i]->dibsPlayer = -1;
 					map[mapId].Enemy[i]->dibsTicker = 0;
 				}
-
 
 				if (map[mapId].Enemy[i]->y > map[mapId].death_pit)
 				{
@@ -691,7 +687,7 @@ void EnemyLoop()
 					} //end no spam
 
 				} //end enemy AI
-			} // end npc for loop
+			}	 // end npc for loop
 		}
 		//Sleep for 2 ticks
 		OPI_Sleep::milliseconds(32);
@@ -840,6 +836,7 @@ void Physics()
 
 				//players
 				for (int i = 0; i < MAX_CLIENTS; i++)
+				{
 					if (User[i].mapId == mapId && User[i].Ident)
 					{
 						//check for portal collisions
@@ -894,7 +891,7 @@ void Physics()
 									break;
 
 								case MOVE_JUMP:
-									Jump(i, numx, numy); 
+									Jump(i, numx, numy);
 									printf("\e[0;32mCorrection! que action being sent NOW: JUMP\e[m\n");
 									break;
 
@@ -1023,109 +1020,103 @@ void Physics()
 							User[i].x += User[i].x_speed;
 						}
 					}
+				}
 
 				//item objects
 				for (int i = 0; i < 256; i++)
-				if (map[mapId].ItemObj[i].status)
 				{
-					//ninja loot
-					if (OPI_Clock::milliseconds() - map[mapId].ItemObj[i].ownerTicker > 10000)
-					{
-						//reset the item's owner
-						map[mapId].ItemObj[i].owner = -1;
-						map[mapId].ItemObj[i].ownerTicker = 0;
-					}
-
-					itemId = map[mapId].ItemObj[i].itemID;
-
-					// printf("(%.2f,%.2f)\n", map[mapId].ItemObj[i].x, map[mapId].ItemObj[i].y);
-					//horizontal collision detection
-					block_x = blocked(mapId, map[mapId].ItemObj[i].x + map[mapId].ItemObj[i].x_speed, map[mapId].ItemObj[i].y, map[mapId].ItemObj[i].x + map[mapId].ItemObj[i].x_speed + Item[map[mapId].ItemObj[i].itemID].w, map[mapId].ItemObj[i].y + Item[map[mapId].ItemObj[i].itemID].w, false);
-
-					if (map[mapId].ItemObj[i].y_speed < 10)
-						map[mapId].ItemObj[i].y_speed += GRAVITY;
-
-					//vertical collision detection
-					block_y = blocked(mapId, map[mapId].ItemObj[i].x + map[mapId].ItemObj[i].x_speed, map[mapId].ItemObj[i].y + map[mapId].ItemObj[i].y_speed + 0.2, map[mapId].ItemObj[i].x + Item[map[mapId].ItemObj[i].itemID].w, map[mapId].ItemObj[i].y + map[mapId].ItemObj[i].y_speed + Item[map[mapId].ItemObj[i].itemID].h, false);
-
-					//vertical movement
-					if (!block_y)
-					{
-						map[mapId].ItemObj[i].y += map[mapId].ItemObj[i].y_speed;
-					}
-					else
-					{
-						map[mapId].ItemObj[i].y_speed = 0;
-						map[mapId].ItemObj[i].x_speed *= 0.5;
-					}
-
-					//horizontal movement
-					if (!block_x)
-					{
-						//not blocked, move
-						map[mapId].ItemObj[i].x += map[mapId].ItemObj[i].x_speed;
-					}
-					else
-					{
-						map[mapId].ItemObj[i].x_speed = 0;
-					}
-
-					//item
-					box1_x1 = map[mapId].ItemObj[i].x;
-					box1_y1 = map[mapId].ItemObj[i].y;
-					box1_x2 = map[mapId].ItemObj[i].x + Item[map[mapId].ItemObj[i].itemID].w;
-					box1_y2 = map[mapId].ItemObj[i].y + Item[map[mapId].ItemObj[i].itemID].h;
-
-					//Despawn items that fell off the edge
-					if (map[mapId].ItemObj[i].y > map[mapId].death_pit)
-					{
-						DespawnItem(i, mapId);
-					} //end despawn items that fell off the edge of the map
-
-					//check for players intersecting
-					for (int c = 0; c < MAX_CLIENTS; c++)
+					if (map[mapId].ItemObj[i].status)
 					{
 						//ninja loot
-						bool isMine = false;
-
-						if (map[mapId].ItemObj[i].owner == -1 || map[mapId].ItemObj[i].owner == c)
-							isMine = true;
-
-						//player
-						float box2_x1 = User[c].x + 25;
-						float box2_y1 = User[c].y;
-						float box2_x2 = User[c].x + 38;
-						float box2_y2 = User[c].y + 64;
-
-						if (box1_x2 > box2_x1 && box1_x1 < box2_x2 && box1_y2 > box2_y1 && box1_y1 < box2_y2)
+						if (OPI_Clock::milliseconds() - map[mapId].ItemObj[i].ownerTicker > 10000)
 						{
-							printf("You're touching an item. IsMine is %i Ident is %i and inventory index is %i\n", isMine, User[c].Ident, User[c].inventory_index);
-							if (User[c].Ident && isMine)
+							//reset the item's owner
+							map[mapId].ItemObj[i].owner = -1;
+							map[mapId].ItemObj[i].ownerTicker = 0;
+						}
+
+						itemId = map[mapId].ItemObj[i].itemID;
+
+						// printf("(%.2f,%.2f)\n", map[mapId].ItemObj[i].x, map[mapId].ItemObj[i].y);
+						//horizontal collision detection
+						block_x = blocked(mapId, map[mapId].ItemObj[i].x + map[mapId].ItemObj[i].x_speed, map[mapId].ItemObj[i].y, map[mapId].ItemObj[i].x + map[mapId].ItemObj[i].x_speed + Item[map[mapId].ItemObj[i].itemID].w, map[mapId].ItemObj[i].y + Item[map[mapId].ItemObj[i].itemID].w, false);
+
+						if (map[mapId].ItemObj[i].y_speed < 10)
+							map[mapId].ItemObj[i].y_speed += GRAVITY;
+
+						//vertical collision detection
+						block_y = blocked(mapId, map[mapId].ItemObj[i].x + map[mapId].ItemObj[i].x_speed, map[mapId].ItemObj[i].y + map[mapId].ItemObj[i].y_speed + 0.2, map[mapId].ItemObj[i].x + Item[map[mapId].ItemObj[i].itemID].w, map[mapId].ItemObj[i].y + map[mapId].ItemObj[i].y_speed + Item[map[mapId].ItemObj[i].itemID].h, false);
+
+						//vertical movement
+						if (!block_y)
+						{
+							map[mapId].ItemObj[i].y += map[mapId].ItemObj[i].y_speed;
+						}
+						else
+						{
+							map[mapId].ItemObj[i].y_speed = 0;
+							map[mapId].ItemObj[i].x_speed *= 0.5;
+						}
+
+						//horizontal movement
+						if (!block_x)
+						{
+							//not blocked, move
+							map[mapId].ItemObj[i].x += map[mapId].ItemObj[i].x_speed;
+						}
+						else
+						{
+							map[mapId].ItemObj[i].x_speed = 0;
+						}
+
+						//item
+						box1_x1 = map[mapId].ItemObj[i].x;
+						box1_y1 = map[mapId].ItemObj[i].y;
+						box1_x2 = map[mapId].ItemObj[i].x + Item[map[mapId].ItemObj[i].itemID].w;
+						box1_y2 = map[mapId].ItemObj[i].y + Item[map[mapId].ItemObj[i].itemID].h;
+
+						//Despawn items that fell off the edge
+						if (map[mapId].ItemObj[i].y > map[mapId].death_pit)
+						{
+							DespawnItem(i, mapId);
+						} //end despawn items that fell off the edge of the map
+
+						//check for players intersecting
+						for (int c = 0; c < MAX_CLIENTS; c++)
+						{
+							//ninja loot
+							bool isMine = false;
+
+							if (map[mapId].ItemObj[i].owner == -1 || map[mapId].ItemObj[i].owner == c)
+								isMine = true;
+
+							//player
+							float box2_x1 = User[c].x + 25;
+							float box2_y1 = User[c].y;
+							float box2_x2 = User[c].x + 38;
+							float box2_y2 = User[c].y + 64;
+
+							if (box1_x2 > box2_x1 && box1_x1 < box2_x2 && box1_y2 > box2_y1 && box1_y1 < box2_y2)
 							{
-								//if user doesnt have it, can only pick up if they dont have a full inventory
-								if (User[c].inventory[itemId] == 0 && User[c].inventory_index > 23)
+								if (User[c].Ident && isMine)
 								{
-									printf("User %s inventory is full and cant pick up item %i!", User[c].Nick.c_str(), itemId);
+									//if user doesnt have it, can only pick up if they dont have a full inventory
+									if (User[c].inventory[itemId] == 0 && User[c].inventory_index <= 23)
+									{
+										DespawnItem(i, mapId);
+										unsigned int amount = map[mapId].ItemObj[i].amount + User[c].inventory[itemId];
+										PocketItem(c, itemId, amount);
+									} //end else not inventory full (you can pick up)
 								}
-								else
-								{
-									DespawnItem(i, mapId);
-									unsigned int amount = map[mapId].ItemObj[i].amount + User[c].inventory[itemId];
-									PocketItem(c, itemId, amount);
-								} //end else not inventory full (you can pick up)
 							}
 						}
 					}
 				}
-		
-		
 			}
 		} //end timestep
-
 		OPI_Sleep::microseconds(1);
 	} //end while true
 }
-
 
 /* perform player actions */
 void Attack(unsigned char userId, float numx, float numy)
@@ -1239,7 +1230,6 @@ void Attack(unsigned char userId, float numx, float numy)
 					dam = 0;
 				}
 
-				
 				if (User[i].hp <= dam)
 				{
 					printf("Respawn, x:%.2f y:%.2f\n", User[i].x, User[i].y);
@@ -1328,7 +1318,6 @@ void Attack(unsigned char userId, float numx, float numy)
 		//check is they are active and not dib'sed by a party
 		if (!map[mapId].Enemy[i]->dead && !partyBlocked)
 		{
-			printf("Checking enemy: %i on map: %i\n", i, mapId);
 			//check for collision
 			//horizontal
 			float x_dist, y_dist;
@@ -1353,7 +1342,7 @@ void Attack(unsigned char userId, float numx, float numy)
 				EnemyHit(i, mapId, userId);
 			}
 		} //end loop if you hit enemys
-	} // end if enemy is dead
+	}	 // end if enemy is dead
 }
 
 void Stop(unsigned char userId, float numx, float numy)
@@ -1411,10 +1400,10 @@ void Right(unsigned char userId, float numx, float numy)
 	bool isCorrection = false;
 
 	if (((
-		(numx - User[userId].x <= 0 && numx - User[userId].x > -snap_distance) ||
-		(numx - User[userId].x >= 0 && numx - User[userId].x < snap_distance)) &&
-		((numy - User[userId].y <= 0 && numy - User[userId].y > -snap_distance) ||
-		(numy - User[userId].y >= 0 && numy - User[userId].y < snap_distance))))
+			 (numx - User[userId].x <= 0 && numx - User[userId].x > -snap_distance) ||
+			 (numx - User[userId].x >= 0 && numx - User[userId].x < snap_distance)) &&
+		 ((numy - User[userId].y <= 0 && numy - User[userId].y > -snap_distance) ||
+		  (numy - User[userId].y >= 0 && numy - User[userId].y < snap_distance))))
 	{
 		//update server variables
 		User[userId].x = numx;
@@ -1481,7 +1470,7 @@ void Jump(unsigned char userId, float numx, float numy)
 		User[userId].queue_action = MOVE_JUMP;
 		return;
 	}
-	
+
 	// Physics
 	User[userId].y_speed = -6;
 
@@ -1622,7 +1611,6 @@ void SpawnLoot(unsigned char mapId, SKO_ItemObject lootItem)
 	map[mapId].ItemObj[rand_i].owner = lootItem.owner;
 	map[mapId].ItemObj[rand_i].ownerTicker = OPI_Clock::milliseconds();
 
-	
 	unsigned char itemObjId = rand_i;
 	unsigned char itemId = map[mapId].ItemObj[rand_i].itemID;
 	float x = map[mapId].ItemObj[rand_i].x;
@@ -1738,7 +1726,6 @@ void Warp(unsigned char userId, SKO_Portal portal)
 	}
 
 	//TODO show all items and targets on warp?
-
 }
 
 void GiveXP(unsigned char userId, int xp)
@@ -1866,7 +1853,7 @@ void DespawnItem(unsigned char itemObjId, unsigned char mapId)
 	{
 		if (User[userId].Ident && User[userId].mapId == mapId)
 			network->sendDespawnItem(userId, itemObjId, mapId);
-	} 
+	}
 
 	map[mapId].ItemObj[itemObjId].remove();
 }
@@ -1879,17 +1866,17 @@ void SpawnItem(unsigned char mapId, unsigned char itemObjId, unsigned char itemI
 		if (User[userId].Ident && User[userId].mapId == mapId)
 			network->sendSpawnItem(userId, itemObjId, mapId, itemId, x, y, x_speed, y_speed);
 	}
-} 
+}
 
 void PocketItem(unsigned char userId, unsigned char itemId, unsigned int amount)
 {
 	// If it's a new item, increase the count of held items for the player
 	if (User[userId].inventory[itemId] == 0 && amount > 0)
-			User[userId].inventory_index++;
+		User[userId].inventory_index++;
 
 	// If the item was removed fromt he player's inventory, decrease inventory index
-	if (User[userId].inventory[itemId] > 0 && amount == 0) 
-			User[userId].inventory_index--;
+	if (User[userId].inventory[itemId] > 0 && amount == 0)
+		User[userId].inventory_index--;
 
 	//Set the user inventory amount
 	User[userId].inventory[itemId] = amount;
@@ -1906,7 +1893,7 @@ void PlayerDamaged(unsigned char userId, unsigned char damage)
 
 	//party hp notification
 	unsigned char displayHp = (int)((User[userId].hp / (float)User[userId].max_hp) * 80);
-	
+
 	for (int c = 0; c < MAX_CLIENTS; c++)
 	{
 		if (User[c].Ident && User[c].mapId == User[c].mapId)
@@ -1920,11 +1907,10 @@ void PlayerDamaged(unsigned char userId, unsigned char damage)
 
 unsigned int GetTotalStrength(unsigned char userId)
 {
-	unsigned int totalStrength =  User[userId].strength;
+	unsigned int totalStrength = User[userId].strength;
 	unsigned char weapon = User[userId].equip[0];
 	unsigned char hat = User[userId].equip[1];
 	unsigned char trophy = User[userId].equip[2];
-	
 
 	//Add strength of all equipment
 	if (weapon)
@@ -1933,17 +1919,16 @@ unsigned int GetTotalStrength(unsigned char userId)
 		totalStrength += Item[hat].str;
 	if (trophy)
 		totalStrength += Item[trophy].str;
-	
+
 	return totalStrength;
 }
 
 unsigned int GetTotalDefence(unsigned char userId)
 {
-	unsigned int totalDefence =  User[userId].defence;
+	unsigned int totalDefence = User[userId].defence;
 	unsigned char weapon = User[userId].equip[0];
 	unsigned char hat = User[userId].equip[1];
 	unsigned char trophy = User[userId].equip[2];
-	
 
 	//Add strength of all equipment
 	if (weapon)
@@ -1952,7 +1937,7 @@ unsigned int GetTotalDefence(unsigned char userId)
 		totalDefence += Item[hat].def;
 	if (trophy)
 		totalDefence += Item[trophy].def;
-	
+
 	return totalDefence;
 }
 
@@ -2004,7 +1989,7 @@ void KillEnemy(unsigned char enemyId, unsigned char mapId, unsigned char killerU
 					gimmieXP = pl_dmg / totalDamage;
 
 				printf("Player %s dealt %.2f percent of the damage or %i HP out of %i HP done by the party.\n",
-						User[p].Nick.c_str(), gimmieXP * 100, map[mapId].Enemy[enemyId]->dibsDamage[p], (int)totalDamage);
+					   User[p].Nick.c_str(), gimmieXP * 100, map[mapId].Enemy[enemyId]->dibsDamage[p], (int)totalDamage);
 				gimmieXP *= splitXP;
 
 				//add bonus XP
