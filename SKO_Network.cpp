@@ -127,7 +127,7 @@ void SKO_Network::SaveLoop()
 		while (Clock() - this->lastSaveTime < 1000*this->saveRateSeconds)
 		{
 			//Sleep for one second
-			Sleep(1000);
+			OPI_Sleep::seconds(1);
 		}
 
 		printf("Clock() is: %lu\n", Clock());
@@ -239,8 +239,7 @@ void SKO_Network::QueueLoop()
 			}
 		} //end for loop
 
-		//checking que loop 2 times per second is plenty fast
-		Sleep(500);
+		OPI_Sleep::milliseconds(10);
 	} //end while loop
 } //end QueLoop
 
@@ -361,7 +360,7 @@ void SKO_Network::ConnectLoop()
 		} //if connection incoming
 
 		// Sleep in between checking for new connections
-		Sleep(100);
+		OPI_Sleep::milliseconds(100);
 	} //end while
 }
 

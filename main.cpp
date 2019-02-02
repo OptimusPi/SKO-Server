@@ -30,8 +30,8 @@ SKO_Repository *repository;
 // Maximum number of clients allowed to connect
 #include "KE_Timestep.h"
 
-//HIT_LOOP is how many for loop iterations to follow during collisions
-#define HIT_LOOP 3
+//HIT_LOOPS is how many for loop iterations to follow during collisions
+#define HIT_LOOPS 100
 
 //quit server by logging in as SHUTDOWN
 bool SERVER_QUIT = false;
@@ -327,7 +327,7 @@ void UserLoop()
 		}
 
 		// Sleep a bit
-		Sleep(1);
+		OPI_Sleep::microseconds(1);
 	} //end while
 }
 
@@ -381,7 +381,7 @@ void TargetLoop()
 				}
 			}
 		}
-		Sleep(1000);
+		OPI_Sleep::seconds(1);
 	}
 }
 
@@ -590,14 +590,14 @@ void EnemyLoop()
 						case ENEMY_MOVE_LEFT:
 							if (map[mapId].Enemy[i]->x_speed < 0)
 								redundant = true;
-							map[mapId].Enemy[i]->x_speed = -2;
+							map[mapId].Enemy[i]->x_speed = -3;
 							map[mapId].Enemy[i]->facing_right = false;
 							break;
 
 						case ENEMY_MOVE_RIGHT:
 							if (map[mapId].Enemy[i]->x_speed > 0)
 								redundant = true;
-							map[mapId].Enemy[i]->x_speed = 2;
+							map[mapId].Enemy[i]->x_speed = 3;
 							map[mapId].Enemy[i]->facing_right = true;
 							break;
 
@@ -668,14 +668,14 @@ void EnemyLoop()
 					case NPC_MOVE_LEFT:
 						if (map[mapId].NPC[i]->x_speed < 0)
 							redundant = true;
-						map[mapId].NPC[i]->x_speed = -2;
+						map[mapId].NPC[i]->x_speed = -3;
 						map[mapId].NPC[i]->facing_right = false;
 						break;
 
 					case NPC_MOVE_RIGHT:
 						if (map[mapId].NPC[i]->x_speed > 0)
 							redundant = true;
-						map[mapId].NPC[i]->x_speed = 2;
+						map[mapId].NPC[i]->x_speed = 3;
 						map[mapId].NPC[i]->facing_right = true;
 						break;
 
@@ -753,7 +753,7 @@ void Physics()
 							map[mapId].Enemy[i]->y_speed = 1;
 
 							//while or if TODO
-							for (int loopVar = 0; loopVar < HIT_LOOP && (!blocked(mapId, map[mapId].Enemy[i]->x + map[mapId].Enemy[i]->x1, map[mapId].Enemy[i]->y + map[mapId].Enemy[i]->y_speed + map[mapId].Enemy[i]->y1 + 0.25, map[mapId].Enemy[i]->x + map[mapId].Enemy[i]->x2, map[mapId].Enemy[i]->y + map[mapId].Enemy[i]->y_speed + map[mapId].Enemy[i]->y1 + 0.25 + map[mapId].Enemy[i]->y2, true)); loopVar++)
+							for (int loopVar = 0; loopVar < HIT_LOOPS && (!blocked(mapId, map[mapId].Enemy[i]->x + map[mapId].Enemy[i]->x1, map[mapId].Enemy[i]->y + map[mapId].Enemy[i]->y_speed + map[mapId].Enemy[i]->y1 + 0.25, map[mapId].Enemy[i]->x + map[mapId].Enemy[i]->x2, map[mapId].Enemy[i]->y + map[mapId].Enemy[i]->y_speed + map[mapId].Enemy[i]->y1 + 0.25 + map[mapId].Enemy[i]->y2, true)); loopVar++)
 								map[mapId].Enemy[i]->y += map[mapId].Enemy[i]->y_speed;
 
 							map[mapId].Enemy[i]->y = (int)(map[mapId].Enemy[i]->y + 0.5);
@@ -763,7 +763,7 @@ void Physics()
 							map[mapId].Enemy[i]->y_speed = -1;
 
 							//while or if TODO
-							for (int loopVar = 0; loopVar < HIT_LOOP && (!blocked(mapId, map[mapId].Enemy[i]->x + map[mapId].Enemy[i]->x1, map[mapId].Enemy[i]->y + map[mapId].Enemy[i]->y_speed + map[mapId].Enemy[i]->y1 + 0.25, map[mapId].Enemy[i]->x + map[mapId].Enemy[i]->x2, map[mapId].Enemy[i]->y + map[mapId].Enemy[i]->y_speed + map[mapId].Enemy[i]->y1 + 0.25 + map[mapId].Enemy[i]->y2, true)); loopVar++)
+							for (int loopVar = 0; loopVar < HIT_LOOPS && (!blocked(mapId, map[mapId].Enemy[i]->x + map[mapId].Enemy[i]->x1, map[mapId].Enemy[i]->y + map[mapId].Enemy[i]->y_speed + map[mapId].Enemy[i]->y1 + 0.25, map[mapId].Enemy[i]->x + map[mapId].Enemy[i]->x2, map[mapId].Enemy[i]->y + map[mapId].Enemy[i]->y_speed + map[mapId].Enemy[i]->y1 + 0.25 + map[mapId].Enemy[i]->y2, true)); loopVar++)
 								map[mapId].Enemy[i]->y += map[mapId].Enemy[i]->y_speed;
 						}
 
@@ -812,7 +812,7 @@ void Physics()
 							map[mapId].NPC[i]->y_speed = 1;
 
 							//while or if TODO
-							for (int loopVar = 0; loopVar < HIT_LOOP && (!blocked(mapId, map[mapId].NPC[i]->x + map[mapId].NPC[i]->x1, map[mapId].NPC[i]->y + map[mapId].NPC[i]->y_speed + map[mapId].NPC[i]->y1 + 0.25, map[mapId].NPC[i]->x + map[mapId].NPC[i]->x2, map[mapId].NPC[i]->y + map[mapId].NPC[i]->y_speed + map[mapId].NPC[i]->y1 + 0.25 + map[mapId].NPC[i]->y2, true)); loopVar++)
+							for (int loopVar = 0; loopVar < HIT_LOOPS && (!blocked(mapId, map[mapId].NPC[i]->x + map[mapId].NPC[i]->x1, map[mapId].NPC[i]->y + map[mapId].NPC[i]->y_speed + map[mapId].NPC[i]->y1 + 0.25, map[mapId].NPC[i]->x + map[mapId].NPC[i]->x2, map[mapId].NPC[i]->y + map[mapId].NPC[i]->y_speed + map[mapId].NPC[i]->y1 + 0.25 + map[mapId].NPC[i]->y2, true)); loopVar++)
 								map[mapId].NPC[i]->y += map[mapId].NPC[i]->y_speed;
 
 							map[mapId].NPC[i]->y = (int)(map[mapId].NPC[i]->y + 0.5);
@@ -822,7 +822,7 @@ void Physics()
 							map[mapId].NPC[i]->y_speed = -1;
 
 							//while or if TODO
-							for (int loopVar = 0; loopVar < HIT_LOOP && (!blocked(mapId, map[mapId].NPC[i]->x + map[mapId].NPC[i]->x1, map[mapId].NPC[i]->y + map[mapId].NPC[i]->y_speed + map[mapId].NPC[i]->y1 + 0.25, map[mapId].NPC[i]->x + map[mapId].NPC[i]->x2, map[mapId].NPC[i]->y + map[mapId].NPC[i]->y_speed + map[mapId].NPC[i]->y1 + 0.25 + map[mapId].NPC[i]->y2, true)); loopVar++)
+							for (int loopVar = 0; loopVar < HIT_LOOPS && (!blocked(mapId, map[mapId].NPC[i]->x + map[mapId].NPC[i]->x1, map[mapId].NPC[i]->y + map[mapId].NPC[i]->y_speed + map[mapId].NPC[i]->y1 + 0.25, map[mapId].NPC[i]->x + map[mapId].NPC[i]->x2, map[mapId].NPC[i]->y + map[mapId].NPC[i]->y_speed + map[mapId].NPC[i]->y1 + 0.25 + map[mapId].NPC[i]->y2, true)); loopVar++)
 								map[mapId].NPC[i]->y += map[mapId].NPC[i]->y_speed;
 						}
 
@@ -999,7 +999,7 @@ void Physics()
 								User[i].y_speed = 1;
 
 								//while or if TODO
-								for (int loopVar = 0; loopVar < HIT_LOOP && (!blocked(mapId, User[i].x + 25, User[i].y + User[i].y_speed + 13 + 0.25, User[i].x + 38, User[i].y + User[i].y_speed + 64 + 0.25, false)); loopVar++)
+								for (int loopVar = 0; loopVar < HIT_LOOPS && (!blocked(mapId, User[i].x + 25, User[i].y + User[i].y_speed + 13 + 0.25, User[i].x + 38, User[i].y + User[i].y_speed + 64 + 0.25, false)); loopVar++)
 									User[i].y += User[i].y_speed;
 
 								User[i].y = (int)(User[i].y + 0.5);
@@ -1009,7 +1009,7 @@ void Physics()
 								User[i].y_speed = -1;
 
 								//while or if TODO
-								for (int loopVar = 0; loopVar < HIT_LOOP && (!blocked(mapId, User[i].x + 25, User[i].y + User[i].y_speed + 13 + 0.25, User[i].x + 38, User[i].y + User[i].y_speed + 64 + 0.25, false)); loopVar++)
+								for (int loopVar = 0; loopVar < HIT_LOOPS && (!blocked(mapId, User[i].x + 25, User[i].y + User[i].y_speed + 13 + 0.25, User[i].x + 38, User[i].y + User[i].y_speed + 64 + 0.25, false)); loopVar++)
 									User[i].y += User[i].y_speed;
 							}
 
@@ -1124,7 +1124,7 @@ void Physics()
 			}
 		} //end timestep
 
-		Sleep(1);
+		OPI_Sleep::microseconds(1);
 	} //end while true
 }
 
@@ -1408,7 +1408,7 @@ void Right(unsigned char userId, float numx, float numy)
 
 	// Physics
 	User[userId].facing_right = true;
-	User[userId].x_speed = 2;
+	User[userId].x_speed = 3;
 
 	bool isCorrection = false;
 
@@ -1447,7 +1447,7 @@ void Left(unsigned char userId, float numx, float numy)
 
 	//physics
 	User[userId].facing_right = false;
-	User[userId].x_speed = -2;
+	User[userId].x_speed = -3;
 
 	// Determine if the client is lagged behind the server physics, and correct them.
 	bool isCorrection = false;

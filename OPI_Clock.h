@@ -1,15 +1,27 @@
-#ifndef __OPI_CLOCK_H_
-#define __OPI_CLOCK_H_
+#include <chrono>
+using namespace std::chrono;
 
-#include <SDL/SDL.h>
-
-static unsigned long int Clock()
+class OPI_Clock
 {
-	return (unsigned long int)SDL_GetTicks();
-}
-
-static void Sleep(unsigned int ms)
-{
-	SDL_Delay(ms);
-}
-#endif
+public:
+    static unsigned long long nanoseconds()
+    {
+        return time_point_cast<std::chrono::nanoseconds>(system_clock::now())
+            .time_since_epoch().count();
+    }
+    static unsigned long long microseconds()
+    {
+        return time_point_cast<std::chrono::microseconds>(system_clock::now())
+            .time_since_epoch().count();
+    }
+    static unsigned long long milliseconds()
+    {
+        return time_point_cast<std::chrono::milliseconds>(system_clock::now())
+            .time_since_epoch().count();
+    }
+    static unsigned long long seconds()
+    {
+        return time_point_cast<std::chrono::seconds>(system_clock::now())
+            .time_since_epoch().count();
+    }
+};

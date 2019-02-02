@@ -153,7 +153,7 @@ int OPI_MYSQL::query(std::string statement, bool once)
 			while (!Connected) 
 			{
 				log("Trying to reconnect in Mr. Failed Query if-statement...It didn't work..but I'll wait a second and try again.");
-				Sleep(1000);
+				OPI_Sleep::seconds(1);
 				if (++reconnectAttempts > 5)
 					return 1;
 				
@@ -198,7 +198,7 @@ int OPI_MYSQL::query(std::string statement, bool once)
 
 			
 	      	printf("This is dangerous! I must re-try your query!\n");
-			Sleep(1000);
+			OPI_Sleep::seconds(1);
 	    }
 		
        

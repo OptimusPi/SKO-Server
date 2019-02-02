@@ -1,6 +1,5 @@
 #include <fstream>
 #include <cstring>
-#include <SDL/SDL.h>
 #include "SKO_Stall.h"
 #include "SKO_Shop.h"
 #include "SKO_Item.h"
@@ -27,6 +26,13 @@ class SKO_Map
 {
       public:
          
+        //to avoid SDL dependency, just use struct SDL_Rect
+        typedef struct SDL_Rect
+        {
+                int x, y;
+                int w, h;
+        } SDL_Rect;
+
 	SDL_Rect collision_rect[MAX_TILES];
         int tile_x[MAX_TILES], tile_y[MAX_TILES];
         int fringe_x[MAX_TILES], fringe_y[MAX_TILES];
