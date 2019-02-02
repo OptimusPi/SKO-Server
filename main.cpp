@@ -443,7 +443,7 @@ void EnemyLoop()
 
 								//timer override if first time
 								if (map[mapId].Enemy[i]->x_speed != 0)
-									map[mapId].Enemy[i]->AI_period = 0;
+									map[mapId].Enemy[i]->AI_period = 32;
 							}
 
 						} //end for user Ident only
@@ -629,7 +629,7 @@ void EnemyLoop()
 					// UP TO quarter second extra delay
 					int random_delay = 2500 + rand() % 169;
 
-					int random_action = rand() % 4; //2:1 ratio stopping to moving. To make him not seem like a meth tweaker
+					int random_action = rand() % 4; //2:1 ratio stopping to moving.
 
 					switch (random_action)
 					{
