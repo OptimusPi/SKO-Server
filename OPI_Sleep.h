@@ -1,3 +1,6 @@
+#ifndef __OPI_SLEEP_H_
+#define __OPI_SLEEP_H_
+
 #include <chrono>
 #include <thread>
 
@@ -24,3 +27,5 @@ public:
         std::this_thread::sleep_for(std::chrono::microseconds(time));
     }
 };
+
+#endif
