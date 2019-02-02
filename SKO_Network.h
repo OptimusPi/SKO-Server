@@ -11,6 +11,8 @@
 #include <thread>
 #include "SKO_Repository.h"
 #include "SKO_PacketHandler.h" 
+#include "OPI_Clock.h"
+#include "OPI_Sleep.h"
 #include "SKO_item_defs.h"
 #include "OPI_MYSQL.h"
 #include "GE_Socket.h"

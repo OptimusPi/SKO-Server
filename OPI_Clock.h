@@ -1,4 +1,8 @@
+#ifndef __OPI_CLOCK_H_
+#define __OPI_CLOCK_H_
+
 #include <chrono>
+
 using namespace std::chrono;
 
 class OPI_Clock
@@ -25,3 +29,5 @@ public:
             .time_since_epoch().count();
     }
 };
+
+#endif

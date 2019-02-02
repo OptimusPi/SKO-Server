@@ -5,7 +5,6 @@
 #include "SKO_PacketFactory.h"
 #include "SKO_PacketParser.h"
 #include "Global.h"
-#include "OPI_Clock.h"
 #include "GE_Socket.h"
 
 SKO_Network::SKO_Network(SKO_Repository *repository, int port, unsigned long int saveRateSeconds)
