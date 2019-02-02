@@ -25,7 +25,7 @@ class SKO_Network
  
 public:
 
-	SKO_Network(SKO_Repository * repository, int port, unsigned long int saveRateSeconds);
+	SKO_Network(SKO_Repository * repository, int port, unsigned long long int saveRateSeconds);
 	std::string startup();
 	void cleanup();
 
@@ -139,7 +139,7 @@ public:
 
 	// How often to save all valid players.
 	unsigned long int saveRateSeconds;
-	unsigned long int lastSaveTime;
+	unsigned long long int lastSaveTime;
 	
 	// Do not spam the database status table if there have been 0 players online for some time.
 	bool pauseSavingStatus = false;

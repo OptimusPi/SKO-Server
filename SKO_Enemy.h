@@ -48,8 +48,8 @@ class SKO_Enemy
 		bool attacking;
 		bool ground;
 		int  current_frame;
-		unsigned long int animation_ticker;
-		unsigned long int attack_ticker;
+		unsigned long long int animation_ticker;
+		unsigned long long int attack_ticker;
 
 		//loot
 		int lootAmount;
@@ -57,7 +57,7 @@ class SKO_Enemy
 
 		//keep track of players who hit me
 		int dibsPlayer;
-		unsigned long int dibsTicker;
+		unsigned long long int dibsTicker;
 		int dibsDamage[MAX_CLIENTS];
 
 

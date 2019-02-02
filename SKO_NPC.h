@@ -19,13 +19,13 @@ public:
 	int w, h;
 	//spawn
 	int sx, sy;
-	unsigned long int AI_ticker;       
-	unsigned long int AI_period;
+	unsigned long long int AI_ticker;       
+	unsigned long long int AI_period;
 
 	bool facing_right; 
 	bool ground;
 	int current_frame;
-	unsigned long int animation_ticker;
+	unsigned long long int animation_ticker;
 
 
 

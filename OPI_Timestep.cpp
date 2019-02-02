@@ -3,7 +3,7 @@
 
 OPI_Timestep::OPI_Timestep(unsigned int FPS)
 {
-   frameTime = (unsigned long int)(1000000.0/FPS);
+   frameTime = (unsigned long long int)(1000000.0/FPS);
    currentTime = OPI_Clock::microseconds();
    newTime = 0;
    accumulator = 0;

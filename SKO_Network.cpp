@@ -18,7 +18,7 @@ SKO_Network::SKO_Network(SKO_Repository *repository, int port, unsigned long int
 
 	// Properties passed into threads
 	this->saveRateSeconds = saveRateSeconds;
-	this->lastSaveTime = Clock();
+	this->lastSaveTime = OPI_Clock::milliseconds();
 	this->listenSocket = new GE_Socket();
 	this->packetHandler = new SKO_PacketHandler(this);
 }
@@ -114,7 +114,7 @@ void SKO_Network::saveAllProfiles()
 	else
 		this->pauseSavingStatus = true;
 
-	this->lastSaveTime = Clock();
+	this->lastSaveTime = OPI_Clock::milliseconds();
 	printf("lastSaveTime is: %lu\n", this->lastSaveTime);
 }
 
@@ -124,17 +124,17 @@ void SKO_Network::SaveLoop()
 	{
 		// throttle this call
 		// other functions may have already saved recently
-		while (Clock() - this->lastSaveTime < 1000*this->saveRateSeconds)
+		while (OPI_Clock::milliseconds() - this->lastSaveTime < 1000*this->saveRateSeconds)
 		{
 			//Sleep for one second
 			OPI_Sleep::seconds(1);
 		}
 
-		printf("Clock() is: %lu\n", Clock());
+		printf("OPI_Clock::milliseconds() is: %lu\n", OPI_Clock::milliseconds());
 		printf("and lastSaveTime is: %lu\n", this->lastSaveTime);
 		printf("this->saveRateSeconds is: %lu\n", this->saveRateSeconds);
 
-		printf("so: (%lu > %lu)\n\n", (Clock() - this->lastSaveTime), this->saveRateSeconds);
+		printf("so: (%lu > %lu)\n\n", (OPI_Clock::milliseconds() - this->lastSaveTime), this->saveRateSeconds);
 		printf("Auto Save...\n");
 		saveAllProfiles();
 	}
@@ -184,7 +184,7 @@ void SKO_Network::QueueLoop()
 							User[userId].Que = false;
 							sendVersionSuccess(userId);
 							printf("Que Time: \t%lu\n", User[userId].QueTime);
-							printf("Current Time: \t%lu\n", Clock());
+							printf("Current Time: \t%lu\n", OPI_Clock::milliseconds());
 
 							//operating system statistics
 							User[userId].OS = versionOS;
@@ -230,7 +230,7 @@ void SKO_Network::QueueLoop()
 			}
 
 			//didn't recv anything, don't kill unless it's too long
-			if (Clock() - User[userId].QueTime >= 500)
+			if (OPI_Clock::milliseconds() - User[userId].QueTime >= 500)
 			{
 				User[userId].Que = false;
 				User[userId].Sock->Close();
@@ -255,7 +255,7 @@ void SKO_Network::ConnectLoop()
 
 			if (User[i].pingWaiting)
 			{
-				int ping = Clock() - User[i].pingTicker;
+				int ping = OPI_Clock::milliseconds() - User[i].pingTicker;
 
 				//TODO set limit for ping
 				if (ping > 60000)
@@ -267,12 +267,12 @@ void SKO_Network::ConnectLoop()
 			else
 			{
 				//send ping waiting again if its been more than a second
-				if (Clock() - User[i].pingTicker > 1000)
+				if (OPI_Clock::milliseconds() - User[i].pingTicker > 1000)
 				{
 					//time to ping them.
 					send(User[i].Sock, PING);
 					User[i].pingWaiting = true;
-					User[i].pingTicker = Clock();
+					User[i].pingTicker = OPI_Clock::milliseconds();
 				}
 			}
 		} //end max clients for ping
@@ -332,7 +332,7 @@ void SKO_Network::ConnectLoop()
 				User[incomingSocket].Sock->Connected = true;
 
 				//set the data counting clock
-				User[incomingSocket].Sock->stream_ticker = Clock();
+				User[incomingSocket].Sock->stream_ticker = OPI_Clock::milliseconds();
 
 				//set the data_stream to null
 				User[incomingSocket].Sock->byte_counter = 0;
@@ -354,7 +354,7 @@ void SKO_Network::ConnectLoop()
 
 			//put in que
 			User[incomingSocket].Que = true;
-			User[incomingSocket].QueTime = Clock();
+			User[incomingSocket].QueTime = OPI_Clock::milliseconds();
 
 			printf("put socket %i in que\n", incomingSocket);
 		} //if connection incoming

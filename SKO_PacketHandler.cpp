@@ -16,8 +16,8 @@ void SKO_PacketHandler::parsePing(unsigned char userId)
 // [PONG]
 void SKO_PacketHandler::parsePong(unsigned char userId)
 {
-    User[userId].ping = Clock() - User[userId].pingTicker;
-    User[userId].pingTicker = Clock();
+    User[userId].ping = OPI_Clock::milliseconds() - User[userId].pingTicker;
+    User[userId].pingTicker = OPI_Clock::milliseconds();
     User[userId].pingWaiting = false;
 }
 

@@ -161,7 +161,7 @@ int SKO_Repository::loadPlayerData(unsigned char userId)
 		User[userId].inventory_order = base64_decode(database->getString(23));
 
 		//playtime stats
-		User[userId].loginTime = Clock();
+		User[userId].loginTime = OPI_Clock::milliseconds();
 
 		sql = "SELECT * FROM inventory WHERE player_id LIKE '";
 		sql += database->clean(player_id);
@@ -767,9 +767,9 @@ bool SKO_Repository::savePlayerData(unsigned char userId)
 
 	//time played
 	unsigned long int total_minutes_played = User[userId].minutesPlayed;
-	double this_session_milli = (Clock() - User[userId].loginTime);
+	double this_session_milli = (OPI_Clock::milliseconds() - User[userId].loginTime);
 	//add the milliseconds to total time
-	total_minutes_played += (unsigned long int)(this_session_milli/1000.0/60.0);
+	total_minutes_played += (unsigned long long int)(this_session_milli/1000.0/60.0);
 
 	sql << ", minutes_played=";
 	sql << (int)total_minutes_played;

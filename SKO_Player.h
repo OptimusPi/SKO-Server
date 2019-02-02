@@ -30,9 +30,9 @@ class SKO_Player
         bool Que;
         bool Ident;
         bool Save;
-        unsigned long int QueTime;
+        unsigned long long int QueTime;
         unsigned int ping;
-        unsigned long int pingTicker;
+        unsigned long long int pingTicker;
         bool pingWaiting;
 
         // Name
@@ -52,8 +52,8 @@ class SKO_Player
         bool attacking;
         bool ground;
         bool facing_right;
-        unsigned long int attack_ticker;
-        unsigned long int regen_ticker;
+        unsigned long long int attack_ticker;
+        unsigned long long int regen_ticker;
         int que_action;
 
         void setX();
@@ -106,8 +106,8 @@ class SKO_Player
         int partyStatus;
 
         //fun server stuff
-        unsigned long int loginTime;
-        unsigned long int minutesPlayed;
+        unsigned long long int loginTime;
+        unsigned long long int minutesPlayed;
         unsigned short int OS;
         unsigned long int mobKills;
         unsigned long int pvpKills;

@@ -22,7 +22,7 @@ class SKO_ItemObject
       
       //who owns the item
       int owner;
-      unsigned long int ownerTicker;
+      unsigned long long int ownerTicker;
       
       //constructor
       SKO_ItemObject();

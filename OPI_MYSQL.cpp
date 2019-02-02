@@ -51,7 +51,7 @@ OPI_MYSQL::~OPI_MYSQL()
 //log file
 void OPI_MYSQL::log(std::string output)
 {
-	//logFile << "[" << Clock() << "] " << output << std::endl;
+	//logFile << "[" << OPI_Clock::milliseconds() << "] " << output << std::endl;
 	printf("[OPI_MYSQL] %s\n", output.c_str());
 	logCount++;
 }

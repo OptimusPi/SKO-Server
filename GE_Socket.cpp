@@ -26,7 +26,7 @@ void GE_Socket::Stream()
     //this tracks the bandwith usage of each client 
      
     //get the time 
-    float seconds = (Clock() - stream_ticker)  /  1000.0;  
+    float seconds = (OPI_Clock::milliseconds() - stream_ticker)  /  1000.0;  
      
     //update every second 
     if (seconds >= 1.0) 
@@ -43,7 +43,7 @@ void GE_Socket::Stream()
        byte_counter = 0; 
         
        //reset clock 
-       stream_ticker = Clock(); 
+       stream_ticker = OPI_Clock::milliseconds(); 
     } 
 } 
  

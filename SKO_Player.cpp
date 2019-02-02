@@ -36,9 +36,9 @@ void SKO_Player::init()
 	ping = 0;
 
 
-	attack_ticker = Clock();
-	regen_ticker = Clock();
-	pingTicker = Clock();
+	attack_ticker = OPI_Clock::milliseconds();
+	regen_ticker = OPI_Clock::milliseconds();
+	pingTicker = OPI_Clock::milliseconds();
 	pingWaiting = false;
 	
 	//holds all the worn items

@@ -297,7 +297,7 @@ int main()
 	}
 
 	/* initialize random seed: */
-	srand(Clock());
+	srand(OPI_Clock::nanoseconds());
 
 	//multi threading
 	std::thread physicsThread (Physics);
@@ -374,7 +374,7 @@ void TargetLoop()
 			for (int i = 0; i < map[mapId].num_targets; i++)
 			{
 				//respawn this box if it's been dead a while
-				if (!map[mapId].Target[i].active && Clock() - map[mapId].Target[i].respawn_ticker > 5000)
+				if (!map[mapId].Target[i].active && OPI_Clock::milliseconds() - map[mapId].Target[i].respawn_ticker > 5000)
 				{
 					map[mapId].Target[i].active = true;
 					network->sendSpawnTarget(i, mapId);
@@ -397,7 +397,7 @@ void EnemyLoop()
 				int next_action = 0;
 
 				//check for dibs on the kill, reset after 5 seconds
-				if (Clock() - map[mapId].Enemy[i]->dibsTicker >= 5000)
+				if (OPI_Clock::milliseconds() - map[mapId].Enemy[i]->dibsTicker >= 5000)
 				{
 					map[mapId].Enemy[i]->dibsPlayer = -1;
 					map[mapId].Enemy[i]->dibsTicker = 0;
@@ -413,7 +413,7 @@ void EnemyLoop()
 				//check for spawn
 				if (map[mapId].Enemy[i]->dead)
 				{
-					if (Clock() - map[mapId].Enemy[i]->respawn_ticker >= 7000)
+					if (OPI_Clock::milliseconds() - map[mapId].Enemy[i]->respawn_ticker >= 7000)
 					{
 						map[mapId].Enemy[i]->Respawn();
 						network->sendSpawnEnemy(map[mapId].Enemy[i], i, mapId);
@@ -463,7 +463,7 @@ void EnemyLoop()
 					} //end for user: u
 
 					//not dead, do some actions.
-					if ((Clock() - map[mapId].Enemy[i]->AI_ticker) > map[mapId].Enemy[i]->AI_period)
+					if ((OPI_Clock::milliseconds() - map[mapId].Enemy[i]->AI_ticker) > map[mapId].Enemy[i]->AI_period)
 					{
 						//only move if you shouldnt defend yourself, dumb enemy.
 						if (!confront)
@@ -615,7 +615,7 @@ void EnemyLoop()
 						{
 							//if it wasn't redundant, reset the ticker
 							network->sendEnemyAction(map[mapId].Enemy[i], next_action, i, mapId);
-							map[mapId].Enemy[i]->AI_ticker = Clock();
+							map[mapId].Enemy[i]->AI_ticker = OPI_Clock::milliseconds();
 						} //end no spam
 
 					} //end enemy AI
@@ -630,7 +630,7 @@ void EnemyLoop()
 				unsigned char next_action = 0;
 
 				//not dead, do some actions.
-				if ((Clock() - map[mapId].NPC[i]->AI_ticker) > map[mapId].NPC[i]->AI_period)
+				if ((OPI_Clock::milliseconds() - map[mapId].NPC[i]->AI_ticker) > map[mapId].NPC[i]->AI_period)
 				{
 					// UP TO quarter second extra delay
 					int random_delay = 2500 + rand() % 169;
@@ -688,15 +688,15 @@ void EnemyLoop()
 					if (!redundant)
 					{
 						//if it wasn't redundant, reset the ticker
-						map[mapId].NPC[i]->AI_ticker = Clock();
+						map[mapId].NPC[i]->AI_ticker = OPI_Clock::milliseconds();
 						network->sendNpcAction(map[mapId].NPC[i], next_action, i, mapId);
 					} //end no spam
 
 				} //end enemy AI
 			} // end enemy for loop
 		}
-		//Sleep for 2 ticks
-		Sleep(33);
+		//Sleep for 1 tick
+		OPI_Sleep::milliseconds(15);
 	}
 }
 
@@ -713,7 +713,7 @@ void Physics()
 	unsigned int amt = 0;
 
 	unsigned int updates = 0;
-	unsigned int lastTime = Clock();
+	unsigned int lastTime = OPI_Clock::milliseconds();
 
 	while (!SERVER_QUIT)
 	{
@@ -873,7 +873,7 @@ void Physics()
 						}	 //end for portal
 
 						//stop attacking
-						if (Clock() - User[i].attack_ticker > attack_speed)
+						if (OPI_Clock::milliseconds() - User[i].attack_ticker > attack_speed)
 						{
 							User[i].attacking = false;
 
@@ -939,7 +939,7 @@ void Physics()
 
 						if (regen > 0)
 						{
-							if (Clock() - User[i].regen_ticker >= 1200)
+							if (OPI_Clock::milliseconds() - User[i].regen_ticker >= 1200)
 							{
 								//regen hp
 								if (User[i].hp < User[i].max_hp)
@@ -961,7 +961,7 @@ void Physics()
 
 								//Send changed HP stat to client player
 								network->sendStatHp(i, User[i].hp);
-								User[i].regen_ticker = Clock();
+								User[i].regen_ticker = OPI_Clock::milliseconds();
 							}
 						}
 
@@ -1031,7 +1031,7 @@ void Physics()
 				if (map[mapId].ItemObj[i].status)
 				{
 					//ninja loot
-					if (Clock() - map[mapId].ItemObj[i].ownerTicker > 10000)
+					if (OPI_Clock::milliseconds() - map[mapId].ItemObj[i].ownerTicker > 10000)
 					{
 						//reset the item's owner
 						map[mapId].ItemObj[i].owner = -1;
@@ -1152,7 +1152,7 @@ void Attack(unsigned char userId, float numx, float numy)
 
 	printf("%s is attacking!\n", User[userId].Nick.c_str());
 	User[userId].attacking = true;
-	User[userId].attack_ticker = Clock();
+	User[userId].attack_ticker = OPI_Clock::milliseconds();
 	User[userId].x_speed = 0;
 
 	bool good = false;
@@ -1285,7 +1285,7 @@ void Attack(unsigned char userId, float numx, float numy)
 		if (x_dist > -map[mapId].Target[i].w && x_dist < max_dist && y_dist > 0 && y_dist < 60)
 		{
 			//make this target disappear
-			map[mapId].Target[i].respawn_ticker = Clock();
+			map[mapId].Target[i].respawn_ticker = OPI_Clock::milliseconds();
 			map[mapId].Target[i].active = false;
 			network->sendDespawnTarget(i, mapId);
 
@@ -1593,7 +1593,7 @@ void RespawnEnemy(unsigned char mapId, int enemy)
 	map[mapId].Enemy[enemy]->dead = true;
 
 	//set their respawn timer
-	map[mapId].Enemy[enemy]->respawn_ticker = Clock();
+	map[mapId].Enemy[enemy]->respawn_ticker = OPI_Clock::milliseconds();
 
 	//disappear TODO - remove this hack add enemy killed pakcet for client & server
 	map[mapId].Enemy[enemy]->x = -100000;
@@ -1622,7 +1622,7 @@ void SpawnLoot(unsigned char mapId, SKO_ItemObject lootItem)
 
 	map[mapId].ItemObj[rand_i] = SKO_ItemObject(lootItem.itemID, lootItem.x, lootItem.y, lootItem.x_speed, lootItem.y_speed, lootItem.amount);
 	map[mapId].ItemObj[rand_i].owner = lootItem.owner;
-	map[mapId].ItemObj[rand_i].ownerTicker = Clock();
+	map[mapId].ItemObj[rand_i].ownerTicker = OPI_Clock::milliseconds();
 
 	
 	unsigned char itemObjId = rand_i;
@@ -2050,7 +2050,7 @@ void EnemyHit(unsigned char enemyId, unsigned char mapId, unsigned char userId)
 	//keep track of damage
 	map[mapId].Enemy[enemyId]->dibsDamage[userId] += damage;
 	map[mapId].Enemy[enemyId]->dibsPlayer = userId;
-	map[mapId].Enemy[enemyId]->dibsTicker = Clock();
+	map[mapId].Enemy[enemyId]->dibsTicker = OPI_Clock::milliseconds();
 
 	for (int c = 0; c < MAX_CLIENTS; c++)
 	{
