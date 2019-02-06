@@ -50,6 +50,9 @@ unsigned char hpBar = 25;
 //gravity
 const float GRAVITY = 0.169;
 
+//player walk speed
+const float WALK_SPEED = 3;
+
 //holiday events TODO use a config not hard coded magic
 unsigned const char HOLIDAY_NPC_DROP = ITEM_EASTER_EGG, HOLIDAY_BOX_DROP = ITEM_BUNNY_EARS;
 const bool HOLIDAY = false;
@@ -584,14 +587,14 @@ void EnemyLoop()
 						case ENEMY_MOVE_LEFT:
 							if (map[mapId].Enemy[i]->x_speed < 0)
 								redundant = true;
-							map[mapId].Enemy[i]->x_speed = -3;
+							map[mapId].Enemy[i]->x_speed = -WALK_SPEED;
 							map[mapId].Enemy[i]->facing_right = false;
 							break;
 
 						case ENEMY_MOVE_RIGHT:
 							if (map[mapId].Enemy[i]->x_speed > 0)
 								redundant = true;
-							map[mapId].Enemy[i]->x_speed = 3;
+							map[mapId].Enemy[i]->x_speed = WALK_SPEED;
 							map[mapId].Enemy[i]->facing_right = true;
 							break;
 
@@ -662,14 +665,14 @@ void EnemyLoop()
 					case NPC_MOVE_LEFT:
 						if (map[mapId].NPC[i]->x_speed < 0)
 							redundant = true;
-						map[mapId].NPC[i]->x_speed = -3;
+						map[mapId].NPC[i]->x_speed = -WALK_SPEED;
 						map[mapId].NPC[i]->facing_right = false;
 						break;
 
 					case NPC_MOVE_RIGHT:
 						if (map[mapId].NPC[i]->x_speed > 0)
 							redundant = true;
-						map[mapId].NPC[i]->x_speed = 3;
+						map[mapId].NPC[i]->x_speed = WALK_SPEED;
 						map[mapId].NPC[i]->facing_right = true;
 						break;
 
@@ -1395,7 +1398,7 @@ void Right(unsigned char userId, float numx, float numy)
 
 	// Physics
 	User[userId].facing_right = true;
-	User[userId].x_speed = 3;
+	User[userId].x_speed = WALK_SPEED;
 
 	bool isCorrection = false;
 
@@ -1434,7 +1437,7 @@ void Left(unsigned char userId, float numx, float numy)
 
 	//physics
 	User[userId].facing_right = false;
-	User[userId].x_speed = -3;
+	User[userId].x_speed = -WALK_SPEED;
 
 	// Determine if the client is lagged behind the server physics, and correct them.
 	bool isCorrection = false;
