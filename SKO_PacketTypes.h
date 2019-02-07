@@ -11,8 +11,8 @@ const unsigned char
 	DISCONNECT = 251,
 
 	VERSION_MAJOR = 1,
-	VERSION_MINOR = 2,
-	VERSION_PATCH = 1,
+	VERSION_MINOR = 3,
+	VERSION_PATCH = 0,
 
 	CHAT = 1,
 

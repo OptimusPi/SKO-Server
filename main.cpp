@@ -62,10 +62,6 @@ bool blocked(unsigned char mapId, float box1_x1, float box1_y1, float box1_x2, f
 //attack time
 int attack_speed = 40 * 6;
 
-//this waits for auto-save
-unsigned int persistTicker;
-bool persistLock = false;
-
 void GiveLoot(int enemy, int player);
 void Attack(unsigned char userId, float x, float y);
 void Jump(unsigned char userId, float x, float y);
@@ -86,9 +82,9 @@ void Warp(unsigned char userId, SKO_Portal portal);
 void Respawn(unsigned char mapId, unsigned char userId);
 void SpawnLoot(unsigned char mapId, SKO_ItemObject lootItem);
 
-void Physics();
-void TargetLoop();
-void EnemyLoop();
+void PhysicsLoop();
+void MapObjectLoop();
+void NpcLoop();
 void UserLoop();
 
 std::string trim(std::string str)
@@ -298,14 +294,14 @@ int main()
 	srand(OPI_Clock::nanoseconds());
 
 	//multi threading
-	std::thread physicsThread(Physics);
-	std::thread enemyThread(EnemyLoop);
-	std::thread targetThread(TargetLoop);
+	std::thread physicsThread(PhysicsLoop);
+	std::thread npcThread(NpcLoop);
+	std::thread mapObjectThread(MapObjectLoop);
 	std::thread mainThread(UserLoop);
 
 	mainThread.join();
-	targetThread.join();
-	enemyThread.join();
+	mapObjectThread.join();
+	npcThread.join();
 	physicsThread.join();
 
 	return 0;
@@ -362,13 +358,13 @@ bool blocked(unsigned char mapId, float box1_x1, float box1_y1, float box1_x2, f
 	return false;
 }
 
-void TargetLoop()
+void MapObjectLoop()
 {
 	while (!SERVER_QUIT)
 	{
 		for (unsigned char mapId = 0; mapId < NUM_MAPS; mapId++)
 		{
-			//npc
+			// Respawn targets
 			for (int i = 0; i < map[mapId].num_targets; i++)
 			{
 				//respawn this box if it's been dead a while
@@ -378,12 +374,49 @@ void TargetLoop()
 					network->sendSpawnTarget(i, mapId);
 				}
 			}
+
+			// Check for portal collisions
+			for (int portal = 0; portal < map[mapId].num_portals; portal++)
+			{
+				for (int i = 0; i < MAX_CLIENTS; i++)
+				{
+					if (!User[i].Status || User[i].mapId != mapId)
+						continue;
+
+					//player box
+					float box1_x1 = User[i].x + 23;
+					float box1_y1 = User[i].y + 13;
+					float box1_x2 = User[i].x + 40;
+					float box1_y2 = User[i].y + 64;
+
+					//portal box
+					float box2_x1 = map[mapId].Portal[portal].x;
+					float box2_y1 = map[mapId].Portal[portal].y;
+					float box2_x2 = map[mapId].Portal[portal].x + map[mapId].Portal[portal].w;
+					float box2_y2 = map[mapId].Portal[portal].y + map[mapId].Portal[portal].h;
+
+					if (box1_x2 > box2_x1 && box1_x1 < box2_x2 && box1_y2 > box2_y1 && box1_y1 < box2_y2)
+					{
+						if (User[i].level >= map[mapId].Portal[portal].level_required)
+						{
+							Warp(i, map[mapId].Portal[portal]);
+							//TODO: how do players stay in a party on different maps?
+							//Maybe disconnect after a minute.
+							quitParty(i);
+						}
+					} //end portal collison
+				}
+				
+			}	 //end for portal
 		}
-		OPI_Sleep::seconds(1);
+
+		// Use less CPU power on this thread by sleeping more.
+		// Actions in this thread are very low priority that should not check very often
+		OPI_Sleep::milliseconds(100);
 	}
 }
 
-void EnemyLoop()
+void NpcLoop()
 {
 	while (!SERVER_QUIT)
 	{
@@ -692,12 +725,12 @@ void EnemyLoop()
 				} //end enemy AI
 			}	 // end npc for loop
 		}
-		//Sleep for 2 ticks
+		// Medium thread priority, should be quick enough to make responsive enemies, but not so quick it takes away from physics and network handling
 		OPI_Sleep::milliseconds(32);
 	}
 }
 
-void Physics()
+void PhysicsLoop()
 {
 	//initialize the timestep
 	OPI_Timestep *timestep = new OPI_Timestep(60);
@@ -724,7 +757,6 @@ void Physics()
 				//enemies
 				for (int i = 0; i < map[mapId].num_enemies; i++)
 				{
-
 					//enemy physics
 					if (map[mapId].Enemy[i]->y_speed < 10)
 						map[mapId].Enemy[i]->y_speed += GRAVITY;
@@ -842,34 +874,6 @@ void Physics()
 				{
 					if (User[i].mapId == mapId && User[i].Ident)
 					{
-						//check for portal collisions
-						for (int portal = 0; portal < map[mapId].num_portals; portal++)
-						{
-
-							//player box
-							float box1_x1 = User[i].x + 23;
-							float box1_y1 = User[i].y + 13;
-							float box1_x2 = User[i].x + 40;
-							float box1_y2 = User[i].y + 64;
-
-							//portal box
-							float box2_x1 = map[mapId].Portal[portal].x;
-							float box2_y1 = map[mapId].Portal[portal].y;
-							float box2_x2 = map[mapId].Portal[portal].x + map[mapId].Portal[portal].w;
-							float box2_y2 = map[mapId].Portal[portal].y + map[mapId].Portal[portal].h;
-
-							if (box1_x2 > box2_x1 && box1_x1 < box2_x2 && box1_y2 > box2_y1 && box1_y1 < box2_y2)
-							{
-								if (User[i].level >= map[mapId].Portal[portal].level_required)
-								{
-									Warp(i, map[mapId].Portal[portal]);
-									//TODO: how do players stay in a party on different maps?
-									//Maybe disconnect after a minute.
-									quitParty(i);
-								}
-							} //end portal collison
-						}	 //end for portal
-
 						//stop attacking
 						if (OPI_Clock::milliseconds() - User[i].attack_ticker > attack_speed)
 						{
@@ -1116,9 +1120,9 @@ void Physics()
 					}
 				}
 			}
-		} //end timestep
+		} 
 		OPI_Sleep::microseconds(1);
-	} //end while true
+	}
 }
 
 /* perform player actions */
@@ -1721,6 +1725,9 @@ void Warp(unsigned char userId, SKO_Portal portal)
 	User[userId].mapId = portal.mapId;
 	User[userId].x = portal.spawn_x;
 	User[userId].y = portal.spawn_y;
+
+	printf("Warp user from map %i to map %i\n", oldMap, User[userId].mapId);
+	//TODO: threading issue: a correction packet could interfere and warp to the wrong position!
 
 	for (int c = 0; c < MAX_CLIENTS; c++)
 	{

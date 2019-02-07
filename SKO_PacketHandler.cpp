@@ -28,6 +28,7 @@ void SKO_PacketHandler::parseLogin(unsigned char userId, SKO_PacketParser *parse
     std::string loginRequest = parser->getPacketBody();
     std::string username = nextParameter(loginRequest);
     std::string password = loginRequest;
+    printf("attemptLogin%s, %s);\n", username.c_str(), password.c_str());
     network->attemptLogin(userId, username, password);
 }
 
@@ -36,6 +37,7 @@ void SKO_PacketHandler::parseRegister(unsigned char userId, std::string paramete
 {
     std::string username = nextParameter(parameters);
     std::string password = parameters;//do not use nextParameter to get password, just use remaining
+    printf("attemptRegister%s, %s);\n", username.c_str(), password.c_str());
     network->attemptRegister(userId, username, password);      
 }
 

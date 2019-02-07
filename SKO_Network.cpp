@@ -114,7 +114,7 @@ void SKO_Network::saveAllProfiles()
 		this->pauseSavingStatus = true;
 
 	this->lastSaveTime = OPI_Clock::milliseconds();
-	printf("lastSaveTime is: %lu\n", this->lastSaveTime);
+	printf("lastSaveTime is: %llu\n", this->lastSaveTime);
 }
 
 void SKO_Network::SaveLoop()
@@ -129,11 +129,11 @@ void SKO_Network::SaveLoop()
 			OPI_Sleep::seconds(1);
 		}
 
-		printf("OPI_Clock::milliseconds() is: %lu\n", OPI_Clock::milliseconds());
-		printf("and lastSaveTime is: %lu\n", this->lastSaveTime);
+		printf("OPI_Clock::milliseconds() is: %llu\n", OPI_Clock::milliseconds());
+		printf("and lastSaveTime is: %llu\n", this->lastSaveTime);
 		printf("this->saveRateSeconds is: %lu\n", this->saveRateSeconds);
 
-		printf("so: (%lu > %lu)\n\n", (OPI_Clock::milliseconds() - this->lastSaveTime), this->saveRateSeconds);
+		printf("so: (%llu > %lu)\n\n", (OPI_Clock::milliseconds() - this->lastSaveTime), this->saveRateSeconds);
 		printf("Auto Save...\n");
 		saveAllProfiles();
 	}
@@ -182,8 +182,8 @@ void SKO_Network::QueueLoop()
 							User[userId].Status = true;
 							User[userId].Que = false;
 							sendVersionSuccess(userId);
-							printf("Que Time: \t%lu\n", User[userId].QueTime);
-							printf("Current Time: \t%lu\n", OPI_Clock::milliseconds());
+							printf("Que Time: \t%llu\n", User[userId].QueTime);
+							printf("Current Time: \t%llu\n", OPI_Clock::milliseconds());
 
 							//operating system statistics
 							User[userId].OS = versionOS;
@@ -197,7 +197,7 @@ void SKO_Network::QueueLoop()
 							printf(">>>[expected values] VERSION_MAJOR: %i VERSION_MINOR: %i VERSION_PATCH: %i\n",
 								   VERSION_MAJOR, VERSION_MINOR, VERSION_PATCH);
 							User[userId].Que = false;
-							User[userId].Sock->Close(); 
+							User[userId].Sock->Close();
 							User[userId] = SKO_Player();
 						}
 					}

@@ -13,7 +13,7 @@
 class OPI_Hasher
 {
   public:
-  static std::string Hash(std::string _password, std::string _salt)
+  static std::string hash(std::string _password, std::string _salt)
   {
     std::string hashResult = "";
     uint8_t SALTLEN = _salt.length();

@@ -87,7 +87,7 @@ int SKO_Repository::loginPlayer(std::string username, std::string password)
 	sql = "SELECT * FROM player WHERE username like '";
 	sql += database->clean(username);
 	sql += "' AND password like '";
-	sql += database->clean(OPI_Hasher::Hash(password, player_salt));
+	sql += database->clean(OPI_Hasher::hash(password, player_salt));
 	sql += "'";
 	database->query(sql);
 
@@ -317,13 +317,12 @@ int SKO_Repository::createPlayer(std::string Username, std::string Password, std
 	sql = "INSERT INTO player (username, password, level, facing_right, x, y, hp, str, def, xp_max, hp_max, current_map, salt) VALUES('";
 	sql += database->clean(Username);
 	sql += "', '";
-	sql += database->clean(OPI_Hasher::Hash(Password, player_salt));
+	sql += database->clean(OPI_Hasher::hash(Password, player_salt));
 	sql += "', '1', b'1', '314', '300', '10', '2', '1', '10', '10', '2', '";
 	sql += database->clean(player_salt);
 	sql += "')";
 	printf("%s", sql.c_str());;
 	database->query(sql);
-	printf("inserted. Well, tried anyway.\n");
 
 	//make sure it worked
 	sql = "SELECT * FROM player WHERE username LIKE '";

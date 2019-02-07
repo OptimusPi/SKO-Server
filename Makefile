@@ -1,5 +1,5 @@
 CXX=g++
-CXXFLAGS=-c -g -std=c++11 -O3
+CXXFLAGS=-c -Wall -g -D_GLIBCXX_USE_NANOSLEEP -std=c++11 -O3
 DMYSQL_CXXFLAGS=-stdlib=libc++
 LDLIBS=-lmysqlclient -largon2 -lpthread
 SOURCES:=$(wildcard *.cpp)
