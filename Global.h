@@ -14,11 +14,11 @@
 
 #define MAX_CLIENTS 16
 
-#include "SKO_Player.h"
-#include "SKO_Portal.h"
-#include "SKO_ItemObject.h"
-#include "SKO_Item.h"
-#include "SKO_Map.h"
+#include "SKO_Game/SKO_Player.h"
+#include "SKO_Game/SKO_Portal.h"
+#include "SKO_Game/SKO_ItemObject.h"
+#include "SKO_Game/SKO_Item.h"
+#include "SKO_Game/SKO_Map.h"
 
 //Quit all threads global flag
 extern bool SERVER_QUIT;
@@ -43,7 +43,7 @@ extern void Right(unsigned char userId, float x, float y);
 extern void Stop(unsigned char userId, float x, float y);
 extern void GiveXP(unsigned char userId, int xp);
 extern void quitParty(unsigned char userId);
-extern void Warp(unsigned char userId, SKO_Portal portal);
+extern void Warp(unsigned char userId, SKO_Portal *portal);
 extern void SpawnLoot(unsigned char mapId, SKO_ItemObject lootItem);
 
 //Utilities

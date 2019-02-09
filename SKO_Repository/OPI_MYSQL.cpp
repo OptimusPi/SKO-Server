@@ -221,12 +221,12 @@ char * OPI_MYSQL::getData(int i)
      return row[i];
 }
 
-std::string OPI_MYSQL::getString(int index)
+std::string OPI_MYSQL::getString(unsigned int index)
 {
      char * a = getData(index);
      std::string returnStr = "";
 
-     for (int i = 0; i < length[index]; i++)
+     for (unsigned long int i = 0; i < length[index]; i++)
      {	
 	returnStr += a[i];
      }	

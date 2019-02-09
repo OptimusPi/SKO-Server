@@ -37,7 +37,7 @@ std::string SKO_PacketParser::toString()
 
     // Print such as {5, 251, 1, 2, 1}
     prettyString << "{";
-    for (int i = 0; i < packet.length(); i++) 
+    for (unsigned int i = 0; i < packet.length(); i++) 
     {
         if (i == 0)
             prettyString << "packetLength:";

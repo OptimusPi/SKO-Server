@@ -1,10 +1,11 @@
 #include <ctime>
 #include <vector>
-#include "SKO_ItemObject.h"
 #include <cstdio>
 #include <iostream>
 #include <cstdlib>
 #include <cmath>
+
+#include "SKO_ItemObject.h"
 
 #define MAX_CLIENTS 16
 
@@ -37,7 +38,7 @@ class SKO_Enemy
 		//spawn
 		int sx, sy;
 
-		unsigned int defence;
+		unsigned int defense;
 		unsigned int strength;
 		unsigned int hp;
 		unsigned int xp;

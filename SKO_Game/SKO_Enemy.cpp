@@ -47,7 +47,7 @@ SKO_Enemy();
      sx = sx_in;
      sy = sy_in;
      
-     defence = 1;
+     defense = 1;
      strength = 4;
      
      AI_ticker = 0;
@@ -119,12 +119,12 @@ SKO_ItemObject SKO_Enemy::getLootItem()
 	for (int dontInf = 0; dontInf < 1000 && !itemGiven; dontInf++)
 	{
 		//loop through all my loot items!
-		for (int i = startRollAt; i < lootItem.size(); i++)
+		for (unsigned int i = startRollAt; i < lootItem.size(); i++)
 		{
 			//roll for this item!
 			if (Roll(lootItem[i].chance))
 			{
-                item.itemID = lootItem[i].item_id;
+        item.itemID = lootItem[i].item_id;
 				item.amount = lootItem[i].amount;
 				item.owner = -1;
 				itemGiven = true;

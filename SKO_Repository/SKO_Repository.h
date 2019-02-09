@@ -3,7 +3,6 @@
 
 #include "OPI_MYSQL.h"
 
-
 class SKO_Repository
 {
 	public:

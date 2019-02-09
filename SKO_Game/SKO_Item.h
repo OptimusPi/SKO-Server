@@ -1,4 +1,3 @@
-#include "library.h"
 
 #ifndef __SKO_ITEM_H_
 #define __SKO_ITEM_H_

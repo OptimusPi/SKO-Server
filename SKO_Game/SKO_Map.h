@@ -10,7 +10,7 @@
 #include "SKO_Target.h"
 #include "SKO_NPC.h"
 
-#include "INIReader.h"
+#include "../SKO_Utilities/INIReader.h"
 
 #ifndef __SKO_MAP_H_
 #define __SKO_MAP_H_
@@ -66,7 +66,7 @@ class SKO_Map
         SKO_ItemObject ItemObj[256];
         SKO_Stall Stall[25];
         SKO_Shop  Shop[25];
-	SKO_Portal Portal[25];
+	SKO_Portal *Portal[25];
 	SKO_Target Target[25];
 	SKO_NPC	*NPC[25];
 
@@ -76,7 +76,6 @@ class SKO_Map
       //constructors
       SKO_Map();
       SKO_Map(std::string filename);
-      
 };
 
 #endif

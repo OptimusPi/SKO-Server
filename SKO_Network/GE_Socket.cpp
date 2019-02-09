@@ -8,7 +8,7 @@ GE_Socket::~GE_Socket()
  
 GE_Socket::GE_Socket() 
 { 
-    Data = ""; 
+    data = ""; 
     Connected = false; 
     IP = ""; 
     byte_counter = 0;//counts data in bytes 
@@ -82,30 +82,28 @@ int GE_Socket::GetStatus2()
     FD_SET((unsigned int)Socket,&rset);  
     FD_SET((unsigned int)Socket,&wset);  
     FD_SET((unsigned int)Socket,&eset); 
- 
-    int i = select(FD_SETSIZE,&rset,&wset,&eset,(struct timeval*)&timeout); 
-     
       
-    int Status = 0; 
+    int status = 0; 
     if( FD_ISSET(Socket,&eset) ) 
     { 
-        Status |= GE_Socket_Error; 
-        return Status; 
+        status |= GE_Socket_Error; 
+        return status; 
     } 
     else 
     { 
-        Status |= GE_Socket_OK; 
+        status |= GE_Socket_OK; 
     } 
+    
     if( FD_ISSET(Socket,&wset) )
 	{  
-        Status |= GE_Socket_Write; 
+        status |= GE_Socket_Write; 
     } 
     else if( FD_ISSET(Socket,&rset) ){
 		
-         Status |= GE_Socket_Read; 
+         status |= GE_Socket_Read; 
     } 
      
-    return Status; 
+    return status; 
 } 
  
 int GE_Socket::GetStatus() 
@@ -228,7 +226,7 @@ GE_Socket* GE_Socket::Accept()
 void GE_Socket::Close() 
 { 
     //Close the socket if it exists 
-    Data = "";
+    data = "";
     Connected = false; 
     if (Socket > 0)
 		close(Socket);
@@ -266,7 +264,7 @@ int GE_Socket::Recv()
         int iResult = recv (Socket, recvbuf, DEFAULT_BUFLEN, 0); 
         if (iResult > 0)  
         { 
-           Data.append(recvbuf, iResult); 
+           data.append(recvbuf, iResult); 
         } 
         else if (iResult == 0 ) 
         { 

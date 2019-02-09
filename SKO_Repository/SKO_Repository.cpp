@@ -1,6 +1,8 @@
 #include "SKO_Repository.h"
-#include "OPI_Hasher.h"
-#include "Global.h"
+#include "../SKO_Utilities/OPI_Hasher.h"
+
+//TODO remove this when possible
+#include "../Global.h"
 
 SKO_Repository::SKO_Repository() 
 {
@@ -139,7 +141,7 @@ int SKO_Repository::loadPlayerData(unsigned char userId)
 		User[userId].xp = database->getInt(6);
 		User[userId].hp = database->getInt(7);
 		User[userId].strength = database->getInt(8);
-		User[userId].defence = database->getInt(9);
+		User[userId].defense = database->getInt(9);
 		User[userId].max_xp = database->getInt(10);
 		User[userId].max_hp = database->getInt(11);
 		User[userId].y_speed = database->getFloat(12);
@@ -243,7 +245,7 @@ void SKO_Repository::LogPlayerAddress(unsigned char userId)
 { 
 		//log ip
 	printf("i.p. logging...\n");
-	std::string player_ip = User[userId].Sock->Get_IP();
+	std::string player_ip = User[userId].socket->Get_IP();
 	std::string player_id = User[userId].ID;
 	std::string sql = "INSERT INTO ip_log (player_id, ip) VALUES('";
 	sql += database->clean(player_id);
@@ -737,7 +739,7 @@ bool SKO_Repository::savePlayerData(unsigned char userId)
 	sql << ", str=";
 	sql << (int)User[userId].strength; 
 	sql << ", def=";
-	sql << (int)User[userId].defence;
+	sql << (int)User[userId].defense;
 	sql << ", xp_max=";
 	sql << User[userId].max_xp;
 	sql << ", hp_max="; 

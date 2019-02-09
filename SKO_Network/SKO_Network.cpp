@@ -1,11 +1,14 @@
+#include "../SKO_Game/SKO_Player.h"
+#include "../SKO_Repository/SKO_Repository.h"
+
 #include "SKO_Network.h"
-#include "SKO_Player.h"
-#include "SKO_Repository.h"
 #include "SKO_PacketTypes.h"
 #include "SKO_PacketFactory.h"
 #include "SKO_PacketParser.h"
-#include "Global.h"
 #include "GE_Socket.h"
+
+//TODO remove this when possible
+#include "../Global.h"
 
 SKO_Network::SKO_Network(SKO_Repository *repository, int port, unsigned long int saveRateSeconds)
 {
@@ -141,7 +144,7 @@ void SKO_Network::SaveLoop()
 
 void SKO_Network::sendVersionSuccess(unsigned char userId)
 {
-	send(User[userId].Sock, VERSION_SUCCESS);
+	send(User[userId].socket, VERSION_SUCCESS);
 }
 
 void SKO_Network::QueueLoop()
@@ -156,11 +159,11 @@ void SKO_Network::QueueLoop()
 				continue;
 
 			//receive
-			if (User[userId].Sock->Recv() & GE_Socket_OK)
+			if (User[userId].socket->Recv() & GE_Socket_OK)
 			{
-				std::string packet = User[userId].Sock->Data;
+				std::string packet = User[userId].socket->data;
 				printf("A client is trying to connect...\n");
-				printf("Data.length() = [%i]\n", (int)packet.length());
+				printf("data.length() = [%i]\n", (int)packet.length());
 
 				//if you got anything
 				if (packet.length() >= 6)
@@ -178,7 +181,7 @@ void SKO_Network::QueueLoop()
 						if (versionMajor == VERSION_MAJOR && versionMinor == VERSION_MINOR && versionPatch == VERSION_PATCH)
 						{
 							printf("Correct version!\n");
-							User[userId].Sock->Data = "";
+							User[userId].socket->data = "";
 							User[userId].Status = true;
 							User[userId].Que = false;
 							sendVersionSuccess(userId);
@@ -190,14 +193,14 @@ void SKO_Network::QueueLoop()
 						}
 						else //not correct version
 						{
-							send(User[userId].Sock, VERSION_FAIL);
+							send(User[userId].socket, VERSION_FAIL);
 							printf("error, packet code failed on VERSION_CHECK see look:\n");
 							printf(">>>[read values] VERSION_MAJOR: %i VERSION_MINOR: %i VERSION_PATCH: %i VERSION_OS: %i\n",
 								  versionMajor, versionMinor, versionPatch, versionOS);
 							printf(">>>[expected values] VERSION_MAJOR: %i VERSION_MINOR: %i VERSION_PATCH: %i\n",
 								   VERSION_MAJOR, VERSION_MINOR, VERSION_PATCH);
 							User[userId].Que = false;
-							User[userId].Sock->Close();
+							User[userId].socket->Close();
 							User[userId] = SKO_Player();
 						}
 					}
@@ -205,16 +208,16 @@ void SKO_Network::QueueLoop()
 					{
 						printf("Here is the back packet! ");
 
-						for (int i = 0; i < User[userId].Sock->Data.length(); i++)
+						for (unsigned int i = 0; i < User[userId].socket->data.length(); i++)
 						{
-							printf("[%i]", User[userId].Sock->Data[i]);
+							printf("[%i]", User[userId].socket->data[i]);
 						}
 						printf("\n");
 
-						send(User[userId].Sock, VERSION_FAIL);
+						send(User[userId].socket, VERSION_FAIL);
 						printf("error, packet code failed on VERSION_CHECK (2)\n");
 						User[userId].Que = false;
-						User[userId].Sock->Close();
+						User[userId].socket->Close();
 					}
 				}
 			}
@@ -223,18 +226,18 @@ void SKO_Network::QueueLoop()
 				User[userId].Que = false;
 				User[userId].Status = false;
 				User[userId].Ident = false;
-				User[userId].Sock->Close();
+				User[userId].socket->Close();
 				User[userId] = SKO_Player();
-				printf("*\n**\n*\nQUE FAIL! (Recv returned error) IP IS %s*\n**\n*\n\n", User[userId].Sock->IP.c_str());
+				printf("*\n**\n*\nQUE FAIL! (Recv returned error) IP IS %s*\n**\n*\n\n", User[userId].socket->IP.c_str());
 			}
 
 			//didn't recv anything, don't kill unless it's too long
 			if (OPI_Clock::milliseconds() - User[userId].QueTime >= 500)
 			{
 				User[userId].Que = false;
-				User[userId].Sock->Close();
+				User[userId].socket->Close();
 				printf("Closing socket %i for timeout.\n", userId);
-				printf("*\n**\n*\nQUE FAIL! IP IS %s*\n**\n*\n\n", User[userId].Sock->IP.c_str());
+				printf("*\n**\n*\nQUE FAIL! IP IS %s*\n**\n*\n\n", User[userId].socket->IP.c_str());
 			}
 		} //end for loop
 
@@ -260,7 +263,7 @@ void SKO_Network::ConnectLoop()
 				if (ping > 60000)
 				{
 					printf("\e[31;0mClosing socket based on ping greater than one minute.\e[m\n");
-					User[i].Sock->Close();
+					User[i].socket->Close();
 				}
 			} //end pingWaiting
 			else
@@ -269,7 +272,7 @@ void SKO_Network::ConnectLoop()
 				if (OPI_Clock::milliseconds() - User[i].pingTicker > 1000)
 				{
 					//time to ping them.
-					send(User[i].Sock, PING);
+					send(User[i].socket, PING);
 					User[i].pingWaiting = true;
 					User[i].pingTicker = OPI_Clock::milliseconds();
 				}
@@ -311,44 +314,44 @@ void SKO_Network::ConnectLoop()
 			}
 
 			printf("incoming socket is: %i\n", incomingSocket);
-			printf("> User[incomingSocket].Sock->Connected == %s\n", User[incomingSocket].Sock->Connected ? "True" : "False");
+			printf("> User[incomingSocket].socket->Connected == %s\n", User[incomingSocket].socket->Connected ? "True" : "False");
 			printf("> User[incomingSocket].Save == %i\n", (int)User[incomingSocket].Save);
 			printf("> User[incomingSocket].Status == %i\n", (int)User[incomingSocket].Status);
 			printf("> User[incomingSocket].Ident == %i\n", (int)User[incomingSocket].Ident);
 
 			//make them mute and such
 			User[incomingSocket] = SKO_Player();
-			User[incomingSocket].Sock = listenSocket->Accept();
+			User[incomingSocket].socket = listenSocket->Accept();
 
 			//error reporting
-			if (User[incomingSocket].Sock->Socket == 0)
+			if (User[incomingSocket].socket->Socket == 0)
 			{
-				printf("Sock[%i] INVALID_SOCKET\n", incomingSocket);
+				printf("socket[%i] INVALID_SOCKET\n", incomingSocket);
 			}
 			else
 			{
 				// Set the status of that socket to taken
-				User[incomingSocket].Sock->Connected = true;
+				User[incomingSocket].socket->Connected = true;
 
 				//set the data counting clock
-				User[incomingSocket].Sock->stream_ticker = OPI_Clock::milliseconds();
+				User[incomingSocket].socket->stream_ticker = OPI_Clock::milliseconds();
 
 				//set the data_stream to null
-				User[incomingSocket].Sock->byte_counter = 0;
+				User[incomingSocket].socket->byte_counter = 0;
 
 				//set bandwidth to null
-				User[incomingSocket].Sock->bandwidth = 0;
+				User[incomingSocket].socket->bandwidth = 0;
 			}
 			// Output that a client connected
 			printf("[ !!! ] Client %i Connected\n", incomingSocket);
 
-			std::string their_ip = User[incomingSocket].Sock->Get_IP();
+			std::string their_ip = User[incomingSocket].socket->Get_IP();
 
 			if (repository->IsAddressBanned(their_ip))
 			{
 				//cut them off!
 				printf("SOMEONE BANNED TRIED TO CONNECT FROM [%s]\7\n", their_ip.c_str());
-				User[incomingSocket].Sock->Close();
+				User[incomingSocket].socket->Close();
 			}
 
 			//put in que
@@ -401,8 +404,8 @@ void SKO_Network::send(GE_Socket *socket, First const &first, Rest const &... re
 void SKO_Network::disconnectClient(unsigned char userId)
 {
 	User[userId].Ident = false;
-	User[userId].Sock->Close();
-	User[userId].Sock->Connected = false;
+	User[userId].socket->Close();
+	User[userId].socket->Connected = false;
 
 	// Output socket status
 	printf("[ ERR ] User status: %i\n", User[userId].Status);
@@ -419,7 +422,7 @@ void SKO_Network::disconnectClient(unsigned char userId)
 	{
 		if (User[i].Ident && i != userId)
 		{
-			send(User[i].Sock, EXIT, userId);
+			send(User[i].socket, EXIT, userId);
 		}
 	}
 
@@ -429,7 +432,7 @@ void SKO_Network::disconnectClient(unsigned char userId)
 	if (User[userId].tradeStatus > 0 && User[userId].tradePlayer >= 0)
 	{
 		int playerB = User[userId].tradePlayer;
-		send(User[playerB].Sock, TRADE, CANCEL);
+		send(User[playerB].socket, TRADE, CANCEL);
 
 		//set playerB to not trading at all
 		User[playerB].tradeStatus = 0;
@@ -439,9 +442,9 @@ void SKO_Network::disconnectClient(unsigned char userId)
 	quitParty(userId);
 
 	printf("Clearing User #%i named %s\n", userId, User[userId].Nick.c_str());
-	if (User[userId].Sock)
+	if (User[userId].socket)
 	{
-		delete User[userId].Sock;
+		delete User[userId].socket;
 	}
 	User[userId] = SKO_Player();
 
@@ -450,7 +453,7 @@ void SKO_Network::disconnectClient(unsigned char userId)
 void SKO_Network::attemptRegister(unsigned char userId, std::string username, std::string password)
 {
     //try to create new player account
-    int result = repository->createPlayer(username, password, User[userId].Sock->IP);
+    int result = repository->createPlayer(username, password, User[userId].socket->IP);
 
     if (result == 1) // user already exists
     {
@@ -464,12 +467,12 @@ void SKO_Network::attemptRegister(unsigned char userId, std::string username, st
     }
     else if (result == 2) // user is ip banned
     {
-        User[userId].Sock->Close();
+        User[userId].socket->Close();
     }
     else if (result == 3) // fatal error occurred
     {
         printf(kRed "[FATAL] Unable to create player.\n" kNormal);
-        User[userId].Sock->Close();
+        User[userId].socket->Close();
     }
 }
 void SKO_Network::attemptLogin(unsigned char userId, std::string username, std::string password)
@@ -516,7 +519,7 @@ void SKO_Network::attemptLogin(unsigned char userId, std::string username, std::
 	default:break;
 	}
 
-	printf("(login success) User %i %s socket status: %i\n", userId, username.c_str(), User[userId].Sock->GetStatus());
+	printf("(login success) User %i %s socket status: %i\n", userId, username.c_str(), User[userId].socket->GetStatus());
 
 	//successful login
 	sendLoginResponse_Success(userId);
@@ -534,7 +537,7 @@ void SKO_Network::attemptLogin(unsigned char userId, std::string username, std::
 	{
 		printf("couldn't load data. KILL!\n");
 		User[userId].Save = false;
-		User[userId].Sock->Close();
+		User[userId].socket->Close();
 		return;
 	}
 
@@ -563,7 +566,7 @@ void SKO_Network::attemptLogin(unsigned char userId, std::string username, std::
 	//STATS
 	sendStatLevel(userId, User[userId].level);
 	sendStatStr(userId, User[userId].strength);
-	sendStatDef(userId, User[userId].defence);
+	sendStatDef(userId, User[userId].defense);
 	sendStatPoints(userId, User[userId].stat_points);
 
 	//equipment
@@ -692,8 +695,8 @@ void SKO_Network::createClan(unsigned char userId, std::string clanTag)
         User[userId].inventory[ITEM_GOLD] -= 100000;
 
         //TODO do not rely on client reconnect when forming or joining a clan
-        User[userId].Sock->Close();
-        User[userId].Sock->Connected = false;
+        User[userId].socket->Close();
+        User[userId].socket->Connected = false;
     }
     else if (result == 1)
     {
@@ -710,8 +713,8 @@ void SKO_Network::acceptClanInvite(unsigned char userId)
 
 	// TODO - make new packet type to update clan instead of booting player
 	// This relies on client to automatically reconnect
-	User[userId].Sock->Close();
-	User[userId].Sock->Connected = false;
+	User[userId].socket->Close();
+	User[userId].socket->Connected = false;
 }
 void SKO_Network::clanInvite(unsigned char userId, unsigned char playerId)
 {
@@ -747,7 +750,7 @@ void SKO_Network::sendSpawnTarget(unsigned char targetId, unsigned char mapId)
 	for (int i = 0; i < MAX_CLIENTS; i++)
 	{
 		if (User[i].Ident)
-			send(User[i].Sock, SPAWN_TARGET, targetId, mapId);
+			send(User[i].socket, SPAWN_TARGET, targetId, mapId);
 	}
 }
 void SKO_Network::sendDespawnTarget(unsigned char targetId, unsigned char mapId)
@@ -755,16 +758,16 @@ void SKO_Network::sendDespawnTarget(unsigned char targetId, unsigned char mapId)
 	for (int i = 0; i < MAX_CLIENTS; i++)
 	{  
 		if (User[i].Ident)
-			send(User[i].Sock, DESPAWN_TARGET, targetId, mapId);
+			send(User[i].socket, DESPAWN_TARGET, targetId, mapId);
 	}
 }
 void SKO_Network::sendPlayerHit(unsigned char userId, unsigned char hitUserId) 
 {
-	send(User[userId].Sock, TARGET_HIT, (char)1, hitUserId);		
+	send(User[userId].socket, TARGET_HIT, (char)1, hitUserId);		
 }
 void SKO_Network::sendEnemyHit(unsigned char userId, unsigned char enemyId)
 {
-	send(User[userId].Sock, TARGET_HIT, (char)0, enemyId);
+	send(User[userId].socket, TARGET_HIT, (char)0, enemyId);
 }
 bool SKO_Network::verifyAdmin(unsigned char userId)
 {
@@ -786,10 +789,10 @@ void SKO_Network::warpPlayer(unsigned char userId, std::string username, int x, 
     {
         if (User[wu].Ident && (lower(User[wu].Nick).compare(lower(username)) == 0))
         {
-            SKO_Portal warp_p = SKO_Portal();
-            warp_p.spawn_x = x;
-            warp_p.spawn_y = y;
-            warp_p.mapId = mapId;
+            SKO_Portal *warp_p = new SKO_Portal();
+            warp_p->spawn_x = x;
+            warp_p->spawn_y = y;
+            warp_p->mapId = mapId;
 
             Warp(wu, warp_p);
             break;
@@ -961,15 +964,15 @@ void SKO_Network::kickPlayer(unsigned char userId, std::string username, std::st
 		if (lower(username).compare(lower(User[i].Nick)) == 0)
 		{
 			//Send kick packet
-			User[i].Sock->Close();
-			User[i].Sock->Connected = false;
+			User[i].socket->Close();
+			User[i].socket->Connected = false;
 		}
 	}
 }
 void SKO_Network::handleClient(unsigned char userId)
 {
 	// Ensure socket health
-	if (!(User[userId].Sock->GetStatus() & GE_Socket_OK))
+	if (!(User[userId].socket->GetStatus() & GE_Socket_OK))
 	{
 		disconnectClient(userId);
 		return;
@@ -977,16 +980,16 @@ void SKO_Network::handleClient(unsigned char userId)
 
 	// Get incoming data from the socket
 	// If anything was received
-	recvPacket(User[userId].Sock);
+	recvPacket(User[userId].socket);
 
 	// If the data holds a complete data
-	unsigned int data_len = User[userId].Sock->Data.length();
+	unsigned int data_len = User[userId].socket->data.length();
 
 	// Do not process if there is no packet!
 	if (data_len == 0)
 		return;
 
-	unsigned int pack_len = User[userId].Sock->Data[0];
+	unsigned int pack_len = User[userId].socket->data[0];
 
 	// Do not proceed if the packet is not fully captured!
 	if (data_len < pack_len)
@@ -995,13 +998,13 @@ void SKO_Network::handleClient(unsigned char userId)
 	// If more than one packet was received, only process one.
 	std::string newPacket = "";
 	if (data_len > pack_len)
-		newPacket = User[userId].Sock->Data.substr(pack_len, data_len - pack_len);
+		newPacket = User[userId].socket->data.substr(pack_len, data_len - pack_len);
 
-	User[userId].Sock->Data = User[userId].Sock->Data.substr(0, pack_len);
-	packetHandler->parsePacket(userId, User[userId].Sock->Data);
+	User[userId].socket->data = User[userId].socket->data.substr(0, pack_len);
+	packetHandler->parsePacket(userId, User[userId].socket->data);
 
 	//put the extra data (if any) into data
-	User[userId].Sock->Data = newPacket;
+	User[userId].socket->data = newPacket;
 };
 // Other public functions called from main
 void SKO_Network::sendSpawnEnemy(SKO_Enemy *enemy, unsigned char enemyId, unsigned char mapId)
@@ -1014,14 +1017,14 @@ void SKO_Network::sendSpawnEnemy(SKO_Enemy *enemy, unsigned char enemyId, unsign
 	{
 		if (User[c].Ident)
 		{
-			send(User[c].Sock, ENEMY_MOVE_STOP, enemyId, mapId, enemy->x, enemy->y);
-			send(User[c].Sock, ENEMY_HP, enemyId, mapId, hp);
+			send(User[c].socket, ENEMY_MOVE_STOP, enemyId, mapId, enemy->x, enemy->y);
+			send(User[c].socket, ENEMY_HP, enemyId, mapId, hp);
 		}
 	}
 }
 void SKO_Network::sendEnemyHp(unsigned char userId, unsigned char enemyId, unsigned char mapId, unsigned char displayHp)
 { 
-	send(User[userId].Sock, ENEMY_HP, enemyId, mapId, displayHp);
+	send(User[userId].socket, ENEMY_HP, enemyId, mapId, displayHp);
 }
 void SKO_Network::sendEnemyAction(SKO_Enemy* enemy, unsigned char action, unsigned char enemyId, unsigned char mapId)
 {
@@ -1029,7 +1032,7 @@ void SKO_Network::sendEnemyAction(SKO_Enemy* enemy, unsigned char action, unsign
 	for (int c = 0; c < MAX_CLIENTS; c++)
 	{
 		if (User[c].Ident && User[c].mapId == mapId)
-			send(User[c].Sock, action, enemyId, mapId, enemy->x, enemy->y);
+			send(User[c].socket, action, enemyId, mapId, enemy->x, enemy->y);
 	}
 }
 void SKO_Network::sendNpcAction(SKO_NPC* npc, unsigned char action, unsigned char npcId, unsigned char mapId)
@@ -1038,7 +1041,7 @@ void SKO_Network::sendNpcAction(SKO_NPC* npc, unsigned char action, unsigned cha
 	for (int c = 0; c < MAX_CLIENTS; c++)
 	{
 		if (User[c].Ident && User[c].mapId == mapId)
-			send(User[c].Sock, action, npcId, mapId, npc->x, npc->y);
+			send(User[c].socket, action, npcId, mapId, npc->x, npc->y);
 	}
 }
 void SKO_Network::sendPlayerAction(bool isCorrection, unsigned char action, unsigned char userId, float x, float y)
@@ -1047,121 +1050,121 @@ void SKO_Network::sendPlayerAction(bool isCorrection, unsigned char action, unsi
 	// due to client predictive physics.
 	for (int c = 0; c < MAX_CLIENTS; c++)
 		if (c != userId && User[c].Ident && User[c].mapId == User[userId].mapId)
-			send(User[c].Sock, action, userId, x, y);
+			send(User[c].socket, action, userId, x, y);
 
 	// However, when the client needs correcting due to lag, 
 	// send the correction packet to the given userId.
 	if (isCorrection)
-		send(User[userId].Sock, action, userId, x, y);
+		send(User[userId].socket, action, userId, x, y);
 }
 void SKO_Network::sendStatLevel(unsigned char userId, unsigned char level)
 {	
-	send(User[userId].Sock, STAT_LEVEL, level);
+	send(User[userId].socket, STAT_LEVEL, level);
 }
 void SKO_Network::sendStatRegen(unsigned char userId, unsigned char regen)
 {
-	send(User[userId].Sock, STAT_REGEN, regen);
+	send(User[userId].socket, STAT_REGEN, regen);
 }
 void SKO_Network::sendStatHp(unsigned char userId, unsigned char hp)
 {
-	send(User[userId].Sock, STAT_HP, hp);
+	send(User[userId].socket, STAT_HP, hp);
 }
 void SKO_Network::sendStatHpMax(unsigned char userId, unsigned char hp_max)
 {
-	send(User[userId].Sock, STATMAX_HP, hp_max);
+	send(User[userId].socket, STATMAX_HP, hp_max);
 }
 void SKO_Network::sendStatStr(unsigned char userId, unsigned char str)
 {
-	send(User[userId].Sock, STAT_STR, str);
+	send(User[userId].socket, STAT_STR, str);
 }
 void SKO_Network::sendStatDef(unsigned char userId, unsigned char def)
 {
-	send(User[userId].Sock, STAT_DEF, def);
+	send(User[userId].socket, STAT_DEF, def);
 }
 void SKO_Network::sendStatPoints(unsigned char userId, unsigned char points)
 {
-	send(User[userId].Sock, STAT_POINTS, points);
+	send(User[userId].socket, STAT_POINTS, points);
 }
 void SKO_Network::sendStatXp(unsigned char userId, unsigned int xp)
 {
-	send(User[userId].Sock, STAT_XP, xp);
+	send(User[userId].socket, STAT_XP, xp);
 }
 void SKO_Network::sendStatXpMax(unsigned char userId, unsigned int xp_max)
 {
-	send(User[userId].Sock, STATMAX_XP, xp_max);
+	send(User[userId].socket, STATMAX_XP, xp_max);
 
 }
 void SKO_Network::sendBuddyStatXp(unsigned char userId, unsigned char partyMemberId, unsigned char displayXp)
 {
-	send(User[userId].Sock, BUDDY_XP, partyMemberId, displayXp);
+	send(User[userId].socket, BUDDY_XP, partyMemberId, displayXp);
 }
 void SKO_Network::sendBuddyStatHp(unsigned char userId, unsigned char partyMemberId, unsigned char displayHp)
 {
-	send(User[userId].Sock, BUDDY_HP, partyMemberId, displayHp);
+	send(User[userId].socket, BUDDY_HP, partyMemberId, displayHp);
 }
 void SKO_Network::sendBuddyStatLevel(unsigned char userId, unsigned char partyMemberId, unsigned char displayLevel)
 {
-	send(User[userId].Sock, BUDDY_LEVEL, partyMemberId, displayLevel);
+	send(User[userId].socket, BUDDY_LEVEL, partyMemberId, displayLevel);
 }
 void SKO_Network::sendSpawnItem(unsigned char userId, unsigned char itemObjId, unsigned char mapId, unsigned char itemType, float x, float y, float x_speed, float y_speed)
 {
-	send(User[userId].Sock, SPAWN_ITEM, itemObjId, mapId, itemType, x, y, x_speed, y_speed);  
+	send(User[userId].socket, SPAWN_ITEM, itemObjId, mapId, itemType, x, y, x_speed, y_speed);  
 }
 void SKO_Network::sendDespawnItem(unsigned char userId, unsigned char itemObjId, unsigned char mapId)
 {
-	send(User[userId].Sock, DESPAWN_ITEM, itemObjId, mapId);
+	send(User[userId].socket, DESPAWN_ITEM, itemObjId, mapId);
 }
 void SKO_Network::sendPocketItem(unsigned char userId, unsigned char itemId, unsigned int amount)
 {
-	send(User[userId].Sock, POCKET_ITEM, itemId, amount);
+	send(User[userId].socket, POCKET_ITEM, itemId, amount);
 }
 void SKO_Network::sendBankItem(unsigned char userId, unsigned char itemId, unsigned int amount)
 {
-	send(User[userId].Sock, BANK_ITEM, itemId, amount);
+	send(User[userId].socket, BANK_ITEM, itemId, amount);
 }
 void SKO_Network::sendWarpPlayer(unsigned char userId, unsigned char warpUserId, unsigned char mapId, float x, float y)
 { 
-	send(User[userId].Sock, WARP, warpUserId, mapId, x, y);
+	send(User[userId].socket, WARP, warpUserId, mapId, x, y);
 }
 void SKO_Network::sendPlayerRespawn(unsigned char userId, unsigned char deadUserId, float x, float y)
 {
-	send(User[userId].Sock, RESPAWN, deadUserId, x, y);
+	send(User[userId].socket, RESPAWN, deadUserId, x, y);
 }
 void SKO_Network::sendPong(unsigned char userId)
 {
-	send(User[userId].Sock, PONG);
+	send(User[userId].socket, PONG);
 }
 void SKO_Network::sendRegisterResponse_Success(unsigned char userId)
 {
-	send(User[userId].Sock, REGISTER_SUCCESS);
+	send(User[userId].socket, REGISTER_SUCCESS);
 }
 void SKO_Network::sendRegisterResponse_AlreadyRegistered(unsigned char userId)
 {
-	send(User[userId].Sock, REGISTER_FAIL_DOUBLE);
+	send(User[userId].socket, REGISTER_FAIL_DOUBLE);
 }
 void SKO_Network::sendLoginResponse_Success(unsigned char userId)
 {
-	send(User[userId].Sock, LOGIN_SUCCESS, userId);
+	send(User[userId].socket, LOGIN_SUCCESS, userId);
 }
 void SKO_Network::sendLoginResponse_AlreadyOnline(unsigned char userId) 
 {
-	send(User[userId].Sock, LOGIN_FAIL_DOUBLE);
+	send(User[userId].socket, LOGIN_FAIL_DOUBLE);
 }
 void SKO_Network::sendLoginResponse_PlayerBanned(unsigned char userId)
 {
-	send(User[userId].Sock, LOGIN_FAIL_BANNED); 
+	send(User[userId].socket, LOGIN_FAIL_BANNED); 
 }
 void SKO_Network::sendLoginResponse_PasswordFailed(unsigned char userId)
 {
-	send(User[userId].Sock, LOGIN_FAIL_NONE);
+	send(User[userId].socket, LOGIN_FAIL_NONE);
 }
 void SKO_Network::sendEquip(unsigned char userId, unsigned char playerId, unsigned char equipSlot, unsigned char equipId, unsigned char itemId)
 { 
-	send(User[userId].Sock, EQUIP, playerId, equipSlot, equipId, itemId);
+	send(User[userId].socket, EQUIP, playerId, equipSlot, equipId, itemId);
 }
 void SKO_Network::sendInventoryOrder(unsigned char userId, std::string inventoryOrder)
 {
-	send(User[userId].Sock, INVENTORY, inventoryOrder);
+	send(User[userId].socket, INVENTORY, inventoryOrder);
 }
 void SKO_Network::sendPlayerJoin(unsigned char userId, unsigned char playerId)
 {
@@ -1174,7 +1177,7 @@ void SKO_Network::sendPlayerJoin(unsigned char userId, unsigned char playerId)
 	std::string userTag = User[playerId].Nick + "|" + User[playerId].Clan;
 
 	// notify useRId that playerId joined
-	send(User[userId].Sock, JOIN, playerId, x, y, x_speed, y_speed, facing_right, mapId, userTag);
+	send(User[userId].socket, JOIN, playerId, x, y, x_speed, y_speed, facing_right, mapId, userTag);
 	
 	// Always send player equipment after player join
 	sendEquip(userId, playerId, (char)0, Item[User[playerId].equip[0]].equipID, User[playerId].equip[0]);
@@ -1185,7 +1188,7 @@ void SKO_Network::sendPlayerJoin(unsigned char userId, unsigned char playerId)
 // This packet will stop the "Loading..." screen on the client and let them playe the game.
 void SKO_Network::sendPlayerLoaded(unsigned char userId)
 {
-	send(User[userId].Sock, LOADED);
+	send(User[userId].socket, LOADED);
 }
 void SKO_Network::sendWho(unsigned char userId)
 {
@@ -1226,49 +1229,49 @@ void SKO_Network::sendWho(unsigned char userId)
 }
 void SKO_Network::sendChat(unsigned char userId, std::string message)
 {
-	send(User[userId].Sock, CHAT, message);
+	send(User[userId].socket, CHAT, message);
 }
 void SKO_Network::sendClanInvite(unsigned char userId, unsigned char playerId)
 {
-	send(User[userId].Sock, CLAN, INVITE, playerId);
+	send(User[userId].socket, CLAN, INVITE, playerId);
 }
 void SKO_Network::sendTradeInvite(unsigned char userId, unsigned char playerId)
 {
-	send(User[userId].Sock, TRADE, INVITE, playerId);
+	send(User[userId].socket, TRADE, INVITE, playerId);
 }
 void SKO_Network::sendTradeReady(unsigned char userId, char tradeWindow)
 { 
-	send(User[userId].Sock, TRADE, READY);
+	send(User[userId].socket, TRADE, READY);
 } 
 void SKO_Network::sendTradeAccept(unsigned char userId, unsigned char playerId)
 { 
-	send(User[userId].Sock, TRADE, ACCEPT, playerId);
+	send(User[userId].socket, TRADE, ACCEPT, playerId);
 }
 void SKO_Network::sendTradeOffer(unsigned char userId, char tradeWindow, unsigned char itemId, unsigned int amount)
 { 
-	send(User[userId].Sock, TRADE, OFFER, tradeWindow, itemId, amount); 
+	send(User[userId].socket, TRADE, OFFER, tradeWindow, itemId, amount); 
 }
 void SKO_Network::sendTradeCancel(unsigned char userId)
 { 
-	send(User[userId].Sock, TRADE, CANCEL);
+	send(User[userId].socket, TRADE, CANCEL);
 }
 void SKO_Network::sendBankOpen(unsigned char userId)
 {
-	send(User[userId].Sock, BANK, INVITE);
+	send(User[userId].socket, BANK, INVITE);
 }
 void SKO_Network::sendShopOpen(unsigned char userId, unsigned char shopId)
 {
-	send(User[userId].Sock, SHOP, shopId);
+	send(User[userId].socket, SHOP, shopId);
 }
 void SKO_Network::sendPartyAccept(unsigned char userId, unsigned char playerId, char party)
 {
-	send(User[userId].Sock, PARTY, ACCEPT, playerId, party);
+	send(User[userId].socket, PARTY, ACCEPT, playerId, party);
 }
 void SKO_Network::sendPartyCancel(unsigned char userId, unsigned char quitUserId)
 {
-	send(User[userId].Sock, PARTY, CANCEL, quitUserId);
+	send(User[userId].socket, PARTY, CANCEL, quitUserId);
 }
 void SKO_Network::sendPartyLeave(unsigned char userId, unsigned char quitUserId)
 {
-	send(User[userId].Sock, PARTY, ACCEPT, quitUserId, (char)-1);
+	send(User[userId].socket, PARTY, ACCEPT, quitUserId, (char)-1);
 }

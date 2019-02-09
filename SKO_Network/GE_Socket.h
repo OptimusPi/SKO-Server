@@ -13,8 +13,10 @@
 #include <netinet/in.h>
 #include <netinet/tcp.h>
 #include <arpa/inet.h>
-#include "OPI_Clock.h"
 #include <unistd.h>
+
+#include "../SKO_Utilities/OPI_Clock.h"
+
 int close(int fd);
 
 #define DEFAULT_BUFLEN 10000
@@ -42,7 +44,7 @@ private:
 	char TempBuf;
  public:
 	int					Socket;
-	std::string			Data;
+	std::string			data;
 	struct sockaddr_in	sin;
 	bool				Connected;
 	std::string         IP;

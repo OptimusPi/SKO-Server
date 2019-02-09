@@ -1,24 +1,26 @@
 #include "SKO_Map.h"
-SKO_Map::SKO_Map(){
+#include <sstream>
 
-	death_pit = 0;
-	num_enemies = 0;
-	num_portals = 0;
-	num_shops = 0;
-	num_stalls = 0;
-	num_targets = 0;
-	num_npcs = 0;
-
-	for (int i = 0; i < 256; i++)
-		ItemObj[i] = SKO_ItemObject();
+SKO_Map::SKO_Map()
+{
+    death_pit = 0;
+    num_enemies = 0;
+    num_portals = 0;
+    num_shops = 0;
+    num_stalls = 0;
+    num_targets = 0;
+    num_npcs = 0;
+    
+    for (int i = 0; i < 256; i++)
+        ItemObj[i] = SKO_ItemObject();
 }
 
 SKO_Map::SKO_Map (std::string FileName)
 { 
 
-	SKO_Map();
+    SKO_Map();
      std::stringstream mapFileLoc;
-	mapFileLoc << FileName << ".map";
+	mapFileLoc << "SKO_Content" << FileName << ".map";
 
      printf("loading map: %s\n", FileName.c_str());
      std::ifstream MapFile(mapFileLoc.str().c_str(), std::ios::in|std::ios::binary|std::ios::ate);
@@ -192,8 +194,8 @@ SKO_Map::SKO_Map (std::string FileName)
            printf("Can't load map %s.\n", FileName.c_str());
      }
 
-     std::stringstream mapConfLoc;
-        mapConfLoc << FileName << ".ini";
+     std::stringstream mapConfLoc; 
+        mapConfLoc << "SKO_Content/" << FileName << ".ini";
 
 	 //open map config file
      printf("Reading Map config from: %s\n", mapConfLoc.str().c_str());
@@ -212,15 +214,15 @@ SKO_Map::SKO_Map (std::string FileName)
 		ss << "portal" << portal;
 		
 		//load portal parameters
-		Portal[portal] = SKO_Portal();
-                Portal[portal].x = configFile.GetInteger(ss.str(), "x", 0);
-                Portal[portal].y = configFile.GetInteger(ss.str(), "y", 0);
-                Portal[portal].w = configFile.GetInteger(ss.str(), "w", 0);
-                Portal[portal].h = configFile.GetInteger(ss.str(), "h", 0);
-                Portal[portal].mapId = configFile.GetInteger(ss.str(), "map", 0);
-                Portal[portal].spawn_x = configFile.GetInteger(ss.str(), "spawn_x", 0);
-                Portal[portal].spawn_y = configFile.GetInteger(ss.str(), "spawn_y", 0);
-                Portal[portal].level_required = configFile.GetInteger(ss.str(), "level_required", 0);
+		Portal[portal] = new SKO_Portal();
+                Portal[portal]->x = configFile.GetInteger(ss.str(), "x", 0);
+                Portal[portal]->y = configFile.GetInteger(ss.str(), "y", 0);
+                Portal[portal]->w = configFile.GetInteger(ss.str(), "w", 0);
+                Portal[portal]->h = configFile.GetInteger(ss.str(), "h", 0);
+                Portal[portal]->mapId = configFile.GetInteger(ss.str(), "map", 0);
+                Portal[portal]->spawn_x = configFile.GetInteger(ss.str(), "spawn_x", 0);
+                Portal[portal]->spawn_y = configFile.GetInteger(ss.str(), "spawn_y", 0);
+                Portal[portal]->level_required = configFile.GetInteger(ss.str(), "level_required", 0);
 	} 
 	
 	 //load enemies
@@ -245,7 +247,7 @@ SKO_Map::SKO_Map (std::string FileName)
 		 Enemy[enemy]->hp_max = configFile.GetInteger(ss.str(), "hp", 0);
 		 Enemy[enemy]->hp = Enemy[enemy]->hp_max;
 		 Enemy[enemy]->strength = configFile.GetInteger(ss.str(), "strength", 0);
-		 Enemy[enemy]->defence = configFile.GetInteger(ss.str(), "defence", 0);
+		 Enemy[enemy]->defense = configFile.GetInteger(ss.str(), "defense", 0);
 		 Enemy[enemy]->xp = configFile.GetInteger(ss.str(), "xp", 0);
 
 		Enemy[enemy]->lootAmount = configFile.GetInteger(ss.str(), "loots_dropped", 0);
@@ -375,8 +377,6 @@ SKO_Map::SKO_Map (std::string FileName)
  
 	 spawn_y = configFile.GetInteger("map", "spawn_y", 0);
          printf("spawn_y is: %i\n", spawn_y);
-
-	
 }
 
 

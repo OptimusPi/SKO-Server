@@ -13,8 +13,8 @@
 #include <string.h>
 #include <stdio.h> 
 #include <mutex>
-#include "OPI_Clock.h"
-#include "OPI_Sleep.h"
+#include "../SKO_Utilities/OPI_Clock.h"
+#include "../SKO_Utilities/OPI_Sleep.h"
 
 class OPI_MYSQL
 {
@@ -48,7 +48,7 @@ class OPI_MYSQL
 		int count();
 
 		//get data back from results
-		std::string getString(int i);        
+		std::string getString(unsigned int i);        
 		int getInt(int i);
 		float getFloat(int i);
 

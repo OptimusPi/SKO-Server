@@ -165,9 +165,9 @@ void SKO_PacketHandler::parseStatDef(unsigned char userId, SKO_PacketParser* par
     if (User[userId].stat_points > 0)
     {
         User[userId].stat_points--;
-        User[userId].defence++;
+        User[userId].defense++;
 
-        network->sendStatDef(userId, User[userId].defence);
+        network->sendStatDef(userId, User[userId].defense);
         network->sendStatPoints(userId, User[userId].stat_points);
     }
 }
@@ -209,11 +209,9 @@ void SKO_PacketHandler::parseUseItem(unsigned char userId, SKO_PacketParser *par
     //only attempt to use items if the player has them
     if (User[userId].inventory[item] > 0)
     {
-        unsigned int amt = 0;
-        float numy, numx, numys, numxs,
-            rand_xs, rand_ys,
+        float rand_xs, rand_ys,
             rand_x, rand_y;
-        int rand_i, rand_item;
+        unsigned int rand_item;
 
         //TODO - refactor this into use a item handler.
         switch (type)
@@ -524,7 +522,7 @@ void SKO_PacketHandler::parseDropItem(unsigned char userId, SKO_PacketParser *pa
         for (int iii = 0; iii < MAX_CLIENTS; iii++)
         {
             if (User[iii].Ident && User[iii].mapId == mapId)
-                network->sendSpawnItem(iii, rand_i, mapId, item, x, y, x_speed, x_speed);
+                network->sendSpawnItem(iii, rand_i, mapId, item, x, y, x_speed, y_speed);
         }
     }
 }
@@ -714,7 +712,7 @@ void SKO_PacketHandler::parseChat(unsigned char userId, std::string message)
 
     // Parse chat messages
     //wrap long text messages
-    int max = 62;
+    unsigned int max = 62;
     std::string userTag = "";
 
     // Add nick to the send
@@ -750,8 +748,8 @@ void SKO_PacketHandler::parseChat(unsigned char userId, std::string message)
         if (chatMessage.length() > max)
         {
             //Break message apart on spaces if they are found in the first chunk
-            int found = chatMessage.substr(0, max).find_last_of(" ");
-            if (found > (int)userTag.length() && found > max - 6)
+            size_t found = chatMessage.substr(0, max).find_last_of(" ");
+            if (found > userTag.length() && found > max - 6)
             {
                 chatChunk = chatMessage.substr(0, found);
                 chatMessage = chatMessage.substr(found + 1);
@@ -854,7 +852,6 @@ void SKO_PacketHandler::parseTradeCancel(unsigned char userId, SKO_PacketParser 
 // [TRADE][OFFER]
 void SKO_PacketHandler::parseTradeOffer(unsigned char userId, SKO_PacketParser *parser)
 {
-    unsigned char playerA = 0;
     unsigned char playerB = 0;
     playerB = User[userId].tradePlayer;
     //only do something if both parties are in accept trade mode
@@ -1271,7 +1268,6 @@ void SKO_PacketHandler::parseShopBuy(unsigned char userId, SKO_PacketParser *par
 // [SHOP][SELL][(unsigned char)itemId)][(unsigned int)amount]
 void SKO_PacketHandler::parseShopSell(unsigned char userId, SKO_PacketParser *parser)
 {
-    unsigned char mapId = User[userId].mapId;
     unsigned char item = parser->nextByte();
     unsigned int price = Item[item].price;
     unsigned int amount = parser->nextInt();
@@ -1369,7 +1365,7 @@ void SKO_PacketHandler::parseBankWithdrawal(unsigned char userId, SKO_PacketPars
 
     //send deposit notification to user
     unsigned int deposit = User[userId].bank[item];
-    network->sendBankItem(userId, item, amount);
+    network->sendBankItem(userId, item, deposit);
 
     //update client player's inventory
     unsigned int withdrawal = User[userId].inventory[item];
@@ -1513,7 +1509,7 @@ void SKO_PacketHandler::parsePacket(unsigned char userId, std::string packet)
  
     default:
         // Disconnect clients sending nonsense packets
-        //TODO//User[userId].Sock->Close();
+        //TODO//User[userId].socket->Close();
         printf(kRed "[FATAL] SKO_PacketHandler::parsePacket() called with unknown packet type!\n" kNormal);
         printf(kRed "[       SKO_PacketHandler::parsePacket(%i, %s)] \n" kNormal, userId, parser->toString().c_str());
         break;

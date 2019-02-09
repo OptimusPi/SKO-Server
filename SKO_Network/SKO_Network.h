@@ -7,17 +7,17 @@
 #define LINUX_OS 	2
 #define MAC_OS 		3
 
+// TODO -remove when possible
+#include "../Global.h"
+
 #include <string>
 #include <thread>
-#include "SKO_Repository.h"
+#include "../SKO_Repository/SKO_Repository.h"
+#include "../SKO_Utilities/OPI_Clock.h"
+#include "../SKO_Utilities/OPI_Sleep.h"
 #include "SKO_PacketHandler.h" 
-#include "OPI_Clock.h"
-#include "OPI_Sleep.h"
-#include "SKO_item_defs.h"
-#include "OPI_MYSQL.h"
+#include "../SKO_Game/SKO_item_defs.h"
 #include "GE_Socket.h"
-#include "base64.h"
-#include "Global.h"
 #include <mutex>
 
 class SKO_PacketHandler;

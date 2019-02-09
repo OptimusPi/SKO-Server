@@ -1,6 +1,5 @@
 /* INCLUDES */
-#include "library.h"
-#include "GE_Socket.h"
+#include "../SKO_Network/GE_Socket.h"
 
 #ifndef __SKO_PLAYER_H_
 #define __SKO_PLAYER_H_
@@ -25,7 +24,7 @@ class SKO_Player
 
         /* VARIABLES */
         // Socket pointer
-        GE_Socket *Sock = NULL;
+        GE_Socket *socket = NULL;
         bool Status;
         bool Que;
         bool Ident;
@@ -73,9 +72,9 @@ class SKO_Player
         unsigned char stat_points;
         unsigned int xp;
         unsigned int max_xp;
-        //strength and defence
+        //strength and defense
         unsigned char strength;
-        unsigned char defence;
+        unsigned char defense;
 
         //items
         unsigned int inventory[256];

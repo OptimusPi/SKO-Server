@@ -2,8 +2,8 @@
 
 void SKO_Player::init()
 {
-	Sock = new GE_Socket();
-	Sock->Connected = false;
+	socket = new GE_Socket();
+	socket->Connected = false;
 	Nick = "";
 	Mute = false;
 	Moderator = false;
@@ -27,7 +27,7 @@ void SKO_Player::init()
 	level = 1;
 	regen = 0;
 	strength = 2;
-	defence = 1;
+	defense = 1;
 	attacking = false;
 	y_speed = 0;
 	x_speed = 0;
@@ -75,9 +75,9 @@ void SKO_Player::init()
 
 void SKO_Player::Clear()
 {
-	if (Sock)
+	if (socket)
 	{ 
-		delete Sock;
+		delete socket;
 	}
 	init();
 }
@@ -102,7 +102,7 @@ std::string SKO_Player::getInventoryOrder()
 		iorder += (char)0;
 
 	//set values of list
-	for (int i = 0; i < inventory_order.length() && i < 48; i++)
+	for (unsigned int i = 0; i < inventory_order.length() && i < 48; i++)
 		iorder[i] = inventory_order[i];
 
 	return iorder;

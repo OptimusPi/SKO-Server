@@ -1,7 +1,8 @@
 #ifndef __SKO_PACKET_HANDLER_H_
 #define __SKO_PACKET_HANDLER_H_
 
-#include "Global.h"
+//TODO remove this when possible
+#include "../Global.h"
 
 #include <cstring>
 #include "SKO_Network.h"
