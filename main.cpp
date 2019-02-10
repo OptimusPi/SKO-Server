@@ -1371,6 +1371,56 @@ void Attack(unsigned char userId, float numx, float numy)
 	}	 // end if enemy is dead
 }
 
+void CastSpell(unsigned char userId)
+{
+    //What do you have equipped?
+    int spell = User[userId].equip[2];
+    if (spell > 0)
+    {
+        if (User[userId].inventory[spell] > 0)
+        {
+            User[userId].inventory[spell]--;
+            if (User[userId].inventory[spell] == 0)
+                User[userId].inventory_index--;
+
+            //notify user the item was thrown
+            unsigned int amount = User[userId].inventory[spell];
+            network->sendPocketItem(userId, spell, amount);
+        }
+        else
+        {
+            //Throw the item from your hand instead of inventory if that's all you have
+            User[userId].equip[2] = 0;
+            //send packet that says you arent holding anything!
+            for (int c = 0; c < MAX_CLIENTS; c++)
+                if (User[c].Ident)
+                    network->sendEquip(c, userId, (char)2, (char)0, (char)0);
+        }
+
+        //tell all the users that an item has been thrown...
+        //just use an item object with no value.
+        SKO_ItemObject lootItem = SKO_ItemObject();
+        lootItem.y = User[userId].y + 24;
+
+        if (User[userId].facing_right)
+        {
+            lootItem.x_speed = 10;
+            lootItem.x = User[userId].x + 50;
+        }
+        else
+        {
+            lootItem.x_speed = -10;
+            lootItem.x = User[userId].x - 32;
+        }
+
+        lootItem.y_speed = -3.2;
+        lootItem.itemID = spell;
+        lootItem.owner = userId;
+        lootItem.amount = 1;
+
+        SpawnLoot(User[userId].mapId, lootItem);
+    }
+}
 void Stop(unsigned char userId, float numx, float numy)
 {
 	//you cant move when attacking!

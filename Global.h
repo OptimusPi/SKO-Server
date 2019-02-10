@@ -45,6 +45,7 @@ extern void GiveXP(unsigned char userId, int xp);
 extern void quitParty(unsigned char userId);
 extern void Warp(unsigned char userId, SKO_Portal *portal);
 extern void SpawnLoot(unsigned char mapId, SKO_ItemObject lootItem);
+extern void CastSpell(unsigned char userId);
 
 //Utilities
 extern std::string trim(std::string s);

@@ -362,7 +362,7 @@ void SKO_Network::ConnectLoop()
 		} //if connection incoming
 
 		// Sleep in between checking for new connections
-		OPI_Sleep::milliseconds(100);
+		OPI_Sleep::milliseconds(10);
 	} //end while
 }
 
