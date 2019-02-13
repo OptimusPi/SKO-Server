@@ -1,5 +1,5 @@
-#ifndef __SKO_PACKETTYPES_
-#define __SKO_PACKETTYPES_
+#ifndef __SKO_PACKETTYPES_H_
+#define __SKO_PACKETTYPES_H_
 
 const unsigned char
 	VERSION_CHECK = 255,

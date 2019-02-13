@@ -17,9 +17,7 @@ void SKO_PacketHandler::parsePing(unsigned char userId)
 // [PONG]
 void SKO_PacketHandler::parsePong(unsigned char userId)
 {
-    User[userId].ping = OPI_Clock::milliseconds() - User[userId].pingTicker;
-    User[userId].pingTicker = OPI_Clock::milliseconds();
-    User[userId].pingWaiting = false;
+    network->receivedPong(userId); 
 }
 
 // [LOGIN][<username>][" "][<password>]
@@ -29,7 +27,6 @@ void SKO_PacketHandler::parseLogin(unsigned char userId, SKO_PacketParser *parse
     std::string loginRequest = parser->getPacketBody();
     std::string username = nextParameter(loginRequest);
     std::string password = loginRequest;
-    printf("attemptLogin%s, %s);\n", username.c_str(), password.c_str());
     network->attemptLogin(userId, username, password);
 }
 
@@ -38,7 +35,6 @@ void SKO_PacketHandler::parseRegister(unsigned char userId, std::string paramete
 {
     std::string username = nextParameter(parameters);
     std::string password = parameters;//do not use nextParameter to get password, just use remaining
-    printf("attemptRegister%s, %s);\n", username.c_str(), password.c_str());
     network->attemptRegister(userId, username, password);      
 }
 
@@ -89,397 +85,44 @@ void SKO_PacketHandler::parseCastSpell(unsigned char userId)
 }
 
 // [STAT_HP]
-void SKO_PacketHandler::parseStatHp(unsigned char userId, SKO_PacketParser* parser)
+void SKO_PacketHandler::parseStatHp(unsigned char userId)
 {
-    if (User[userId].stat_points > 0)
-    {
-        User[userId].stat_points--;
-        User[userId].regen++;
-
-        network->sendStatRegen(userId, User[userId].regen);
-        network->sendStatPoints(userId, User[userId].stat_points);
-    }
-}
+    SpendStatPoint(userId, STAT_HP);
+} 
 
 // [STAT_STR]
-void SKO_PacketHandler::parseStatStr(unsigned char userId, SKO_PacketParser* parser)
+void SKO_PacketHandler::parseStatStr(unsigned char userId)
 {
-    if (User[userId].stat_points > 0)
-    {
-        User[userId].stat_points--;
-        User[userId].strength++;
-
-        network->sendStatStr(userId, User[userId].strength);
-        network->sendStatPoints(userId, User[userId].stat_points);
-    }
+    SpendStatPoint(userId, STAT_STR);
 }
 
 // [STAT_DEF]
-void SKO_PacketHandler::parseStatDef(unsigned char userId, SKO_PacketParser* parser)
+void SKO_PacketHandler::parseStatDef(unsigned char userId)
 {
-    if (User[userId].stat_points > 0)
-    {
-        User[userId].stat_points--;
-        User[userId].defense++;
-
-        network->sendStatDef(userId, User[userId].defense);
-        network->sendStatPoints(userId, User[userId].stat_points);
-    }
+    SpendStatPoint(userId, STAT_DEF);
 }
-
 
 // [EQUIP][(unsigned char)equipSlot]
 void SKO_PacketHandler::parseUnequip(unsigned char userId, SKO_PacketParser *parser)
 {
     unsigned char slot = parser->nextByte();
-    unsigned char item = User[userId].equip[slot];
-
-    // TODO - do not let user unequip if their inventory is full.
-    // Only unequip and transfer to inventory if it actually is equipped
-    if (item > 0)
-    {
-        //un-wear it
-        User[userId].equip[slot] = 0; //TODO refactor
-        //put it in the player's inventory
-        User[userId].inventory[item]++; //TODO refactor
-
-        //tell everyone
-        for (int uc = 0; uc < MAX_CLIENTS; uc++)
-            network->sendEquip(uc, userId, slot, (char)0, (char)0);
-
-        //update the player's inventory
-        int amount = User[userId].inventory[item];
-        network->sendPocketItem(userId, item, amount);
-    }
+    UnequipItem(userId, slot);
 }
 
 // TODO - move logic to game class
 // [USE_ITEM][(unsigned char)item]
 void SKO_PacketHandler::parseUseItem(unsigned char userId, SKO_PacketParser *parser)
 {
-    int item = parser->nextByte();
-    int type = Item[item].type;
-    unsigned char mapId = User[userId].mapId;
-
-    //only attempt to use items if the player has them
-    if (User[userId].inventory[item] > 0)
-    {
-        float rand_xs, rand_ys,
-            rand_x, rand_y;
-        unsigned int rand_item;
-
-        //TODO - refactor this into use a item handler.
-        switch (type)
-        {
-        case 0:
-            break; //cosmetic
-
-        case 1: //food
-        {
-            // Do not eat food if player is full health.
-            if (User[userId].hp == User[userId].max_hp)
-                break;
-
-            //TODO refactor
-            User[userId].hp += Item[item].hp;
-
-            if (User[userId].hp > User[userId].max_hp)
-                User[userId].hp = User[userId].max_hp;
-
-            //tell this client
-            network->sendStatHp(userId, User[userId].hp);
-
-            //remove item
-            User[userId].inventory[item]--;
-
-            //tell them how many items they have
-            unsigned int amount = User[userId].inventory[item];
-            if (amount == 0)
-                User[userId].inventory_index--;
-
-            // party hp notification
-            // TODO - change magic number 80 to use a config value
-            unsigned char displayHp = (int)((User[userId].hp / (float)User[userId].max_hp) * 80);
-
-            for (int pl = 0; pl < MAX_CLIENTS; pl++)
-            {
-                if (pl != userId && User[pl].Ident && User[pl].partyStatus == PARTY && User[pl].party == User[userId].party)
-                    network->sendBuddyStatHp(pl, userId, displayHp);
-            }
-
-            //put in client players inventory
-            network->sendPocketItem(userId, item, amount);
-
-            break;
-        }
-        case 2: //weapon
-        {
-            // Does the other player have another WEAPON equipped?
-            // If so, transfer it to inventory
-            unsigned char otherItem = User[userId].equip[0];
-
-            // Transfer weapon from inventory to equipment slot
-            User[userId].equip[0] = item;
-            User[userId].inventory[item]--;
-
-            // Tranfer old weapon to users inventory
-            if (otherItem > 0)
-            {
-                User[userId].inventory[otherItem]++;
-                User[userId].inventory_index++;
-                unsigned int amount = User[userId].inventory[otherItem];
-                network->sendPocketItem(userId, otherItem, amount);
-            }
-
-            // Tell player one weapon is removed from their inventory
-            unsigned int amount = User[userId].inventory[item];
-            network->sendPocketItem(userId, item, amount);
-
-            //tell everyone the player equipped their weapon
-            for (int i1 = 0; i1 < MAX_CLIENTS; i1++)
-            {
-                if (User[i1].Ident)
-                    network->sendEquip(i1, userId, (char)0, Item[item].equipID, item);
-            }
-            break;
-        }
-        case 3: //hat
-        {
-            // Does the other player have another HAT equipped?
-            // If so, transfer it to inventory
-            unsigned char otherItem = User[userId].equip[1];
-
-            // Transfer hat from inventory to equipment slot
-            User[userId].equip[1] = item;
-            User[userId].inventory[item]--;
-
-            // Tranfer old hat to users inventory
-            if (otherItem > 0)
-            {
-                User[userId].inventory[otherItem]++;
-                User[userId].inventory_index++;
-                unsigned int amount = User[userId].inventory[otherItem];
-                network->sendPocketItem(userId, otherItem, amount);
-            }
-
-            // Tell player one hat is removed from their inventory
-            unsigned int amount = User[userId].inventory[item];
-            network->sendPocketItem(userId, item, amount);
-
-            //tell everyone the player equipped their hat
-            for (int i1 = 0; i1 < MAX_CLIENTS; i1++)
-            {
-                if (User[i1].Ident)
-                    network->sendEquip(i1, userId, (char)1, Item[item].equipID, item);
-            }
-            break;
-        }
-        case 4: // mystery box
-        {
-            // holiday event
-            if (HOLIDAY)
-            {
-                ////get rid of the box
-                int numUsed = 0;
-
-                if (User[userId].inventory[item] >= 10)
-                {
-                    numUsed = 10;
-                    User[userId].inventory[item] -= 10;
-                }
-                else
-                {
-                    numUsed = User[userId].inventory[item];
-                    User[userId].inventory[item] = 0;
-                    User[userId].inventory_index--;
-                }
-
-                //tell them how many items they have
-                unsigned int amount = User[userId].inventory[item];
-
-                //put in players inventory
-                network->sendPocketItem(userId, item, amount);
-
-                for (int it = 0; it < numUsed; it++)
-                {
-                    //spawn a hat or nothing
-                    rand_xs = 0;
-                    rand_ys = -5;
-
-                    // 1:100 chance of item
-                    rand_item = rand() % 100;
-                    if (rand_item != 1)
-                        rand_item = ITEM_GOLD;
-                    else
-                        rand_item = HOLIDAY_BOX_DROP;
-
-                    int rand_i;
-                    rand_x = User[userId].x + 32;
-                    rand_y = User[userId].y - 32;
-
-                    for (rand_i = 0; rand_i < 256; rand_i++)
-                    {
-                        if (rand_i == 255 || map[mapId].ItemObj[rand_i].status == false)
-                            break;
-                    }
-
-                    //TODO change this limit to 2 bytes (32K)
-                    if (rand_i == 255)
-                    {
-                        //If we traversed the whole item list already, start over.
-                        if (map[mapId].currentItem == 255)
-                            map[mapId].currentItem = 0;
-
-                        //use the currentItem to traverse the list whenever it overflows, so the "oldest" item gets deleted.
-                        rand_i = map[mapId].currentItem;
-                        map[mapId].currentItem++;
-                    }
-
-                    map[mapId].ItemObj[rand_i] = SKO_ItemObject(rand_item, rand_x, rand_y, rand_xs, rand_ys, 1);
-
-                    {
-                        int i = rand_i;
-                        //dont let them get stuck
-                        if (blocked(mapId, map[mapId].ItemObj[i].x + map[mapId].ItemObj[i].x_speed, map[mapId].ItemObj[i].y + map[mapId].ItemObj[i].y_speed + 0.15, map[mapId].ItemObj[i].x + Item[map[mapId].ItemObj[i].itemID].w, map[mapId].ItemObj[i].y + map[mapId].ItemObj[i].y_speed + Item[map[mapId].ItemObj[i].itemID].h, false))
-                        {
-                            //move it down a bit
-                            rand_y = User[userId].y + 1;
-                            map[mapId].ItemObj[i].y = rand_y;
-                        }
-                    }
-                    float x = rand_x;
-                    float y = rand_y;
-                    float x_speed = rand_xs;
-                    float y_speed = rand_ys;
-
-                    for (int iii = 0; iii < MAX_CLIENTS; iii++)
-                    {
-                        if (User[iii].Ident && User[iii].mapId == mapId)
-                            network->sendSpawnItem(iii, rand_i, mapId, rand_item, x, y, x_speed, y_speed);
-                    }
-                }
-            }
-            break;
-        }
-        case 5: // trophy / spell
-        {
-            // Does the other player have another TROPHY equipped?
-            // If so, transfer it to inventory
-            unsigned char otherItem = User[userId].equip[2];
-
-            // Transfer trophy from inventory to equipment slot
-            User[userId].equip[2] = item;
-            User[userId].inventory[item]--;
-
-            // Tranfer old trophy to users inventory
-            if (otherItem > 0)
-            {
-                User[userId].inventory[otherItem]++;
-                User[userId].inventory_index++;
-                unsigned int amount = User[userId].inventory[otherItem];
-                network->sendPocketItem(userId, otherItem, amount);
-            }
-
-            // Tell player one trophy is removed from their inventory
-            unsigned int amount = User[userId].inventory[item];
-            network->sendPocketItem(userId, item, amount);
-
-            //tell everyone the player equipped their trophy
-            for (int i1 = 0; i1 < MAX_CLIENTS; i1++)
-            {
-                if (User[i1].Ident)
-                    network->sendEquip(i1, userId, (char)2, Item[item].equipID, item);
-            }
-            break;
-        }
-        default:
-            break;
-        } //end switch
-    }     //end if you have the item
+    int itemId = parser->nextByte();
+    UseItem(userId, itemId); 
 }
 
 // [DROP_ITEM][(unsigned char)item][(unsigned int)amount]
 void SKO_PacketHandler::parseDropItem(unsigned char userId, SKO_PacketParser *parser)
 {
-    unsigned char item = parser->nextByte();
-    unsigned char mapId = User[userId].mapId;
+    unsigned char itemId = parser->nextByte();
     unsigned int amount = parser->nextInt();
-
-    //if they have enough to drop
-    if (User[userId].inventory[item] >= amount && amount > 0 && User[userId].tradeStatus < 1)
-    {
-        //take the items away from the player
-        User[userId].inventory[item] -= amount;
-        int ownedAmount = User[userId].inventory[item];
-
-        //keeping track of inventory slots
-        if (User[userId].inventory[item] == 0)
-        {
-            //printf("the user has %i of Item[%i]", amt, i );
-            //prevents them from holding more than 24 items
-            User[userId].inventory_index--;
-        }
-
-        //tell the user they dropped their items.
-        network->sendPocketItem(userId, item, ownedAmount);
-
-        //TODO refactor all of this
-        //next spawn a new item for all players
-        int rand_i;
-        float rand_x = User[userId].x + 16 + (32 - Item[item].w) / 2.0;
-        float rand_y = User[userId].y - Item[item].h;
-
-        float rand_xs = 0;
-        if (User[userId].facing_right)
-        {
-            rand_xs = 2.2;
-        }
-        else
-        {
-            rand_xs = -2.2;
-        }
-
-        float rand_ys = -5;
-        for (rand_i = 0; rand_i < 255; rand_i++)
-        {
-            if (map[mapId].ItemObj[rand_i].status == false)
-                break;
-        }
-
-        //find item object that's free
-        if (rand_i == 255)
-        {
-            if (map[mapId].currentItem == 255)
-                map[mapId].currentItem = 0;
-
-            rand_i = map[mapId].currentItem;
-
-            map[mapId].currentItem++;
-        }
-
-        //tell everyone there's an item up for grabs
-        map[mapId].ItemObj[rand_i] = SKO_ItemObject(item, rand_x, rand_y, rand_xs, rand_ys, amount);
-
-        int i = rand_i;
-        //dont let them get stuck
-        if (blocked(mapId, map[mapId].ItemObj[i].x + map[mapId].ItemObj[i].x_speed, map[mapId].ItemObj[i].y + map[mapId].ItemObj[i].y_speed + 0.15, map[mapId].ItemObj[i].x + Item[map[mapId].ItemObj[i].itemID].w, map[mapId].ItemObj[i].y + map[mapId].ItemObj[i].y_speed + Item[map[mapId].ItemObj[i].itemID].h, false))
-        {
-            //move it down a bit
-            rand_y = User[userId].y + 1;
-            map[mapId].ItemObj[i].y = rand_y;
-        }
-
-        float x = rand_x;
-        float y = rand_y;
-        float x_speed = rand_xs;
-        float y_speed = rand_ys;
-
-        for (int iii = 0; iii < MAX_CLIENTS; iii++)
-        {
-            if (User[iii].Ident && User[iii].mapId == mapId)
-                network->sendSpawnItem(iii, rand_i, mapId, item, x, y, x_speed, y_speed);
-        }
-    }
+    DropItem(userId, itemId, amount);
 }
 
 // Returns the next parameter from a slash command
@@ -545,7 +188,6 @@ void SKO_PacketHandler::parseSlashKick(unsigned char userId, std::string paramet
 {
     std::string username = nextParameter(parameters);
     std::string reason = parameters;
-    printf("network->kickPlayer(%i, %s, %s);\n", userId, username.c_str(), reason.c_str());
     network->kickPlayer(userId, username, reason);
 }
 
@@ -1181,43 +823,9 @@ void SKO_PacketHandler::parseShopInvite(unsigned char userId, SKO_PacketParser *
 // [SHOP][BUY][(unsigned char)itemId)][(unsigned int)amount]
 void SKO_PacketHandler::parseShopBuy(unsigned char userId, SKO_PacketParser *parser)
 {
-    unsigned char mapId = User[userId].mapId;
     unsigned char shopItem = parser->nextByte();
     unsigned int amount = parser->nextInt();
-    int i = 0, item = 0, price = 0;
-
-    //Shops are a 6x4 grid
-    for (int y = 0; y < 4; y++)
-        for (int x = 0; x < 6; x++)
-        {
-            if (i == shopItem)
-            {
-                item = map[mapId].Shop[User[userId].tradePlayer].item[x][y][0];
-                price = map[mapId].Shop[User[userId].tradePlayer].item[x][y][1];
-            }
-            i++;
-        }
-
-    //if the player can afford it
-    if (item <= 0 || User[userId].inventory[ITEM_GOLD] < price * amount)
-    {
-        network->sendChat(userId, "Sorry, but you cannot afford this item.");
-        return;
-    }
-
-    //take away gold
-    User[userId].inventory[ITEM_GOLD] -= price * amount;
-
-    //give them the item
-    User[userId].inventory[item] += amount;
-
-    //put in client players inventory
-    amount = User[userId].inventory[item];
-    network->sendPocketItem(userId, item, amount);
-
-    //Take gold out of player's inventory
-    amount = User[userId].inventory[ITEM_GOLD];
-    network->sendPocketItem(userId, (unsigned char)ITEM_GOLD, amount);
+    ShopBuy(userId, shopItem, amount); 
 }
 
 // [SHOP][SELL][(unsigned char)itemId)][(unsigned int)amount]

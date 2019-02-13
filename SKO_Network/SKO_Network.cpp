@@ -1134,6 +1134,12 @@ void SKO_Network::sendPong(unsigned char userId)
 {
 	send(User[userId].socket, PONG);
 }
+void SKO_Network::receivedPong(unsigned char userId)
+{
+	User[userId].ping = OPI_Clock::milliseconds() - User[userId].pingTicker;
+    User[userId].pingTicker = OPI_Clock::milliseconds();
+    User[userId].pingWaiting = false; 
+}
 void SKO_Network::sendRegisterResponse_Success(unsigned char userId)
 {
 	send(User[userId].socket, REGISTER_SUCCESS);

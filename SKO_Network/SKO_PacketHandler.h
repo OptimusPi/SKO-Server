@@ -42,9 +42,9 @@ private:
     void parseCastSpell(unsigned char userId);
 
     // Stat point spending
-    void parseStatHp(unsigned char userId, SKO_PacketParser* parser);
-    void parseStatStr(unsigned char userId, SKO_PacketParser* parser);
-    void parseStatDef(unsigned char userId, SKO_PacketParser* parser);
+    void parseStatHp(unsigned char userId);
+    void parseStatStr(unsigned char userId);
+    void parseStatDef(unsigned char userId);
     
     // Items and equipment
     void parseUnequip(unsigned char userId, SKO_PacketParser *parser);

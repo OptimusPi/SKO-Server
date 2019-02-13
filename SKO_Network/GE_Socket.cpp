@@ -29,8 +29,8 @@ void GE_Socket::Stream()
     float seconds = (OPI_Clock::milliseconds() - stream_ticker)  /  1000.0;  
      
     //update every second 
-    if (seconds >= 1.0) 
-    {         
+    if (seconds >= 1.0)
+    {
        //if there was nothing, prevent buffer overflow 
        if (byte_counter < 1) 
            bandwidth = 0; 

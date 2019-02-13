@@ -17,7 +17,7 @@ public:
     //      unsigned char as itself
     //      char as itself
     // Examples:
-    //      [7][CHAT]['H']['E']['L']['L']['O']
+    //      [7][CHAT]["Hello"]
     //      [5][VERSION_CHECK][VERSION_MAJOR][VERSION_MINOR][VERSION_PATCH]
     //      [2][PING]
     //      [2][PONG]

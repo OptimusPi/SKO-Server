@@ -22,7 +22,7 @@
 
 class SKO_PacketHandler;
 
-class SKO_Network
+class SKO_Network 
 {
  
 public:
@@ -78,6 +78,7 @@ public:
 
 	//When PING is received, reply immediately with PONG
 	void sendPong(unsigned char userId);
+	void receivedPong(unsigned char userId); 
 	void sendRegisterResponse_Success(unsigned char userId);
 	void sendRegisterResponse_AlreadyRegistered(unsigned char userId);
 	void sendLoginResponse_Success(unsigned char userId); 
