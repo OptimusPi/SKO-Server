@@ -225,39 +225,8 @@ void SKO_PacketHandler::parseSlashWarp(unsigned char userId, std::string paramet
 // [CHAT]["/ping"]
 void SKO_PacketHandler::parseSlashPing(unsigned char userId, std::string parameters)
 {
-    //if they are moderator
-    if (User[userId].Moderator)
-    {
-        std::string username = nextParameter(parameters);
-
-        int datUser;
-        bool result = false;
-
-        for (datUser = 0; datUser < MAX_CLIENTS; datUser++)
-        {
-            if (User[datUser].Ident && User[datUser].Nick.compare(username) == 0)
-            {
-                printf("Moderator inquiry of %s\n", username.c_str());
-                result = true;
-                break;
-            }
-        }
-
-        //find user
-        std::string pingDumpPacket = "0";
-        pingDumpPacket += CHAT;
-
-        if (result)
-        {
-            std::stringstream ss;
-            ss << "User[" << datUser << "] " << User[datUser].Nick << " has a ping of " << User[datUser].ping;
-            network->sendChat(userId, ss.str());
-        }
-        else
-        {
-            network->sendChat(userId, "username " + username + " was not found.");
-        }
-    }
+    std::string username = nextParameter(parameters);
+    network->showPlayerPing(userId, username);
 }
 
 // [CHAT]["/"]["<command>"][" "]["<parameters>"]
@@ -377,36 +346,13 @@ void SKO_PacketHandler::parseChat(unsigned char userId, std::string message)
 void SKO_PacketHandler::parseTradeInvite(unsigned char userId, SKO_PacketParser *parser)
 {
     unsigned char playerB = parser->nextByte();
-
-    if (playerB >= MAX_CLIENTS || playerB == userId || !User[playerB].Ident)
-        return;
-    
-        
-    // make sure both players aren't busy!!
-    if (User[userId].tradeStatus != 0 && User[playerB].tradeStatus != 0)
-    {
-        printf("[ERR] A trade status=%i B trade status=%i\n", User[userId].tradeStatus, User[playerB].tradeStatus);
-        return;
-    }
-
-    printf("%s trade with %s.\n", User[userId].Nick.c_str(), User[playerB].Nick.c_str());
-
-    //Send 'trade with A' to player B
-    network->sendTradeInvite(playerB, userId);
-
-    //hold status of what the players are trying to do
-    // (tentative...)
-    User[userId].tradeStatus = INVITE;
-    User[userId].tradePlayer = playerB;
-    User[playerB].tradeStatus = INVITE;
-    User[playerB].tradePlayer = userId;
+    InvitePlayerToTrade(userId, playerB);
 }
 
 // [TRADE][ACCEPT][(unsigned char)playerB]
 void SKO_PacketHandler::parseTradeAccept(unsigned char userId, SKO_PacketParser *parser)
 {
     unsigned char playerB = User[userId].tradePlayer;
-
     if (playerB >= 0 && User[userId].tradeStatus == INVITE && User[playerB].tradeStatus == INVITE)
     {
         User[userId].tradeStatus = ACCEPT;
@@ -416,179 +362,28 @@ void SKO_PacketHandler::parseTradeAccept(unsigned char userId, SKO_PacketParser 
     //Accept trade on both ends
     network->sendTradeAccept(playerB, userId);
     network->sendTradeAccept(userId, playerB);
+
+    AcceptTrade(userId); 
 }
 
 // [TRADE][CANCEL]
 void SKO_PacketHandler::parseTradeCancel(unsigned char userId, SKO_PacketParser *parser)
 {
-    unsigned char playerB = User[userId].tradePlayer;
-
-    if (playerB < 0)
-        return;
-
-    //set them to blank state
-    User[userId].tradeStatus = 0;
-    User[playerB].tradeStatus = 0;
-
-    //set them to be trading with nobody
-    User[userId].tradePlayer = -1;
-    User[playerB].tradePlayer = -1;
-
-    //tell both players cancel trade
-    network->sendTradeCancel(playerB);
-    network->sendTradeCancel(userId);
-
-    //clear trade windows...
-    for (int i = 0; i < 256; i++)
-    {
-        User[userId].localTrade[i] = 0;
-        User[playerB].localTrade[i] = 0;
-    }
+    CancelTrade(userId);
 }
 
 // [TRADE][OFFER]
 void SKO_PacketHandler::parseTradeOffer(unsigned char userId, SKO_PacketParser *parser)
 {
-    unsigned char playerB = 0;
-    playerB = User[userId].tradePlayer;
-    //only do something if both parties are in accept trade mode
-    if (User[userId].tradeStatus == ACCEPT && User[User[userId].tradePlayer].tradeStatus == ACCEPT)
-    {
-        unsigned char item = parser->nextByte();
-        unsigned int amount = parser->nextInt();
-
-        printf("offer!\n ITEM: [%i]\nAMOUNT [%i/%i]\n...", item, amount, User[userId].inventory[item]);
-        //check if you have that item
-        if (User[userId].inventory[item] >= amount)
-        {
-            User[userId].localTrade[item] = amount;
-
-            //send to both players!
-            network->sendTradeOffer(userId, (char)1, item, amount);
-
-            //send to playerB
-            network->sendTradeOffer(playerB, (char)2, item, amount);
-        }
-    }
+    unsigned char itemId = parser->nextByte();
+    unsigned int amount = parser->nextInt();
+    OfferTradeItem(userId, itemId, amount);
 }
 
 // [TRADE][CONFIRM]
 void SKO_PacketHandler::parseTradeConfirm(unsigned char userId, SKO_PacketParser *parser)
 {
-    unsigned char playerA = userId;
-    unsigned char playerB = User[userId].tradePlayer;
-
-    if (playerB < 0)
-    {
-        network->sendTradeCancel(userId);
-        User[userId].tradeStatus = 0;
-        User[userId].tradePlayer = 0;
-        return;
-    }
-
-    //make sure playerA is in accept mode before confirming
-    if (User[playerA].tradeStatus == ACCEPT)
-        User[playerA].tradeStatus = CONFIRM;
-
-    //tell both players :)
-    network->sendTradeReady(playerA, (char)1);
-    network->sendTradeReady(playerB, (char)2);
-
-    //if both players are now confirm, transact and reset!
-    if (User[playerA].tradeStatus != CONFIRM || User[playerB].tradeStatus != CONFIRM)
-        return;
-    
-    //lets make sure players have that many items
-    bool error = false;
-    for (int i = 0; i < 256; i++)
-    {
-        //compare the offer to the owned items
-        if (User[playerA].inventory[i] < User[playerA].localTrade[i])
-        {
-            printf("Trade error: User: %s, item: %i", User[playerA].Nick.c_str(), i);
-            error = true;
-            break;
-        }
-        //compare the offer to the owned items
-        if (User[playerB].inventory[i] < User[playerB].localTrade[i])
-        {
-            printf("Trade error: User: %s, item: %i", User[playerB].Nick.c_str(), i);
-            error = true;
-            break;
-        }
-    }
-
-    //tell them the trade is over!!!
-    User[playerA].tradeStatus = 0;
-    User[playerB].tradeStatus = 0;
-
-    //set them to be trading with nobody
-    User[playerA].tradePlayer = -1;
-    User[playerB].tradePlayer = -1;
-
-    //tell both players cancel trade
-    network->sendTradeCancel(playerA);
-    network->sendTradeCancel(playerB);
-
-    //make the transaction!
-    if (error)
-    {
-        printf("Error in trade.");
-        return;
-    }
-    
-    printf("trade transaction!\n");
-
-    //go through each item and add them
-    for (int i = 0; i < 256; i++)
-    {
-        unsigned char itemId = (unsigned char)i;
-
-        //easy to follow with these variables broski :P
-        int aOffer = User[playerA].localTrade[itemId];
-        int bOffer = User[playerB].localTrade[itemId];
-        
-        //give A's stuff  to B
-        if (aOffer > 0)
-        {
-            printf(kGreen "%s gives %itemId of item %itemId to %s\n" kNormal, User[playerA].Nick.c_str(), aOffer, itemId, User[playerB].Nick.c_str());
-            //trade the item and tell the player!
-            User[playerB].inventory[itemId] += aOffer;
-            User[playerA].inventory[itemId] -= aOffer;
-
-            //put in players inventory
-            unsigned int amount = User[playerB].inventory[itemId];
-            network->sendPocketItem(playerB, itemId, amount);
-
-            //take it out of A's inventory
-            amount = User[playerA].inventory[itemId];
-            network->sendPocketItem(playerA, itemId, amount);
-        }
-
-        //give B's stuff  to A
-        if (bOffer > 0)
-        {
-            printf(kGreen "%s gives %itemId of item %itemId to %s\n" kNormal, User[playerB].Nick.c_str(), aOffer, itemId, User[playerA].Nick.c_str());
-            //trade the item and tell the player!
-            User[playerA].inventory[itemId] += bOffer;
-            User[playerB].inventory[itemId] -= bOffer;
-
-            //put in players inventory
-            unsigned int amount = User[playerA].inventory[itemId];
-            network->sendPocketItem(playerA, itemId, amount);
-
-            //take it away from B
-            amount = User[playerB].inventory[itemId];
-            network->sendPocketItem(playerB, itemId, amount);
-        }
-
-        //clear the items
-        User[playerA].localTrade[itemId] = 0;
-        User[playerB].localTrade[itemId] = 0;
-    }
-
-    //Save all profiles after a trade
-    network->saveAllProfiles();
+    ConfirmTrade(userId); 
 }
 
 // [TRADE][(unsigned char)tradeAction][...]

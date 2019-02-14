@@ -95,6 +95,12 @@ void ShopBuy(unsigned char userId, unsigned char shopItem, unsigned int amount);
 void SpendStatPoint(unsigned char userId, unsigned char statId);
 void UseItem(unsigned char userId, unsigned char itemId);
 void DropItem(unsigned char userId, unsigned char itemId, unsigned int amount);
+void InvitePlayerToTrade(unsigned char userId, unsigned char playerId);
+void AcceptTrade(unsigned char userId);
+void CancelTrade(unsigned char userId);
+void OfferTradeItem(unsigned char userId, unsigned char itemId, unsigned int amount);
+void ConfirmTrade(unsigned char userId);
+
 
 // threads 
 void PhysicsLoop();
@@ -2272,247 +2278,263 @@ void UnequipItem(unsigned char userId, unsigned char slot)
 }
 
 
-// TODO - split into helper functions for each item type
+void EatFood(unsigned char userId, unsigned char itemId)
+{
+	// Do not eat food if player is full health.
+	if (User[userId].hp == User[userId].max_hp)
+		return;
+
+	User[userId].hp += Item[itemId].hp;
+	if (User[userId].hp > User[userId].max_hp)
+		User[userId].hp = User[userId].max_hp;
+
+	//tell this client
+	network->sendStatHp(userId, User[userId].hp);
+
+	//remove item
+	User[userId].inventory[itemId]--;
+
+	//tell them how many items they have
+	unsigned int amount = User[userId].inventory[itemId];
+	if (amount == 0)
+		User[userId].inventory_index--;
+
+	// party hp notification
+	// TODO - change magic number 80 to use a config value
+	unsigned char displayHp = (int)((User[userId].hp / (float)User[userId].max_hp) * 80);
+
+	for (int pl = 0; pl < MAX_CLIENTS; pl++)
+	{
+		if (pl != userId && User[pl].Ident && User[pl].partyStatus == PARTY && User[pl].party == User[userId].party)
+			network->sendBuddyStatHp(pl, userId, displayHp);
+	}
+
+	// Update item amount in player inventory
+	network->sendPocketItem(userId, itemId, amount);
+}
+
+void EquipWeapon(unsigned char userId, unsigned char itemId)
+{
+	// Does the other player have another WEAPON equipped?
+	// If so, transfer it to inventory
+	unsigned char otherItem = User[userId].equip[0];
+
+	// Transfer weapon from inventory to equipment slot
+	User[userId].equip[0] = itemId;
+	User[userId].inventory[itemId]--;
+
+	// Tranfer old weapon to users inventory
+	if (otherItem > 0)
+	{
+		User[userId].inventory[otherItem]++;
+		User[userId].inventory_index++;
+		unsigned int amount = User[userId].inventory[otherItem];
+		network->sendPocketItem(userId, otherItem, amount);
+	}
+
+	// Tell player one weapon is removed from their inventory
+	unsigned int amount = User[userId].inventory[itemId];
+	network->sendPocketItem(userId, itemId, amount);
+
+	//tell everyone the player equipped their weapon
+	for (int i1 = 0; i1 < MAX_CLIENTS; i1++)
+	{
+		if (User[i1].Ident)
+			network->sendEquip(i1, userId, (char)0, Item[itemId].equipID, itemId);
+	}		
+}
+
+void EquipHat(unsigned char userId, unsigned char itemId)
+{
+	// Does the other player have another HAT equipped?
+	// If so, transfer it to inventory
+	unsigned char otherItem = User[userId].equip[1];
+
+	// Transfer hat from inventory to equipment slot
+	User[userId].equip[1] = itemId;
+	User[userId].inventory[itemId]--;
+
+	// Tranfer old hat to users inventory
+	if (otherItem > 0)
+	{
+		User[userId].inventory[otherItem]++;
+		User[userId].inventory_index++;
+		unsigned int amount = User[userId].inventory[otherItem];
+		network->sendPocketItem(userId, otherItem, amount);
+	}
+
+	// Tell player one hat is removed from their inventory
+	unsigned int amount = User[userId].inventory[itemId];
+	network->sendPocketItem(userId, itemId, amount);
+
+	//tell everyone the player equipped their hat
+	for (int i1 = 0; i1 < MAX_CLIENTS; i1++)
+	{
+		if (User[i1].Ident)
+			network->sendEquip(i1, userId, (char)1, Item[itemId].equipID, itemId);
+	}
+}
+
+void OpenMysteryBox(unsigned char userId, unsigned char itemId)
+{
+	// mystery box is only used during holiday event
+	if (!HOLIDAY)
+		return;
+
+	float rand_xs, rand_ys, rand_x, rand_y;
+	unsigned int rand_item;
+	unsigned char mapId = User[userId].mapId;
+
+	// get rid of the box
+	int numUsed = 0;
+	if (User[userId].inventory[itemId] >= 10)
+	{
+		numUsed = 10;
+		User[userId].inventory[itemId] -= 10;
+	}
+	else
+	{
+		numUsed = User[userId].inventory[itemId];
+		User[userId].inventory[itemId] = 0;
+		User[userId].inventory_index--;
+	}
+
+	//tell them how many items they have
+	unsigned int amount = User[userId].inventory[itemId];
+
+	//put in players inventory
+	network->sendPocketItem(userId, itemId, amount);
+
+	for (int it = 0; it < numUsed; it++)
+	{
+		//spawn a hat or nothing
+		rand_xs = 0;
+		rand_ys = -5;
+
+		// 1:100 chance of item
+		rand_item = rand() % 100;
+		if (rand_item != 1)
+			rand_item = ITEM_GOLD;
+		else
+			rand_item = HOLIDAY_BOX_DROP;
+
+		int rand_i;
+		rand_x = User[userId].x + 32;
+		rand_y = User[userId].y - 32;
+
+		for (rand_i = 0; rand_i < 256; rand_i++)
+		{
+			if (rand_i == 255 || map[mapId].ItemObj[rand_i].status == false)
+				break;
+		}
+
+		//TODO change this limit to 2 bytes (32K)
+		if (rand_i == 255)
+		{
+			//If we traversed the whole item list already, start over.
+			if (map[mapId].currentItem == 255)
+				map[mapId].currentItem = 0;
+
+			//use the currentItem to traverse the list whenever it overflows, so the "oldest" item gets deleted.
+			rand_i = map[mapId].currentItem;
+			map[mapId].currentItem++;
+		}
+
+		map[mapId].ItemObj[rand_i] = SKO_ItemObject(rand_item, rand_x, rand_y, rand_xs, rand_ys, 1);
+
+		{
+			int i = rand_i;
+			//dont let them get stuck
+			if (blocked(mapId, map[mapId].ItemObj[i].x + map[mapId].ItemObj[i].x_speed, map[mapId].ItemObj[i].y + map[mapId].ItemObj[i].y_speed + 0.15, map[mapId].ItemObj[i].x + Item[map[mapId].ItemObj[i].itemID].w, map[mapId].ItemObj[i].y + map[mapId].ItemObj[i].y_speed + Item[map[mapId].ItemObj[i].itemID].h, false))
+			{
+				//move it down a bit
+				rand_y = User[userId].y + 1;
+				map[mapId].ItemObj[i].y = rand_y;
+			}
+		}
+		float x = rand_x;
+		float y = rand_y;
+		float x_speed = rand_xs;
+		float y_speed = rand_ys;
+
+		for (int iii = 0; iii < MAX_CLIENTS; iii++)
+		{
+			if (User[iii].Ident && User[iii].mapId == mapId)
+				network->sendSpawnItem(iii, rand_i, mapId, rand_item, x, y, x_speed, y_speed);
+		}
+	}
+}
+
+void EquipTrophy(unsigned char userId, unsigned char itemId)
+{
+	// Does the other player have another TROPHY equipped?
+	// If so, transfer it to inventory
+	unsigned char otherItem = User[userId].equip[2];
+
+	// Transfer trophy from inventory to equipment slot
+	User[userId].equip[2] = itemId;
+	User[userId].inventory[itemId]--;
+
+	// Tranfer old trophy to users inventory
+	if (otherItem > 0)
+	{
+		User[userId].inventory[otherItem]++;
+		User[userId].inventory_index++;
+		unsigned int amount = User[userId].inventory[otherItem];
+		network->sendPocketItem(userId, otherItem, amount);
+	}
+
+	// Tell player one trophy is removed from their inventory
+	unsigned int amount = User[userId].inventory[itemId];
+	network->sendPocketItem(userId, itemId, amount);
+
+	//tell everyone the player equipped their trophy
+	for (int i1 = 0; i1 < MAX_CLIENTS; i1++)
+	{
+		if (User[i1].Ident)
+			network->sendEquip(i1, userId, (char)2, Item[itemId].equipID, itemId);
+	}
+}
+
 void UseItem(unsigned char userId, unsigned char itemId)
 {
-	int type = Item[itemId].type;
-    unsigned char mapId = User[userId].mapId;
-
     //only attempt to use items if the player has them
-    if (User[userId].inventory[itemId] > 0)
-    {
-        float rand_xs, rand_ys,
-            rand_x, rand_y;
-        unsigned int rand_item;
+    if (Item[itemId].type <= 0)
+		return;
+    
+	switch (Item[itemId].type)
+	{
+	case 0:
+		break; //cosmetic
 
-        //TODO - refactor this into use a item handler.
-        switch (type)
-        {
-        case 0:
-            break; //cosmetic
-
-        case 1: //food
-        {
-            // Do not eat food if player is full health.
-            if (User[userId].hp == User[userId].max_hp)
-                break;
-
-            //TODO refactor
-            User[userId].hp += Item[itemId].hp;
-
-            if (User[userId].hp > User[userId].max_hp)
-                User[userId].hp = User[userId].max_hp;
-
-            //tell this client
-            network->sendStatHp(userId, User[userId].hp);
-
-            //remove item
-            User[userId].inventory[itemId]--;
-
-            //tell them how many items they have
-            unsigned int amount = User[userId].inventory[itemId];
-            if (amount == 0)
-                User[userId].inventory_index--;
-
-            // party hp notification
-            // TODO - change magic number 80 to use a config value
-            unsigned char displayHp = (int)((User[userId].hp / (float)User[userId].max_hp) * 80);
-
-            for (int pl = 0; pl < MAX_CLIENTS; pl++)
-            {
-                if (pl != userId && User[pl].Ident && User[pl].partyStatus == PARTY && User[pl].party == User[userId].party)
-                    network->sendBuddyStatHp(pl, userId, displayHp);
-            }
-
-            //put in client players inventory
-            network->sendPocketItem(userId, itemId, amount);
-
-            break;
-        }
-        case 2: //weapon
-        {
-            // Does the other player have another WEAPON equipped?
-            // If so, transfer it to inventory
-            unsigned char otherItem = User[userId].equip[0];
-
-            // Transfer weapon from inventory to equipment slot
-            User[userId].equip[0] = itemId;
-            User[userId].inventory[itemId]--;
-
-            // Tranfer old weapon to users inventory
-            if (otherItem > 0)
-            {
-                User[userId].inventory[otherItem]++;
-                User[userId].inventory_index++;
-                unsigned int amount = User[userId].inventory[otherItem];
-                network->sendPocketItem(userId, otherItem, amount);
-            }
-
-            // Tell player one weapon is removed from their inventory
-            unsigned int amount = User[userId].inventory[itemId];
-            network->sendPocketItem(userId, itemId, amount);
-
-            //tell everyone the player equipped their weapon
-            for (int i1 = 0; i1 < MAX_CLIENTS; i1++)
-            {
-                if (User[i1].Ident)
-                    network->sendEquip(i1, userId, (char)0, Item[itemId].equipID, itemId);
-            }
-            break;
-        }
-        case 3: //hat
-        {
-            // Does the other player have another HAT equipped?
-            // If so, transfer it to inventory
-            unsigned char otherItem = User[userId].equip[1];
-
-            // Transfer hat from inventory to equipment slot
-            User[userId].equip[1] = itemId;
-            User[userId].inventory[itemId]--;
-
-            // Tranfer old hat to users inventory
-            if (otherItem > 0)
-            {
-                User[userId].inventory[otherItem]++;
-                User[userId].inventory_index++;
-                unsigned int amount = User[userId].inventory[otherItem];
-                network->sendPocketItem(userId, otherItem, amount);
-            }
-
-            // Tell player one hat is removed from their inventory
-            unsigned int amount = User[userId].inventory[itemId];
-            network->sendPocketItem(userId, itemId, amount);
-
-            //tell everyone the player equipped their hat
-            for (int i1 = 0; i1 < MAX_CLIENTS; i1++)
-            {
-                if (User[i1].Ident)
-                    network->sendEquip(i1, userId, (char)1, Item[itemId].equipID, itemId);
-            }
-            break;
-        }
-        case 4: // mystery box
-        {
-            // holiday event
-            if (HOLIDAY)
-            {
-                ////get rid of the box
-                int numUsed = 0;
-
-                if (User[userId].inventory[itemId] >= 10)
-                {
-                    numUsed = 10;
-                    User[userId].inventory[itemId] -= 10;
-                }
-                else
-                {
-                    numUsed = User[userId].inventory[itemId];
-                    User[userId].inventory[itemId] = 0;
-                    User[userId].inventory_index--;
-                }
-
-                //tell them how many items they have
-                unsigned int amount = User[userId].inventory[itemId];
-
-                //put in players inventory
-                network->sendPocketItem(userId, itemId, amount);
-
-                for (int it = 0; it < numUsed; it++)
-                {
-                    //spawn a hat or nothing
-                    rand_xs = 0;
-                    rand_ys = -5;
-
-                    // 1:100 chance of item
-                    rand_item = rand() % 100;
-                    if (rand_item != 1)
-                        rand_item = ITEM_GOLD;
-                    else
-                        rand_item = HOLIDAY_BOX_DROP;
-
-                    int rand_i;
-                    rand_x = User[userId].x + 32;
-                    rand_y = User[userId].y - 32;
-
-                    for (rand_i = 0; rand_i < 256; rand_i++)
-                    {
-                        if (rand_i == 255 || map[mapId].ItemObj[rand_i].status == false)
-                            break;
-                    }
-
-                    //TODO change this limit to 2 bytes (32K)
-                    if (rand_i == 255)
-                    {
-                        //If we traversed the whole item list already, start over.
-                        if (map[mapId].currentItem == 255)
-                            map[mapId].currentItem = 0;
-
-                        //use the currentItem to traverse the list whenever it overflows, so the "oldest" item gets deleted.
-                        rand_i = map[mapId].currentItem;
-                        map[mapId].currentItem++;
-                    }
-
-                    map[mapId].ItemObj[rand_i] = SKO_ItemObject(rand_item, rand_x, rand_y, rand_xs, rand_ys, 1);
-
-                    {
-                        int i = rand_i;
-                        //dont let them get stuck
-                        if (blocked(mapId, map[mapId].ItemObj[i].x + map[mapId].ItemObj[i].x_speed, map[mapId].ItemObj[i].y + map[mapId].ItemObj[i].y_speed + 0.15, map[mapId].ItemObj[i].x + Item[map[mapId].ItemObj[i].itemID].w, map[mapId].ItemObj[i].y + map[mapId].ItemObj[i].y_speed + Item[map[mapId].ItemObj[i].itemID].h, false))
-                        {
-                            //move it down a bit
-                            rand_y = User[userId].y + 1;
-                            map[mapId].ItemObj[i].y = rand_y;
-                        }
-                    }
-                    float x = rand_x;
-                    float y = rand_y;
-                    float x_speed = rand_xs;
-                    float y_speed = rand_ys;
-
-                    for (int iii = 0; iii < MAX_CLIENTS; iii++)
-                    {
-                        if (User[iii].Ident && User[iii].mapId == mapId)
-                            network->sendSpawnItem(iii, rand_i, mapId, rand_item, x, y, x_speed, y_speed);
-                    }
-                }
-            }
-            break;
-        }
-        case 5: // trophy / spell
-        {
-            // Does the other player have another TROPHY equipped?
-            // If so, transfer it to inventory
-            unsigned char otherItem = User[userId].equip[2];
-
-            // Transfer trophy from inventory to equipment slot
-            User[userId].equip[2] = itemId;
-            User[userId].inventory[itemId]--;
-
-            // Tranfer old trophy to users inventory
-            if (otherItem > 0)
-            {
-                User[userId].inventory[otherItem]++;
-                User[userId].inventory_index++;
-                unsigned int amount = User[userId].inventory[otherItem];
-                network->sendPocketItem(userId, otherItem, amount);
-            }
-
-            // Tell player one trophy is removed from their inventory
-            unsigned int amount = User[userId].inventory[itemId];
-            network->sendPocketItem(userId, itemId, amount);
-
-            //tell everyone the player equipped their trophy
-            for (int i1 = 0; i1 < MAX_CLIENTS; i1++)
-            {
-                if (User[i1].Ident)
-                    network->sendEquip(i1, userId, (char)2, Item[itemId].equipID, itemId);
-            }
-            break;
-        }
-        default:
-            break;
-        } //end switch
-    } //end if you have the item
+	case 1: //food
+	{
+		EatFood(userId, itemId);
+		break;
+	}
+	case 2: //weapon
+	{
+		EquipWeapon(userId, itemId);
+		break;
+	}
+	case 3: //hat
+	{
+		EquipHat(userId, itemId);
+		break;
+	}
+	case 4: // mystery box
+	{
+		OpenMysteryBox(userId, itemId);
+		break;
+	}
+	case 5: // trophy / spell
+	{
+		EquipTrophy(userId, itemId);
+		break;
+	}
+	default:
+		break;
+	} //end switch
 }
 
 void DropItem(unsigned char userId, unsigned char itemId, unsigned int amount)
@@ -2594,4 +2616,208 @@ void DropItem(unsigned char userId, unsigned char itemId, unsigned int amount)
                 network->sendSpawnItem(iii, rand_i, mapId, itemId, x, y, x_speed, y_speed);
         }
     }
+}
+
+void InvitePlayerToTrade(unsigned char userId, unsigned char playerId)
+{
+	if (playerId >= MAX_CLIENTS || playerId == userId || !User[playerId].Ident)
+        return;
+        
+    // make sure both players aren't busy!!
+    if (User[userId].tradeStatus != 0 && User[playerId].tradeStatus != 0)
+    {
+        printf("[ERR] A trade status=%i B trade status=%i\n", User[userId].tradeStatus, User[playerId].tradeStatus);
+        return;
+    }
+
+    printf("%s trade with %s.\n", User[userId].Nick.c_str(), User[playerId].Nick.c_str());
+
+    //Send 'trade with A' to player B
+    network->sendTradeInvite(playerId, userId);
+
+    //hold status of what the players are trying to do
+    // (tentative...)
+    User[userId].tradeStatus = INVITE;
+    User[userId].tradePlayer = playerId;
+    User[playerId].tradeStatus = INVITE;
+    User[playerId].tradePlayer = userId;
+}
+
+void AcceptTrade(unsigned char userId)
+{
+	unsigned char playerB = User[userId].tradePlayer;
+    if (playerB >= 0 && User[userId].tradeStatus == INVITE && User[playerB].tradeStatus == INVITE)
+    {
+        User[userId].tradeStatus = ACCEPT;
+        User[playerB].tradeStatus = ACCEPT;
+		
+		//Accept trade on both ends
+    	network->sendTradeAccept(playerB, userId);
+   	 	network->sendTradeAccept(userId, playerB);
+    }
+}
+
+void CancelTrade(unsigned int userId)
+{
+	unsigned char playerB = User[userId].tradePlayer;
+    if (playerB < 0)
+        return;
+
+    //set them to blank state
+    User[userId].tradeStatus = 0;
+    User[playerB].tradeStatus = 0;
+
+    //set them to be trading with nobody
+    User[userId].tradePlayer = -1;
+    User[playerB].tradePlayer = -1;
+
+    //tell both players cancel trade
+    network->sendTradeCancel(playerB);
+    network->sendTradeCancel(userId);
+
+    //clear trade windows...
+    for (int i = 0; i < 256; i++)
+    {
+        User[userId].localTrade[i] = 0;
+        User[playerB].localTrade[i] = 0;
+    }
+}
+
+void OfferTradeItem(unsigned char userId, unsigned char itemId, unsigned int amount)
+{
+	unsigned char playerB = User[userId].tradePlayer;
+    //only do something if both parties are in accept trade mode
+    if (User[userId].tradeStatus == ACCEPT && User[User[userId].tradePlayer].tradeStatus == ACCEPT)
+    {
+        printf("offer!\n ITEM: [%i]\nAMOUNT [%i/%i]\n...", itemId, amount, User[userId].inventory[itemId]);
+        //check if you have that item
+        if (User[userId].inventory[itemId] >= amount)
+        {
+            User[userId].localTrade[itemId] = amount;
+
+            //send to both players!
+            network->sendTradeOffer(userId, (char)1, itemId, amount);
+
+            //send to playerB
+            network->sendTradeOffer(playerB, (char)2, itemId, amount);
+        }
+    }
+}
+
+void ConfirmTrade(unsigned int userId)
+{
+	unsigned char playerA = userId;
+    unsigned char playerB = User[userId].tradePlayer;
+
+    if (playerB < 0)
+    {
+        network->sendTradeCancel(userId);
+        User[userId].tradeStatus = 0;
+        User[userId].tradePlayer = 0;
+        return;
+    }
+
+    //make sure playerA is in accept mode before confirming
+    if (User[playerA].tradeStatus == ACCEPT)
+        User[playerA].tradeStatus = CONFIRM;
+
+    //tell both players :)
+    network->sendTradeReady(playerA, (char)1);
+    network->sendTradeReady(playerB, (char)2);
+
+    //if both players are now confirm, transact and reset!
+    if (User[playerA].tradeStatus != CONFIRM || User[playerB].tradeStatus != CONFIRM)
+        return;
+    
+    //lets make sure players have that many items
+    bool error = false;
+    for (int i = 0; i < 256; i++)
+    {
+        //compare the offer to the owned items
+        if (User[playerA].inventory[i] < User[playerA].localTrade[i])
+        {
+            printf("Trade error: User: %s, item: %i", User[playerA].Nick.c_str(), i);
+            error = true;
+            break;
+        }
+        //compare the offer to the owned items
+        if (User[playerB].inventory[i] < User[playerB].localTrade[i])
+        {
+            printf("Trade error: User: %s, item: %i", User[playerB].Nick.c_str(), i);
+            error = true;
+            break;
+        }
+    }
+
+    //tell them the trade is over!!!
+    User[playerA].tradeStatus = 0;
+    User[playerB].tradeStatus = 0;
+
+    //set them to be trading with nobody
+    User[playerA].tradePlayer = -1;
+    User[playerB].tradePlayer = -1;
+
+    //tell both players cancel trade
+    network->sendTradeCancel(playerA);
+    network->sendTradeCancel(playerB);
+
+    //make the transaction!
+    if (error)
+    {
+        printf("Error in trade.");
+        return;
+    }
+    
+    printf("trade transaction!\n");
+
+    //go through each item and add them
+    for (int i = 0; i < 256; i++)
+    {
+        unsigned char itemId = (unsigned char)i;
+
+        //easy to follow with these variables broski :P
+        int aOffer = User[playerA].localTrade[itemId];
+        int bOffer = User[playerB].localTrade[itemId];
+        
+        //give A's stuff  to B
+        if (aOffer > 0)
+        {
+            printf(kGreen "%s gives %itemId of item %itemId to %s\n" kNormal, User[playerA].Nick.c_str(), aOffer, itemId, User[playerB].Nick.c_str());
+            //trade the item and tell the player!
+            User[playerB].inventory[itemId] += aOffer;
+            User[playerA].inventory[itemId] -= aOffer;
+
+            //put in players inventory
+            unsigned int amount = User[playerB].inventory[itemId];
+            network->sendPocketItem(playerB, itemId, amount);
+
+            //take it out of A's inventory
+            amount = User[playerA].inventory[itemId];
+            network->sendPocketItem(playerA, itemId, amount);
+        }
+
+        //give B's stuff  to A
+        if (bOffer > 0)
+        {
+            printf(kGreen "%s gives %itemId of item %itemId to %s\n" kNormal, User[playerB].Nick.c_str(), aOffer, itemId, User[playerA].Nick.c_str());
+            //trade the item and tell the player!
+            User[playerA].inventory[itemId] += bOffer;
+            User[playerB].inventory[itemId] -= bOffer;
+
+            //put in players inventory
+            unsigned int amount = User[playerA].inventory[itemId];
+            network->sendPocketItem(playerA, itemId, amount);
+
+            //take it away from B
+            amount = User[playerB].inventory[itemId];
+            network->sendPocketItem(playerB, itemId, amount);
+        }
+
+        //clear the items
+        User[playerA].localTrade[itemId] = 0;
+        User[playerB].localTrade[itemId] = 0;
+    }
+
+    //Save all profiles after a trade
+    network->saveAllProfiles();
 }

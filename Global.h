@@ -50,6 +50,11 @@ extern void SpendStatPoint(unsigned char userId, unsigned char statId);
 extern void UnequipItem(unsigned char userId, unsigned char slot);
 extern void UseItem(unsigned char userId, unsigned char itemId);
 extern void DropItem(unsigned char userId, unsigned char itemId, unsigned int amount); 
+extern void InvitePlayerToTrade(unsigned char userId, unsigned char playerId);
+extern void AcceptTrade(unsigned char userId);
+extern void CancelTrade(unsigned char userId);
+extern void OfferTradeItem(unsigned char userId, unsigned char itemId, unsigned int amount);
+extern void ConfirmTrade(unsigned char userId);
 
 //Utilities
 extern std::string trim(std::string s);

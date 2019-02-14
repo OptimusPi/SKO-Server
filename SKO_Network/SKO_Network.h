@@ -132,6 +132,7 @@ public:
 	void banPlayer(unsigned char userId, std::string username, std::string reason);
 	void unbanPlayer(unsigned char userId, std::string username);
 	void warpPlayer(unsigned char userId, std::string usernamne, int x, int y, unsigned char mapId);
+	void showPlayerPing(unsigned char userId, std::string username);
  private:
 	
 	// Bind to this port and accept incoming connections.

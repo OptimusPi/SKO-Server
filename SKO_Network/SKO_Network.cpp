@@ -941,6 +941,41 @@ bool SKO_Network::isPlayerOnline(std::string username)
 	}
 	return false;
 }
+
+void SKO_Network::showPlayerPing(unsigned char userId, std::string username)
+{
+	// Restrict this command to moderator
+	if (!verifyAdmin(userId))
+		return;
+
+	int playerId;
+	bool result = false;
+
+	for (playerId = 0; playerId < MAX_CLIENTS; playerId++)
+	{
+		if (User[playerId].Ident && User[playerId].Nick.compare(username) == 0)
+		{
+			printf("Moderator inquiry of %s\n", username.c_str());
+			result = true;
+			break;
+		}
+	}
+
+	//find user
+	std::string pingDumpPacket = "0";
+	pingDumpPacket += CHAT;
+
+	if (result)
+	{
+		std::stringstream ss;
+		ss << "User[" << playerId << "] " << User[playerId].Nick << " has a ping of " << User[playerId].ping;
+		sendChat(userId, ss.str());
+	}
+	else
+	{
+		sendChat(userId, "username " + username + " was not found.");
+	}
+}
 void SKO_Network::kickPlayer(unsigned char userId, std::string username, std::string reason)
 {
 	// Restrict this command to moderator
