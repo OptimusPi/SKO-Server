@@ -3,13 +3,16 @@
 
 #include <string> 
 #include <cstdlib>
+#include "SKO_Network.h"
+
+// Forward-declare connected classes
+class SKO_Network;
 
 class SKO_ChatHandler
 {
 public:
-    SKO_ChatHandler();
+    SKO_ChatHandler(SKO_Network *network);
     void parseChat(unsigned char userId, std::string message);
-
 
 private:
     void parseSlashBan(unsigned char userId, std::string parameters);
@@ -23,9 +26,8 @@ private:
     void parseSlashWarp(unsigned char userId, std::string parameters);
     void parseSlashPing(unsigned char userId, std::string parameters);
     void parseSlashCommand(unsigned char userId, std::string message);
-
-    // Helper function to parse out the next string in a slash command.
-    std::string nextParameter(std::string &parameters);
     
+    //Network for calling functions
+    SKO_Network *network;
 };
 #endif

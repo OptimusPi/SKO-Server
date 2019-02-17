@@ -1,9 +1,14 @@
 #include "SKO_PacketHandler.h"
+#include "SKO_ChatHandler.h"
+#include "SKO_Network.h"
+#include "../SKO_Utilities/SKO_Utilities.h"
+#include "../Global.h"
 
 //constructor
 SKO_PacketHandler::SKO_PacketHandler(SKO_Network *network)
 { 
     this->network = network;
+    this->chatHandler = new SKO_ChatHandler(network);
 }
 
 // When server receives PING,
@@ -25,7 +30,7 @@ void SKO_PacketHandler::parseLogin(unsigned char userId, SKO_PacketParser *parse
 {
     // Declare message string
     std::string loginRequest = parser->getPacketBody();
-    std::string username = nextParameter(loginRequest);
+    std::string username = SKO_Utilities::nextParameter(loginRequest);
     std::string password = loginRequest;
     network->attemptLogin(userId, username, password);
 }
@@ -33,8 +38,8 @@ void SKO_PacketHandler::parseLogin(unsigned char userId, SKO_PacketParser *parse
 // [REGISTER][<username>][" "][<password>]
 void SKO_PacketHandler::parseRegister(unsigned char userId, std::string parameters)
 {
-    std::string username = nextParameter(parameters);
-    std::string password = parameters;//do not use nextParameter to get password, just use remaining
+    std::string username = SKO_Utilities::nextParameter(parameters);
+    std::string password = parameters;//do not useSKO_Utilities::nextParameter to get password, just use remaining
     network->attemptRegister(userId, username, password);      
 }
 
@@ -539,6 +544,10 @@ void SKO_PacketHandler::parseBank(unsigned char userId, SKO_PacketParser *parser
     }
 }
 
+void SKO_PacketHandler::parseChat(unsigned char userId, std::string message)
+{
+    this->chatHandler->parseChat(userId, message);
+}
 
 // [(unsigned char)packetLength][(unsigned char)packetType][...]
 void SKO_PacketHandler::parsePacket(unsigned char userId, std::string packet)

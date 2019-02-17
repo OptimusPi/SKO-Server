@@ -99,7 +99,7 @@ void InvitePlayerToTrade(unsigned char userId, unsigned char playerId);
 void AcceptTrade(unsigned char userId);
 void CancelTrade(unsigned char userId);
 void OfferTradeItem(unsigned char userId, unsigned char itemId, unsigned int amount);
-void ConfirmTrade(unsigned char userId);
+void ConfirmTrade(unsigned char userId); 
 
 
 // threads 
@@ -2657,7 +2657,7 @@ void AcceptTrade(unsigned char userId)
     }
 }
 
-void CancelTrade(unsigned int userId)
+void CancelTrade(unsigned char userId)
 {
 	unsigned char playerB = User[userId].tradePlayer;
     if (playerB < 0)
@@ -2704,7 +2704,7 @@ void OfferTradeItem(unsigned char userId, unsigned char itemId, unsigned int amo
     }
 }
 
-void ConfirmTrade(unsigned int userId)
+void ConfirmTrade(unsigned char userId)
 {
 	unsigned char playerA = userId;
     unsigned char playerB = User[userId].tradePlayer;

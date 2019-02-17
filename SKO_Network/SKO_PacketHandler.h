@@ -5,12 +5,13 @@
 #include "../Global.h"
 
 #include <cstring>
-#include "SKO_Network.h"
 #include "SKO_PacketParser.h"
 #include "SKO_PacketTypes.h"
+//#include "../SKO_Utilities/SKO_Utilities.h"
 
-// Forward-declare SKO_Network so I can call its functions.
+// Forward-declare connected classes.
 class SKO_Network;
+class SKO_ChatHandler;
 
 // Class to handle packets
 class SKO_PacketHandler
@@ -24,7 +25,8 @@ public:
 private:
     //SKO_GameState gameState;
     SKO_Network *network;
-
+    SKO_ChatHandler *chatHandler;
+    
     // Health check packet types
     void parsePing(unsigned char userId);
     void parsePong(unsigned char userId);
@@ -85,21 +87,8 @@ private:
     void parseClanInvite(unsigned char userId, SKO_PacketParser *parser);
     void parseClanAccept(unsigned char userId);
 
-
     // Chat and slash commands
     void parseChat(unsigned char userId, std::string message);
-    std::string nextParameter(std::string &parameters);
-    void parseSlashCommand(unsigned char userId, std::string parameters);
-    void parseSlashBan(unsigned char userId, std::string parameters);
-    void parseSlashUnban(unsigned char userId, std::string parameters);
-    void parseSlashKick(unsigned char userId, std::string parameters);
-    void parseSlashMute(unsigned char userId, std::string parameters);
-    void parseSlashUnmute(unsigned char userId, std::string parameters);
-    void parseSlashIpban(unsigned char userId, std::string parameters);
-    void parseSlashGetip(unsigned char userId, std::string parameters); 
-    void parseSlashWarp(unsigned char userId, std::string parameters);
-    void parseSlashPing(unsigned char userId, std::string parameters);
-    void parseSlashWho(unsigned char userId);
 };
     
 #endif

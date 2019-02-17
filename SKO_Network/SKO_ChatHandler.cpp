@@ -1,42 +1,16 @@
 #include "SKO_ChatHandler.h"
-#include <string>
+#include "../SKO_Utilities/SKO_Utilities.h"
 
-SKO_ChatHandler::SKO_ChatHandler()
+
+SKO_ChatHandler::SKO_ChatHandler(SKO_Network *network)
 {
-
-}
-
-
-// Returns the next parameter from a slash command
-// Also shrinks the parameter list by one
-// Example:
-//    slash command: "/warp pifreak 2500 100 2"
-//    parameters: "pifreak 2500 100 2"
-//    nextParameter(): "pifreak"
-//    parameters: "2500 100 2"
-//    nextParameter(): "2500"
-//    parameters: "100 2"
-//    nextParameter(): "100"
-//    parameters: "2"
-//    nextParameter(): "2"
-//    parameters: ""
-//    nextParameter: ""
-std::string SKO_ChatHandler::nextParameter(std::string &parameters)
-{
-    //grab first parameter from list
-    std::string next = parameters.substr(0, parameters.find_first_of(" "));
-
-    //shrink list of parameters 
-    parameters = parameters.substr(parameters.find_first_of(" ") + 1);
-    
-    //return a single parameter; the next in line
-    return next;
+    this->network = network;  
 }
 
 // [CHAT]["/ban"][" "]["<username>"][" "]["<reason>"]
 void SKO_ChatHandler::parseSlashBan(unsigned char userId, std::string parameters)
 {
-    std::string username = nextParameter(parameters);
+    std::string username = SKO_Utilities::nextParameter(parameters);
     std::string reason = parameters;
     network->banPlayer(userId, username, reason);
 }
@@ -53,7 +27,7 @@ void SKO_ChatHandler::parseSlashUnban(unsigned char userId, std::string paramete
 void SKO_ChatHandler::parseSlashMute(unsigned char userId, std::string parameters)
 {
     //strip the appropriate data
-    std::string username = nextParameter(parameters);
+    std::string username =SKO_Utilities::nextParameter(parameters);
     std::string reason = parameters;
     network->mutePlayer(userId, username, reason);
 }
@@ -61,14 +35,14 @@ void SKO_ChatHandler::parseSlashMute(unsigned char userId, std::string parameter
 // [CHAT]["/unmute"][" "]["<username>"]
 void SKO_ChatHandler::parseSlashUnmute(unsigned char userId, std::string parameters)
 {
-    std::string username = nextParameter(parameters);
+    std::string username =SKO_Utilities::nextParameter(parameters);
     network->unmutePlayer(userId, username);
 }
 
 // [CHAT]["/ban"][" "]["<username>"][" "]["<reason>"]
 void SKO_ChatHandler::parseSlashKick(unsigned char userId, std::string parameters)
 {
-    std::string username = nextParameter(parameters);
+    std::string username =SKO_Utilities::nextParameter(parameters);
     std::string reason = parameters;
     network->kickPlayer(userId, username, reason);
 }
@@ -83,7 +57,7 @@ void SKO_ChatHandler::parseSlashWho(unsigned char userId)
 // [CHAT]["/ipban"][" "]["<ipv4 address>"][" "][<reason>]
 void SKO_ChatHandler::parseSlashIpban(unsigned char userId, std::string parameters)
 {
-    std::string ip = nextParameter(parameters);
+    std::string ip =SKO_Utilities::nextParameter(parameters);
     std::string reason = parameters;
     network->banAddress(userId, ip, reason);
 }
@@ -91,23 +65,23 @@ void SKO_ChatHandler::parseSlashIpban(unsigned char userId, std::string paramete
 // [CHAT]["/getip"][" "]["<player>"]
 void SKO_ChatHandler::parseSlashGetip(unsigned char userId, std::string parameters)
 {
-    std::string username = nextParameter(parameters);
+    std::string username =SKO_Utilities::nextParameter(parameters);
     network->getIp(userId, username);
 }
 // [CHAT]["/warp"][" "]["<player>"][" "][(string)x][" "][(string)y][" "][(string)mapId]
 void SKO_ChatHandler::parseSlashWarp(unsigned char userId, std::string parameters)
 {
-    std::string username = nextParameter(parameters);
-    int x = atoi(nextParameter(parameters).c_str());
-    int y = atoi(nextParameter(parameters).c_str());
-    int mapId = atoi(nextParameter(parameters).c_str());
+    std::string username = SKO_Utilities::nextParameter(parameters);
+    int x = atoi(SKO_Utilities::nextParameter(parameters).c_str());
+    int y = atoi(SKO_Utilities::nextParameter(parameters).c_str());
+    int mapId = atoi(SKO_Utilities::nextParameter(parameters).c_str());
     network->warpPlayer(userId, username, x, y, mapId);                
 }
 
 // [CHAT]["/ping"]
 void SKO_ChatHandler::parseSlashPing(unsigned char userId, std::string parameters)
 {
-    std::string username = nextParameter(parameters);
+    std::string username =SKO_Utilities::nextParameter(parameters);
     network->showPlayerPing(userId, username);
 }
 
