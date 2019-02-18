@@ -1170,9 +1170,9 @@ void PhysicsLoop()
 				//	if (map.playerCount == 0)
 				//		continue;
 				playerPhysics(mapId);
-				//enemyPhysics(mapId);
-				//npcPhysics(mapId);
-				//itemPhysics(mapId);
+				enemyPhysics(mapId);
+				npcPhysics(mapId);
+				itemPhysics(mapId); 
 			}
 		} 
 		OPI_Sleep::microseconds(1);
