@@ -325,7 +325,6 @@ int main()
 	mapObjectThread.join();
 	npcThread.join();
 	physicsThread.join();
-
 	return 0;
 }
 
@@ -883,161 +882,172 @@ void playerPhysics(unsigned char mapId)
 	bool block_y;
 	bool block_x;
 
-	for (int i = 0; i < MAX_CLIENTS; i++)
+	for (unsigned char i = 0; i < MAX_CLIENTS; i++)
 	{
-		if (User[i].mapId == mapId && User[i].Ident)
+		// Only check players logged in
+		if (!User[i].Ident)
+			continue;
+
+		// Only check players on this map
+		if (User[i].mapId != mapId)
+			continue;
+
+		//stop attacking
+		if (OPI_Clock::milliseconds() - User[i].attack_ticker > attack_speed)
 		{
-			//stop attacking
-			if (OPI_Clock::milliseconds() - User[i].attack_ticker > attack_speed)
+			User[i].attacking = false;
+
+			//if you made an action during an attack, it is saved utnil now. Execute
+			if (User[i].queue_action != 0)
 			{
-				User[i].attacking = false;
-
-				//if you made an action during an attack, it is saved utnil now. Execute
-				if (User[i].queue_action != 0)
+				printf("Glitched user is %s :O\n", User[i].Nick.c_str());
+				float numx = User[i].x;
+				float numy = User[i].y;
+				switch (User[i].queue_action)
 				{
-					printf("Glitched user is %s :O\n", User[i].Nick.c_str());
-					float numx = User[i].x;
-					float numy = User[i].y;
-					switch (User[i].queue_action)
-					{
-					case MOVE_LEFT:
-						Left(i, numx, numy);
-						printf("\e[0;32mCorrection! que action being sent NOW: MOVE_LEFT\e[m\n");
-						break;
+				case MOVE_LEFT:
+					Left(i, numx, numy);
+					printf("\e[0;32mCorrection! Queue action being sent NOW: MOVE_LEFT\e[m\n");
+					break;
 
-					case MOVE_RIGHT:
-						Right(i, numx, numy);
-						printf("\e[0;32mCorrection! que action being sent NOW: MOVE_RIGHT\e[m\n");
-						break;
+				case MOVE_RIGHT:
+					Right(i, numx, numy);
+					printf("\e[0;32mCorrection! Queue action being sent NOW: MOVE_RIGHT\e[m\n");
+					break;
 
-					case MOVE_JUMP:
-						Jump(i, numx, numy);
-						printf("\e[0;32mCorrection! que action being sent NOW: JUMP\e[m\n");
-						break;
+				case MOVE_JUMP:
+					Jump(i, numx, numy);
+					printf("\e[0;32mCorrection! Queue action being sent NOW: JUMP\e[m\n");
+					break;
 
-					case ATTACK:
-						printf("\e[0;32mCorrection! que action being sent NOW: ATTACK\e[m\n");
+				case ATTACK:
+					printf("\e[0;32mCorrection! Queue action being sent NOW: ATTACK\e[m\n");
 
-						//do attack actions
-						Attack(i, numx, numy);
-						break;
+					//do attack actions
+					Attack(i, numx, numy);
+					break;
 
-					case MOVE_STOP:
-						printf("\e[0;32mCorrection! que action being sent NOW: MOVE_STOP\e[m\n");
+				case MOVE_STOP:
+					printf("\e[0;32mCorrection! Queue action being sent NOW: MOVE_STOP\e[m\n");
 
-						//do attack actions
-						Stop(i, numx, numy);
-						break;
+					//do attack actions
+					Stop(i, numx, numy);
+					break;
 
-					default:
-						printf("\e[0;32mCorrection! que action glitch: %i\e[m\n", User[i].queue_action);
+				default:
+					printf("\e[0;32mCorrection! Queue action glitch: %i\e[m\n", User[i].queue_action);
 
-						break;
-					} //end switch
+					break;
+				} //end switch
 
-					//reset the cue
-					User[i].queue_action = 0;
+				//reset the cue
+				User[i].queue_action = 0;
 
-				} // end que actions
-			}	 //end attack ticker
+			} // end Queue actions
+		}	 //end attack ticker
 
-			//HP regen
-			int regen = User[i].regen;
-			int weap = User[i].equip[0];
-			int hat = User[i].equip[1];
+		//HP regen
+		int regen = User[i].regen;
+		int weap = User[i].equip[0];
+		int hat = User[i].equip[1];
 
-			if (weap > 0)
-				regen += Item[weap].hp;
+		if (weap > 0)
+			regen += Item[weap].hp;
 
-			if (hat > 0)
-				regen += Item[hat].hp;
+		if (hat > 0)
+			regen += Item[hat].hp;
 
-			if (regen > 0)
+		// TODO - move this code as it does not belong in Physics
+		if (regen > 0)
+		{
+			if (OPI_Clock::milliseconds() - User[i].regen_ticker >= 1200)
 			{
-				if (OPI_Clock::milliseconds() - User[i].regen_ticker >= 1200)
+				//regen hp
+				if (User[i].hp < User[i].max_hp)
 				{
-					//regen hp
-					if (User[i].hp < User[i].max_hp)
+					User[i].hp += regen;
+
+					//cap the hp to their max
+					if (User[i].hp > User[i].max_hp)
+						User[i].hp = User[i].max_hp;
+
+					//Send changed HP to client player's party members
+					unsigned char displayHp = (int)((User[i].hp / (float)User[i].max_hp) * 80);
+					for (int pl = 0; pl < MAX_CLIENTS; pl++)
 					{
-						User[i].hp += regen;
-
-						//cap the hp to their max
-						if (User[i].hp > User[i].max_hp)
-							User[i].hp = User[i].max_hp;
-
-						//Send changed HP to client player's party members
-						unsigned char displayHp = (int)((User[i].hp / (float)User[i].max_hp) * 80);
-						for (int pl = 0; pl < MAX_CLIENTS; pl++)
-						{
-							if (pl != i && User[pl].Ident && User[pl].partyStatus == PARTY && User[pl].party == User[i].party)
-								network->sendBuddyStatHp(pl, i, displayHp);
-						}
+						if (pl != i && User[pl].Ident && User[pl].partyStatus == PARTY && User[pl].party == User[i].party)
+							network->sendBuddyStatHp(pl, i, displayHp);
 					}
-
-					//Send changed HP stat to client player
-					network->sendStatHp(i, User[i].hp);
-					User[i].regen_ticker = OPI_Clock::milliseconds();
 				}
-			}
 
-			if (User[i].y_speed < 10)
+				//Send changed HP stat to client player
+				network->sendStatHp(i, User[i].hp);
+				User[i].regen_ticker = OPI_Clock::milliseconds();
+			}
+		}
+
+		if (User[i].y_speed < 10)
+		{
+			User[i].y_speed += GRAVITY;
+		}
+
+		//verical collision detection
+		block_y = blocked(mapId, User[i].x + 25, User[i].y + User[i].y_speed + 13 + 0.25, User[i].x + 38, User[i].y + User[i].y_speed + 64, false);
+
+		//vertical movement
+		if (!block_y)
+		{ //not blocked, fall
+			//animation
+			User[i].ground = false;
+
+			User[i].y += User[i].y_speed;
+
+			//bottomless pit
+			if (User[i].y > map[mapId].death_pit)
 			{
-				User[i].y_speed += GRAVITY;
+				printf("user died in death pit on map %i because %i > %i\n", (int)mapId, (int)User[i].y, (int)map[mapId].death_pit);
+				Respawn(User[i].mapId, i);
 			}
+		}
+		else
+		{
+			User[i].ground = true;
 
-			//verical collision detection
-			block_y = blocked(mapId, User[i].x + 25, User[i].y + User[i].y_speed + 13 + 0.25, User[i].x + 38, User[i].y + User[i].y_speed + 64, false);
-
-			//vertical movement
-			if (!block_y)
-			{ //not blocked, fall
-
-				//animation
-				User[i].ground = false;
-
-				User[i].y += User[i].y_speed;
-
-				//bottomless pit
-				if (User[i].y > map[User[i].mapId].death_pit)
-				{
-					printf("user died in death pit on map %i because %i > %i\n", (int)mapId, (int)User[i].y, (int)map[mapId].death_pit);
-					Respawn(User[i].mapId, i);
-				}
-			}
-			else
+			//blocked, stop
+			if (User[i].y_speed > 0)
 			{
-				User[i].ground = true;
+				User[i].y_speed = 1;
 
-				//blocked, stop
-				if (User[i].y_speed > 0)
-				{
-					User[i].y_speed = 1;
+				//while or if TODO
+				for (int loopVar = 0; loopVar < HIT_LOOPS && (!blocked(mapId, User[i].x + 25, User[i].y + User[i].y_speed + 13 + 0.25, User[i].x + 38, User[i].y + User[i].y_speed + 64 + 0.25, false)); loopVar++)
+					User[i].y += User[i].y_speed;
 
-					//while or if TODO
-					for (int loopVar = 0; loopVar < HIT_LOOPS && (!blocked(mapId, User[i].x + 25, User[i].y + User[i].y_speed + 13 + 0.25, User[i].x + 38, User[i].y + User[i].y_speed + 64 + 0.25, false)); loopVar++)
-						User[i].y += User[i].y_speed;
+				User[i].y = (int)(User[i].y + 0.5);
+			}
+			if (User[i].y_speed < 0)
+			{
+				User[i].y_speed = -1;
 
-					User[i].y = (int)(User[i].y + 0.5);
-				}
-				if (User[i].y_speed < 0)
-				{
-					User[i].y_speed = -1;
-
-					//while or if TODO
-					for (int loopVar = 0; loopVar < HIT_LOOPS && (!blocked(mapId, User[i].x + 25, User[i].y + User[i].y_speed + 13 + 0.25, User[i].x + 38, User[i].y + User[i].y_speed + 64 + 0.25, false)); loopVar++)
-						User[i].y += User[i].y_speed;
-				}
-
-				User[i].y_speed = 0;
+				//while or if TODO
+				for (int loopVar = 0; loopVar < HIT_LOOPS && (!blocked(mapId, User[i].x + 25, User[i].y + User[i].y_speed + 13 + 0.25, User[i].x + 38, User[i].y + User[i].y_speed + 64 + 0.25, false)); loopVar++)
+					User[i].y += User[i].y_speed;
 			}
 
+			User[i].y_speed = 0;
+		}
+
+		if (User[i].x_speed != 0)
+		{
 			//horizontal collision detection
 			block_x = blocked(mapId, User[i].x + User[i].x_speed + 23, User[i].y + 13, User[i].x + User[i].x_speed + 40, User[i].y + 64, false);
 
 			//horizontal movement
 			if (!block_x)
 			{ //not blocked, walk
+				//printf("Current time microseconds: %llu\n", OPI_Clock::microseconds());
+				//printf("User[%i].x: %f User[%i].y: %f User[%i].y_speed: %f ", i, User[i].x, i, User[i].y, i, User[i].y_speed);
 				User[i].x += User[i].x_speed;
+				//printf("+ User[%i].x_speed of %f = %f \n\n\n", i, User[i].x_speed, User[i].x);
 			}
 		}
 	}
@@ -1159,11 +1169,10 @@ void PhysicsLoop()
 				//TODO - turn off physics for maps that have no players on them?
 				//	if (map.playerCount == 0)
 				//		continue;
-
-				playerPhysics(mapId);	
-				enemyPhysics(mapId);
-				npcPhysics(mapId);
-				itemPhysics(mapId);
+				playerPhysics(mapId);
+				//enemyPhysics(mapId);
+				//npcPhysics(mapId);
+				//itemPhysics(mapId);
 			}
 		} 
 		OPI_Sleep::microseconds(1);
@@ -1176,7 +1185,7 @@ void Attack(unsigned char userId, float numx, float numy)
 	//set the current map
 	unsigned char mapId = User[userId].mapId;
 
-	//Que next action
+	//Queue next action
 	if (User[userId].attacking)
 	{
 		printf("%s tried to attack while attacking...\7\7\n", User[userId].Nick.c_str());

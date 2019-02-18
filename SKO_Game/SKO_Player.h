@@ -26,10 +26,10 @@ class SKO_Player
         // Socket pointer
         GE_Socket *socket = NULL;
         bool Status;
-        bool Que;
+        bool Queue;
         bool Ident;
         bool Save;
-        unsigned long long int QueTime;
+        unsigned long long int QueueTime;
         unsigned int ping;
         unsigned long long int pingTicker;
         bool pingWaiting;

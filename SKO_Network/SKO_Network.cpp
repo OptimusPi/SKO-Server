@@ -154,9 +154,11 @@ void SKO_Network::QueueLoop()
 		// Cycle through all connections
 		for (unsigned char userId = 0; userId < MAX_CLIENTS; userId++)
 		{
-			//check Que
-			if (!User[userId].Que)
+			//check Queue
+			if (!User[userId].Queue)
 				continue;
+
+			printf("User is waiting in Queue...");
 
 			//receive
 			if (User[userId].socket->Recv() & GE_Socket_OK)
@@ -183,9 +185,9 @@ void SKO_Network::QueueLoop()
 							printf("Correct version!\n");
 							User[userId].socket->data = "";
 							User[userId].Status = true;
-							User[userId].Que = false;
+							User[userId].Queue = false;
 							sendVersionSuccess(userId);
-							printf("Que Time: \t%llu\n", User[userId].QueTime);
+							printf("Queue Time: \t%llu\n", User[userId].QueueTime);
 							printf("Current Time: \t%llu\n", OPI_Clock::milliseconds());
 
 							//operating system statistics
@@ -199,7 +201,7 @@ void SKO_Network::QueueLoop()
 								  versionMajor, versionMinor, versionPatch, versionOS);
 							printf(">>>[expected values] VERSION_MAJOR: %i VERSION_MINOR: %i VERSION_PATCH: %i\n",
 								   VERSION_MAJOR, VERSION_MINOR, VERSION_PATCH);
-							User[userId].Que = false;
+							User[userId].Queue = false;
 							User[userId].socket->Close();
 							User[userId] = SKO_Player();
 						}
@@ -216,14 +218,14 @@ void SKO_Network::QueueLoop()
 
 						send(User[userId].socket, VERSION_FAIL);
 						printf("error, packet code failed on VERSION_CHECK (2)\n");
-						User[userId].Que = false;
+						User[userId].Queue = false;
 						User[userId].socket->Close();
 					}
 				}
 			}
 			else // Recv returned error!
 			{
-				User[userId].Que = false;
+				User[userId].Queue = false;
 				User[userId].Status = false;
 				User[userId].Ident = false;
 				User[userId].socket->Close();
@@ -232,9 +234,9 @@ void SKO_Network::QueueLoop()
 			}
 
 			//didn't recv anything, don't kill unless it's too long
-			if (OPI_Clock::milliseconds() - User[userId].QueTime >= 500)
+			if (OPI_Clock::milliseconds() - User[userId].QueueTime >= 500)
 			{
-				User[userId].Que = false;
+				User[userId].Queue = false;
 				User[userId].socket->Close();
 				printf("Closing socket %i for timeout.\n", userId);
 				printf("*\n**\n*\nQUE FAIL! IP IS %s*\n**\n*\n\n", User[userId].socket->IP.c_str());
@@ -247,6 +249,8 @@ void SKO_Network::QueueLoop()
 
 void SKO_Network::ConnectLoop()
 {
+	printf("ConnecttLoop: SERVER_QUIT is: %i\n", (int)SERVER_QUIT);
+
 	while (!SERVER_QUIT)
 	{
 		//check for disconnects by too high of ping.
@@ -282,6 +286,7 @@ void SKO_Network::ConnectLoop()
 		// If there is someone trying to connect
 		if (listenSocket->GetStatus2() & (int)GE_Socket_Read)
 		{
+			printf(kGreen "Incoming socket connection...\n" kNormal);
 			// Declare a temp int
 			int incomingSocket;
 
@@ -354,16 +359,18 @@ void SKO_Network::ConnectLoop()
 				User[incomingSocket].socket->Close();
 			}
 
-			//put in que
-			User[incomingSocket].Que = true;
-			User[incomingSocket].QueTime = OPI_Clock::milliseconds();
+			//put in Queue
+			User[incomingSocket].Queue = true;
+			User[incomingSocket].QueueTime = OPI_Clock::milliseconds();
 
-			printf("put socket %i in que\n", incomingSocket);
+			printf("put socket %i in Queue\n", incomingSocket);
 		} //if connection incoming
 
 		// Sleep in between checking for new connections
 		OPI_Sleep::milliseconds(10);
 	} //end while
+
+	printf(kMagenta "ConnectLoop has finished.\n" kNormal);
 }
 
 void SKO_Network::recvPacket(GE_Socket *socket)

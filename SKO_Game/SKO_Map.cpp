@@ -19,8 +19,8 @@ SKO_Map::SKO_Map (std::string FileName)
 { 
 
     SKO_Map();
-     std::stringstream mapFileLoc;
-	mapFileLoc << "SKO_Content" << FileName << ".map";
+    std::stringstream mapFileLoc;
+	mapFileLoc << "SKO_Content/" << FileName << ".map";
 
      printf("loading map: %s\n", FileName.c_str());
      std::ifstream MapFile(mapFileLoc.str().c_str(), std::ios::in|std::ios::binary|std::ios::ate);
@@ -190,8 +190,9 @@ SKO_Map::SKO_Map (std::string FileName)
          }
 
          free(memblock);
-     }else {
+     } else {
            printf("Can't load map %s.\n", FileName.c_str());
+           exit(1);
      }
 
      std::stringstream mapConfLoc; 

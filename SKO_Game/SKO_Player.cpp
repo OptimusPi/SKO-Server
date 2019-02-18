@@ -9,9 +9,9 @@ void SKO_Player::init()
 	Moderator = false;
 	Ident = false;
 	Status = false;
-	Que = false;
+	Queue = false;
 	Save = false;
-	QueTime = 0;
+	QueueTime = 0;
 	ground = false;
 	tempClanId = "";
 

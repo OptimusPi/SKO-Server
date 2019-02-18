@@ -83,6 +83,8 @@ int GE_Socket::GetStatus2()
     FD_SET((unsigned int)Socket,&wset);  
     FD_SET((unsigned int)Socket,&eset); 
       
+    select(FD_SETSIZE,&rset,&wset,&eset,(struct timeval*)&timeout); 
+
     int status = 0; 
     if( FD_ISSET(Socket,&eset) ) 
     { 

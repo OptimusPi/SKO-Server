@@ -29,7 +29,7 @@ class SKO_Map
         //to avoid SDL dependency, just use struct SDL_Rect
         typedef struct SDL_Rect
         {
-                short int x, y;
+                signed short int x, y;
                 unsigned short int w, h;
         } SDL_Rect;
 
