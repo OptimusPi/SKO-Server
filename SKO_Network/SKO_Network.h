@@ -159,11 +159,11 @@ public:
 	GE_Socket*	listenSocket;		
 
 	// threads for running the below functions.
-	std::thread queueThread, connectThread, saveThread; 
+	std::thread connectionThread;
+	std::thread saveThread; 
 	
 	// Endless loop functions that are to be assigned into threads.
-	void QueueLoop();
-	void ConnectLoop();
+	void ConnectionLoop();
 	void SaveLoop();
  
 	// Client socket functions

@@ -40,8 +40,7 @@ std::string SKO_Network::startup()
 	this->listenSocket->Connected = true;
 
 	//start threads
-	this->queueThread = std::thread(&SKO_Network::QueueLoop, this);
-	this->connectThread = std::thread(&SKO_Network::ConnectLoop, this);
+	this->connectionThread = std::thread(&SKO_Network::ConnectionLoop, this);
 	this->saveThread = std::thread(&SKO_Network::SaveLoop, this);
 
 	return "success";
@@ -147,11 +146,12 @@ void SKO_Network::sendVersionSuccess(unsigned char userId)
 	send(User[userId].socket, VERSION_SUCCESS);
 }
 
-void SKO_Network::QueueLoop()
+//TODO refactor into different functions, handle authentication in the socket class.
+void SKO_Network::ConnectionLoop()
 {
 	while (!SERVER_QUIT)
 	{
-		// Cycle through all connections
+		// Wait for users to authenticate
 		for (unsigned char userId = 0; userId < MAX_CLIENTS; userId++)
 		{
 			//check Queue
@@ -243,45 +243,42 @@ void SKO_Network::QueueLoop()
 			}
 		} //end for loop
 
-		OPI_Sleep::milliseconds(10);
-	} //end while loop
-} //end QueLoop
-
-void SKO_Network::ConnectLoop()
-{
-	printf("ConnecttLoop: SERVER_QUIT is: %i\n", (int)SERVER_QUIT);
-
-	while (!SERVER_QUIT)
-	{
-		//check for disconnects by too high of ping.
-		for (int i = 0; i < MAX_CLIENTS; i++)
+		// Handle all authenticated clients
+		for (unsigned char userId = 0; userId < MAX_CLIENTS; userId++)
 		{
-			if (!User[i].Ident)
+			// Ignore socket if it is not connected
+			if (!User[userId].Status)
 				continue;
 
-			if (User[i].pingWaiting)
+			handleClient(userId);
+
+			// Ping check authenticated users
+			if (!User[userId].Ident)
+				continue;
+
+			if (User[userId].pingWaiting)
 			{
-				int ping = OPI_Clock::milliseconds() - User[i].pingTicker;
+				int ping = OPI_Clock::milliseconds() - User[userId].pingTicker;
 
 				//TODO set limit for ping
 				if (ping > 60000)
 				{
 					printf("\e[31;0mClosing socket based on ping greater than one minute.\e[m\n");
-					User[i].socket->Close();
+					User[userId].socket->Close();
 				}
 			} //end pingWaiting
 			else
 			{
 				//send ping waiting again if its been more than a second
-				if (OPI_Clock::milliseconds() - User[i].pingTicker > 1000)
+				if (OPI_Clock::milliseconds() - User[userId].pingTicker > 1000)
 				{
 					//time to ping them.
-					send(User[i].socket, PING);
-					User[i].pingWaiting = true;
-					User[i].pingTicker = OPI_Clock::milliseconds();
+					send(User[userId].socket, PING);
+					User[userId].pingWaiting = true;
+					User[userId].pingTicker = OPI_Clock::milliseconds();
 				}
 			}
-		} //end max clients for ping
+		}
 
 		// If there is someone trying to connect
 		if (listenSocket->GetStatus2() & (int)GE_Socket_Read)
@@ -367,10 +364,10 @@ void SKO_Network::ConnectLoop()
 		} //if connection incoming
 
 		// Sleep in between checking for new connections
-		OPI_Sleep::milliseconds(10);
+		OPI_Sleep::milliseconds(1);
 	} //end while
 
-	printf(kMagenta "ConnectLoop has finished.\n" kNormal);
+	printf(kMagenta "ConnectionLoop has finished.\n" kNormal);
 }
 
 void SKO_Network::recvPacket(GE_Socket *socket)

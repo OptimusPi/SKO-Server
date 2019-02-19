@@ -28,7 +28,6 @@
 #include "SKO_Network/SKO_Network.h"
 
 bool SERVER_QUIT = false;
-bool a = false;
 /* Ctrl+C in terminal */
 void terminal_quit(int signal){
 	printf("Gracefully shutting down after receiving signal=%i.\n", signal);
@@ -71,7 +70,6 @@ bool blocked(unsigned char mapId, float box1_x1, float box1_y1, float box1_x2, f
 //attack time
 unsigned long long int attack_speed = 40 * 6;
 
-
 //TODO -Game Logic Refactor
 void GiveLoot(int enemy, int player);
 void Attack(unsigned char userId, float x, float y);
@@ -107,7 +105,6 @@ void ConfirmTrade(unsigned char userId);
 void PhysicsLoop();
 void MapObjectLoop();
 void NpcLoop();
-void UserLoop();
 
 int snap_distance = 64;
 
@@ -296,31 +293,11 @@ int main()
 	std::thread physicsThread(PhysicsLoop);
 	std::thread npcThread(NpcLoop);
 	std::thread mapObjectThread(MapObjectLoop);
-	std::thread userThread(UserLoop);
 
-	userThread.join();
 	mapObjectThread.join();
 	npcThread.join();
 	physicsThread.join();
 	return 0;
-}
-
-void UserLoop()
-{
-	while (!SERVER_QUIT)
-	{
-		for (unsigned char userId = 0; userId < MAX_CLIENTS; userId++)
-		{
-			// Ignore socket if it is not connected
-			if (!User[userId].Status)
-				continue;
-
-			network->handleClient(userId);
-		}
-
-		// Sleep a bit
-		OPI_Sleep::microseconds(1);
-	} //end while
 }
 
 bool blocked(unsigned char mapId, float box1_x1, float box1_y1, float box1_x2, float box1_y2, bool npc)
