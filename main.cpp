@@ -30,7 +30,7 @@ bool SERVER_QUIT = false;
 bool a = false;
 /* Ctrl+C in terminal */
 void terminal_quit(int signal){
-	printf("Gracefully shutting down after receiving %i.\n", signal);
+	printf("Gracefully shutting down after receiving signal=%i.\n", signal);
 	SERVER_QUIT = true;
 }
 
@@ -59,7 +59,7 @@ unsigned char hpBar = 25;
 const float GRAVITY = 0.169;
 
 //player walk speed
-const float WALK_SPEED = 3;
+const float WALK_SPEED = 2.5f;
 
 //holiday events TODO use a config not hard coded magic
 unsigned const char HOLIDAY_NPC_DROP = ITEM_EASTER_EGG, HOLIDAY_BOX_DROP = ITEM_BUNNY_EARS;
@@ -99,7 +99,7 @@ void InvitePlayerToTrade(unsigned char userId, unsigned char playerId);
 void AcceptTrade(unsigned char userId);
 void CancelTrade(unsigned char userId);
 void OfferTradeItem(unsigned char userId, unsigned char itemId, unsigned int amount);
-void ConfirmTrade(unsigned char userId); 
+void ConfirmTrade(unsigned char userId);
 
 
 // threads 
@@ -137,7 +137,7 @@ int snap_distance = 64;
 /* CODE */
 int main()
 {
- 	struct sigaction sigIntHandler;
+   struct sigaction sigIntHandler;
    sigIntHandler.sa_handler = terminal_quit;
    sigemptyset(&sigIntHandler.sa_mask);
    sigIntHandler.sa_flags = 0;
