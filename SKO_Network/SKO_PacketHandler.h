@@ -7,7 +7,6 @@
 #include <cstring>
 #include "SKO_PacketParser.h"
 #include "SKO_PacketTypes.h"
-//#include "../SKO_Utilities/SKO_Utilities.h"
 
 // Forward-declare connected classes.
 class SKO_Network;

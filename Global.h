@@ -56,8 +56,4 @@ extern void CancelTrade(unsigned char userId);
 extern void OfferTradeItem(unsigned char userId, unsigned char itemId, unsigned int amount);
 extern void ConfirmTrade(unsigned char userId);
 
-//Utilities
-extern std::string trim(std::string s);
-extern std::string lower(std::string myString);
-
 #endif

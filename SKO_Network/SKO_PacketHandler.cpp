@@ -39,7 +39,7 @@ void SKO_PacketHandler::parseLogin(unsigned char userId, SKO_PacketParser *parse
 void SKO_PacketHandler::parseRegister(unsigned char userId, std::string parameters)
 {
     std::string username = SKO_Utilities::nextParameter(parameters);
-    std::string password = parameters;//do not useSKO_Utilities::nextParameter to get password, just use remaining
+    std::string password = parameters;//do not use nextParameter to get password, just use remaining
     network->attemptRegister(userId, username, password);      
 }
 

@@ -1,5 +1,6 @@
 #include "OPI_MYSQL.h"
-            
+#include "../Global.h"            
+
 void OPI_MYSQL::cleanup()
 { 
 	log("cleanup MYSQL...\n");
@@ -41,10 +42,10 @@ OPI_MYSQL::OPI_MYSQL()
 OPI_MYSQL::~OPI_MYSQL()
 {
 	printf("destructing OPI_MYSQL...\n");
-	delete server;
-	delete user;
-	delete database;
-	delete password;
+	delete[] server;
+	delete[] user;
+	delete[] database;
+	delete[] password;
 }
 
 
@@ -154,7 +155,7 @@ int OPI_MYSQL::query(std::string statement, bool once)
 			{
 				log("Trying to reconnect in Mr. Failed Query if-statement...It didn't work..but I'll wait a second and try again.");
 				OPI_Sleep::seconds(1);
-				if (++reconnectAttempts > 5)
+				if (SERVER_QUIT || ++reconnectAttempts > 5)
 					return 1;
 				
 				Connected = reconnect();
@@ -195,7 +196,6 @@ int OPI_MYSQL::query(std::string statement, bool once)
 
 	      	log("query failed!");
 	      	log("query was [" + statement + "]");
-
 			
 	      	printf("This is dangerous! I must re-try your query!\n");
 			OPI_Sleep::seconds(1);

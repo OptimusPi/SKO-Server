@@ -21,6 +21,8 @@ class SKO_Utilities
     //    parameters: ""
     //   SKO_Utilities::nextParameter: ""
     static std::string nextParameter(std::string &parameters);
+    static std::string trimString(std::string str);
+    static std::string lowerString(std::string myString);
 };
  
 #endif

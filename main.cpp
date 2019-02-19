@@ -12,6 +12,7 @@
 
 #include "SKO_Utilities/OPI_Clock.h"
 #include "SKO_Utilities/OPI_Timestep.h"
+#include "SKO_Utilities/SKO_Utilities.h"
 
 #include "SKO_Game/SKO_Player.h"
 #include "SKO_Game/SKO_Item.h"
@@ -108,30 +109,6 @@ void MapObjectLoop();
 void NpcLoop();
 void UserLoop();
 
-std::string trim(std::string str)
-{
-	std::size_t first = str.find_first_not_of(' ');
-
-	// If there is no non-whitespace character, both first and last will be std::string::npos (-1)
-	// There is no point in checking both, since if either doesn't work, the
-	// other won't work, either.
-	if (first == std::string::npos)
-		return "";
-
-	std::size_t last = str.find_last_not_of(' ');
-
-	std::string returnVal = str.substr(first, last - first + 1);
-	return returnVal;
-}
-
-std::string lower(std::string myString)
-{
-	for (unsigned long int i = 0; i < myString.length(); ++i)
-		myString[i] = std::tolower(myString[i]);
-
-	return myString;
-}
-
 int snap_distance = 64;
 
 /* CODE */
@@ -212,10 +189,10 @@ int main()
 		return 1;
 	}
 
-	databaseHostname = trim(databaseHostname);
-	databaseUsername = trim(databaseUsername);
-	databasePassword = trim(databasePassword);
-	databaseSchema = trim(databaseSchema);
+	databaseHostname = SKO_Utilities::lowerString(databaseHostname);
+	databaseUsername = SKO_Utilities::lowerString(databaseUsername);
+	databasePassword = SKO_Utilities::lowerString(databasePassword);
+	databaseSchema = SKO_Utilities::lowerString(databaseSchema);
 
 	printf("About to connect to database.\n");
 

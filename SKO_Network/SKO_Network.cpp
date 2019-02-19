@@ -1,6 +1,6 @@
 #include "../SKO_Game/SKO_Player.h"
 #include "../SKO_Repository/SKO_Repository.h"
-
+#include "../SKO_Utilities/SKO_Utilities.h"
 #include "SKO_Network.h"
 #include "SKO_PacketTypes.h"
 #include "SKO_PacketFactory.h"
@@ -491,7 +491,7 @@ void SKO_Network::attemptLogin(unsigned char userId, std::string username, std::
     for (int i = 0; i < MAX_CLIENTS; i++)
     {
         //tell the client if you are logged in already
-        if (lower(User[i].Nick).compare(lower(username)) == 0)
+        if (SKO_Utilities::lowerString(User[i].Nick).compare(SKO_Utilities::lowerString(username)) == 0)
         {
             printf("User that is you already is: %s x is %i i is %i\n", User[i].Nick.c_str(), (int)User[i].x, i);
             sendLoginResponse_AlreadyOnline(userId);
@@ -794,7 +794,7 @@ void SKO_Network::warpPlayer(unsigned char userId, std::string username, int x, 
     //find user
     for (int wu = 0; mapId <= NUM_MAPS && wu < MAX_CLIENTS; wu++)
     {
-        if (User[wu].Ident && (lower(User[wu].Nick).compare(lower(username)) == 0))
+        if (User[wu].Ident && (SKO_Utilities::lowerString(User[wu].Nick).compare(SKO_Utilities::lowerString(username)) == 0))
         {
             SKO_Portal *warp_p = new SKO_Portal();
             warp_p->spawn_x = x;
@@ -881,7 +881,7 @@ void SKO_Network::banPlayer(unsigned char userId, std::string username, std::str
 		{
 			sendChat(i, username + " has been banned. (" + reason + ")");
 
-			if (lower(User[i].Nick).compare(lower(username)) == 0)
+			if (SKO_Utilities::lowerString(User[i].Nick).compare(SKO_Utilities::lowerString(username)) == 0)
 				kickPlayer(userId, username, reason);
 		}
 	}
@@ -929,7 +929,7 @@ void SKO_Network::mutePlayer(unsigned char userId, std::string username, std::st
 	for (int i = 0; i < MAX_CLIENTS; i++)
 	{
 		// well, unmute the person
-		if (lower(User[i].Nick).compare(lower(username)) == 0)
+		if (SKO_Utilities::lowerString(User[i].Nick).compare(SKO_Utilities::lowerString(username)) == 0)
 			User[i].Mute = false;
 
 		// well, tell everyone
@@ -943,7 +943,7 @@ bool SKO_Network::isPlayerOnline(std::string username)
 	//check if they are online
 	for (int i = 0; i < MAX_CLIENTS; i++)
 	{
-		if (lower(User[i].Nick).compare(lower(username)) == 0)
+		if (SKO_Utilities::lowerString(User[i].Nick).compare(SKO_Utilities::lowerString(username)) == 0)
 			return true;
 	}
 	return false;
@@ -1003,7 +1003,7 @@ void SKO_Network::kickPlayer(unsigned char userId, std::string username, std::st
 			sendChat(userId, username + " has been kicked. (" + reason + ")");
 
 		//kick the user
-		if (lower(username).compare(lower(User[i].Nick)) == 0)
+		if (SKO_Utilities::lowerString(username).compare(SKO_Utilities::lowerString(User[i].Nick)) == 0)
 		{
 			//Send kick packet
 			User[i].socket->Close();
