@@ -160,7 +160,6 @@ int OPI_MYSQL::query(std::string statement, bool once)
 				
 				Connected = reconnect();
 			}
-			log("\nReconnected finally, now I'll try your damn query.\n");
 		} 
 	
 	    //count is 0;
