@@ -22,7 +22,7 @@ void SKO_PacketHandler::parsePing(unsigned char userId)
 // [PONG]
 void SKO_PacketHandler::parsePong(unsigned char userId)
 {
-    network->receivedPong(userId); 
+    network->receivedPong(userId);
 }
 
 // [LOGIN][<username>][" "][<password>]
@@ -140,17 +140,6 @@ void SKO_PacketHandler::parseTradeInvite(unsigned char userId, SKO_PacketParser 
 // [TRADE][ACCEPT][(unsigned char)playerB]
 void SKO_PacketHandler::parseTradeAccept(unsigned char userId, SKO_PacketParser *parser)
 {
-    unsigned char playerB = User[userId].tradePlayer;
-    if (playerB >= 0 && User[userId].tradeStatus == INVITE && User[playerB].tradeStatus == INVITE)
-    {
-        User[userId].tradeStatus = ACCEPT;
-        User[playerB].tradeStatus = ACCEPT;
-    }
-
-    //Accept trade on both ends
-    network->sendTradeAccept(playerB, userId);
-    network->sendTradeAccept(userId, playerB);
-
     AcceptTrade(userId);
 }
 
@@ -209,87 +198,14 @@ void SKO_PacketHandler::parseTrade(unsigned char userId, SKO_PacketParser *parse
 void SKO_PacketHandler::parsePartyInvite(unsigned char userId, SKO_PacketParser *parser)
 {
     unsigned char playerB = parser->nextByte();
-
-    //invite the other user
-    //if the other user is not in your party
-    if (User[playerB].partyStatus != 0)
-        return;
-        
-    int partyID = User[userId].party;
-
-    //set their party
-    if (User[userId].party == -1)
-    {
-        for (partyID = 0; partyID <= MAX_CLIENTS; partyID++)
-        {
-            //look for an open partyID
-            bool taken = false;
-            for (int i = 0; i < MAX_CLIENTS; i++)
-            {
-                if (User[i].Ident && User[i].party == partyID)
-                {
-                    taken = true;
-                    break;
-                }
-            }
-            if (!taken)
-                break;
-        } //find oepn party id
-    }     //end if party is null
-
-    //make the parties equal
-    User[userId].party = partyID;
-    User[playerB].party = partyID;
-
-    //set the party status of the invited person
-    User[playerB].partyStatus = INVITE;
-    User[userId].partyStatus = ACCEPT;
-
-    //ask the user to party
-    network->sendTradeInvite(playerB, userId);   
+    InvitePlayerToParty(userId, playerB);
 }
 
 // [PARTY][ACCEPT]
 void SKO_PacketHandler::parsePartyAccept(unsigned char userId)
 {
-    //only if I was invited :)
-    if (User[userId].partyStatus != INVITE)
-        return;
-
-    //tell the user about all the players in the party
-    for (int pl = 0; pl < MAX_CLIENTS; pl++)
-    {
-        if (!User[pl].Ident || pl == userId || User[pl].partyStatus != PARTY || User[pl].party != User[userId].party)
-            continue;
-        //
-        // Notify all members in the party that player is joining
-        //
-        network->sendPartyAccept(pl, userId, User[userId].party);
-        //tell existing party members the new player's stats
-        unsigned char hp = (int)((User[userId].hp / (float)User[userId].max_hp) * 80);
-        unsigned char xp = (int)((User[userId].xp / (float)User[userId].max_xp) * 80);
-        unsigned char level = User[userId].level;
-
-        network->sendBuddyStatHp(pl, userId, hp);
-        network->sendBuddyStatXp(pl, userId, xp);
-        network->sendBuddyStatLevel(pl, userId, level);
-
-        //
-        // Notify player of each existing party member
-        //
-        network->sendPartyAccept(userId, pl, User[pl].party);
-        // Send player the current party member stats
-        hp = (int)((User[pl].hp / (float)User[pl].max_hp) * 80);
-        xp = (int)((User[pl].xp / (float)User[pl].max_xp) * 80);
-        level = User[pl].level;
-
-        // Update party stats for client party player list
-        network->sendBuddyStatHp(userId, pl, hp);
-        network->sendBuddyStatXp(userId, pl, xp);
-        network->sendBuddyStatLevel(userId, pl, level);
-    }
-        
-}
+    AcceptPartyInvite(userId);
+} 
 
 // [PARTY][(unsigned char)partyAction]
 void SKO_PacketHandler::parseParty(unsigned char userId, SKO_PacketParser *parser)
@@ -297,7 +213,6 @@ void SKO_PacketHandler::parseParty(unsigned char userId, SKO_PacketParser *parse
     int partyAction = parser->nextByte();
     switch (partyAction)
     {
-
     case INVITE:
         parsePartyInvite(userId, parser);
         break;
@@ -333,7 +248,7 @@ void SKO_PacketHandler::parseClanAccept(unsigned char userId)
 // [CLAN][INVITE][(unsigned char)playerId]
 void SKO_PacketHandler::parseClanInvite(unsigned char userId, SKO_PacketParser *parser)
 {
-    unsigned char playerB = parser->nextByte(); 
+    unsigned char playerB = parser->nextByte();
     network->clanInvite(userId, playerB);
 }
 
@@ -354,8 +269,7 @@ void SKO_PacketHandler::parseClan(unsigned char userId, SKO_PacketParser *parser
         break;
 
     case CANCEL:
-        //quit them out of this clan
-        User[userId].clanStatus = -1;
+        DeclineClanInvite(userId); 
         break;
 
     default:
@@ -373,71 +287,24 @@ void SKO_PacketHandler::parseInventory(unsigned char userId, SKO_PacketParser *p
 // [SHOP][INVITE][(unsigned char)itemId)][(unsigned int)amount]
 void SKO_PacketHandler::parseShopInvite(unsigned char userId, SKO_PacketParser *parser)
 {
-    unsigned char mapId = User[userId].mapId;
     unsigned char stallId = parser->nextByte();
-
-    if (stallId >= map[mapId].num_stalls)
-        return;
-
-    //open bank
-    if (map[mapId].Stall[stallId].shopid == 0)
-    {
-        if (User[userId].tradeStatus < 1)
-        {
-            //set trade status to banking
-            User[userId].tradeStatus = BANK;
-            network->sendBankOpen(userId);
-        }
-    }
-
-    //open shop
-    if (map[mapId].Stall[stallId].shopid > 0)
-    {
-        //tell the user "shop[shopId] opened up"
-        unsigned char shopId = map[mapId].Stall[stallId].shopid;
-        network->sendShopOpen(userId, shopId);
-
-        //set trade status to shopping
-        User[userId].tradeStatus = SHOP;
-        User[userId].tradePlayer = map[mapId].Stall[stallId].shopid;
-    }
-}
+    OpenStall(userId, stallId);
+} 
 
 // [SHOP][BUY][(unsigned char)itemId)][(unsigned int)amount]
 void SKO_PacketHandler::parseShopBuy(unsigned char userId, SKO_PacketParser *parser)
 {
     unsigned char shopItem = parser->nextByte();
     unsigned int amount = parser->nextInt();
-    ShopBuy(userId, shopItem, amount); 
+    ShopBuy(userId, shopItem, amount);
 }
 
 // [SHOP][SELL][(unsigned char)itemId)][(unsigned int)amount]
 void SKO_PacketHandler::parseShopSell(unsigned char userId, SKO_PacketParser *parser)
 {
-    unsigned char item = parser->nextByte();
-    unsigned int price = Item[item].price;
+    unsigned char itemId = parser->nextByte();
     unsigned int amount = parser->nextInt();
-
-    //if they even have the item to sell
-    if (price <= 0 || User[userId].inventory[item] < amount)
-    {
-        network->sendChat(userId, "Sorry, but you cannot sell this item.");
-        return;
-    }
-
-    //take away gold
-    User[userId].inventory[item] -= amount;
-
-    //give them the item
-    User[userId].inventory[ITEM_GOLD] += price * amount;
-
-    //take out of client player's inventory
-    amount = User[userId].inventory[item];
-    network->sendPocketItem(userId, item, amount);
-
-    //put gold into player's inventory
-    amount = User[userId].inventory[ITEM_GOLD];
-    network->sendPocketItem(userId, (char)ITEM_GOLD, amount);
+    ShopSell(userId, itemId, amount);
 }
 
 // [SHOP][(unsigned char)shopAction)][...]
@@ -473,49 +340,17 @@ void SKO_PacketHandler::parseShop(unsigned char userId, SKO_PacketParser *parser
 void SKO_PacketHandler::parseBankDeposit(unsigned char userId, SKO_PacketParser *parser)
 {
     //get item type and amount
-    unsigned char item = parser->nextByte();
+    unsigned char itemId = parser->nextByte();
     unsigned int amount = parser->nextInt();
-
-    if (item >= NUM_ITEMS || User[userId].inventory[item] < amount)
-    {
-        network->sendChat(userId, "Sorry, but you may cannot deposit this item.");
-        return;
-    }
-
-    User[userId].inventory[item] -= amount;
-    User[userId].bank[item] += amount;
-
-    //send deposit notification to user
-    unsigned int deposit = User[userId].bank[item];
-    network->sendBankItem(userId, item, deposit);
-
-    //update client player's inventory
-    unsigned int withdrawal = User[userId].inventory[item];
-    network->sendPocketItem(userId, item, withdrawal);
+    DepositBankItem(userId, itemId, amount);      
 }
 
 // [BANK][DEBANK_ITEM][(unsigned char)itemId)][(unsigned int)amount]
 void SKO_PacketHandler::parseBankWithdrawal(unsigned char userId, SKO_PacketParser *parser)
 {
-    unsigned char item = parser->nextByte();
+    unsigned char itemId = parser->nextByte();
     unsigned int amount = parser->nextInt();
-
-    if (item >= NUM_ITEMS || User[userId].bank[item] < amount)
-    {
-        network->sendChat(userId, "Sorry, but you cannot withdrawal this item.");
-        return;
-    }
-    
-    User[userId].bank[item] -= amount;
-    User[userId].inventory[item] += amount;
-
-    //send deposit notification to user
-    unsigned int deposit = User[userId].bank[item];
-    network->sendBankItem(userId, item, deposit);
-
-    //update client player's inventory
-    unsigned int withdrawal = User[userId].inventory[item];
-    network->sendPocketItem(userId, item, withdrawal);
+    WithdrawalBankItem(userId, itemId, amount);
 }
 
 // [BANK][(unsigned char)bankAction]

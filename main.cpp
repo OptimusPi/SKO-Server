@@ -99,7 +99,12 @@ void AcceptTrade(unsigned char userId);
 void CancelTrade(unsigned char userId);
 void OfferTradeItem(unsigned char userId, unsigned char itemId, unsigned int amount);
 void ConfirmTrade(unsigned char userId);
-
+void InvitePlayerToParty(unsigned char userId, unsigned char playerB);
+void AcceptPartyInvite(unsigned char userId);
+void ShopSell(unsigned char userId, unsigned char itemId, unsigned int amount);
+void DepositBankItem(unsigned char userId, unsigned char itemId, unsigned int amount);
+void WithdrawalBankItem(unsigned char userId, unsigned char itemId, unsigned int amount);
+void DeclineClanInvite(unsigned char userId);
 
 // threads 
 void PhysicsLoop();
@@ -2148,6 +2153,32 @@ void EnemyHit(unsigned char enemyId, unsigned char mapId, unsigned char userId)
 	}
 }
 
+void ShopSell(unsigned char userId, unsigned char itemId, unsigned int amount)
+{
+    unsigned int price = Item[itemId].price;
+
+    //if they even have the item to sell
+    if (price <= 0 || User[userId].inventory[itemId] < amount)
+    {
+        network->sendChat(userId, "Sorry, but you cannot sell this item.");
+        return;
+    }
+
+    //take away gold
+    User[userId].inventory[itemId] -= amount;
+
+    //give them the item
+    User[userId].inventory[ITEM_GOLD] += price * amount;
+
+    //take out of client player's inventory
+    amount = User[userId].inventory[itemId];
+    network->sendPocketItem(userId, itemId, amount);
+
+    //put gold into player's inventory
+    amount = User[userId].inventory[ITEM_GOLD];
+    network->sendPocketItem(userId, (char)ITEM_GOLD, amount);
+}
+
 void ShopBuy(unsigned char userId, unsigned char shopItem, unsigned int amount) 
 {
 	int i = 0, item = 0, price = 0;
@@ -2581,6 +2612,47 @@ void DropItem(unsigned char userId, unsigned char itemId, unsigned int amount)
     }
 }
 
+void InvitePlayerToParty(unsigned char userId, unsigned char playerB)
+{
+    //invite the other user
+    //if the other user is not in your party
+    if (User[playerB].partyStatus != 0)
+        return;
+        
+    int partyID = User[userId].party;
+
+    //set their party
+    if (User[userId].party == -1)
+    {
+        for (partyID = 0; partyID <= MAX_CLIENTS; partyID++)
+        {
+            //look for an open partyID
+            bool taken = false;
+            for (int i = 0; i < MAX_CLIENTS; i++)
+            {
+                if (User[i].Ident && User[i].party == partyID)
+                {
+                    taken = true;
+                    break;
+                }
+            }
+            if (!taken)
+                break;
+        } //find open party id
+    } //end if party is null
+
+    //make the parties equal
+    User[userId].party = partyID;
+    User[playerB].party = partyID;
+
+    //set the party status of the invited person
+    User[playerB].partyStatus = INVITE;
+    User[userId].partyStatus = ACCEPT;
+
+    //ask the user to party
+    network->sendTradeInvite(playerB, userId);
+}
+
 void InvitePlayerToTrade(unsigned char userId, unsigned char playerId)
 {
 	if (playerId >= MAX_CLIENTS || playerId == userId || !User[playerId].Ident)
@@ -2783,4 +2855,127 @@ void ConfirmTrade(unsigned char userId)
 
     //Save all profiles after a trade
     network->saveAllProfiles();
+}
+
+void AcceptPartyInvite(unsigned char userId)
+{
+	//only if I was invited :)
+    if (User[userId].partyStatus != INVITE)
+        return;
+
+    //tell the user about all the players in the party
+    for (int pl = 0; pl < MAX_CLIENTS; pl++)
+    {
+        if (!User[pl].Ident || pl == userId || User[pl].partyStatus != PARTY || User[pl].party != User[userId].party)
+            continue;
+        //
+        // Notify all members in the party that player is joining
+        //
+        network->sendPartyAccept(pl, userId, User[userId].party);
+        //tell existing party members the new player's stats
+        unsigned char hp = (int)((User[userId].hp / (float)User[userId].max_hp) * 80);
+        unsigned char xp = (int)((User[userId].xp / (float)User[userId].max_xp) * 80);
+        unsigned char level = User[userId].level;
+
+        network->sendBuddyStatHp(pl, userId, hp);
+        network->sendBuddyStatXp(pl, userId, xp);
+        network->sendBuddyStatLevel(pl, userId, level);
+
+        //
+        // Notify player of each existing party member
+        //
+        network->sendPartyAccept(userId, pl, User[pl].party);
+        // Send player the current party member stats
+        hp = (int)((User[pl].hp / (float)User[pl].max_hp) * 80);
+        xp = (int)((User[pl].xp / (float)User[pl].max_xp) * 80);
+        level = User[pl].level;
+
+        // Update party stats for client party player list
+        network->sendBuddyStatHp(userId, pl, hp);
+        network->sendBuddyStatXp(userId, pl, xp);
+        network->sendBuddyStatLevel(userId, pl, level);
+    }
+}
+
+void OpenStall(unsigned char userId, unsigned char stallId)
+{
+    unsigned char mapId = User[userId].mapId;
+
+	//Only continue if this is a valid stallId
+    if (stallId >= map[mapId].num_stalls)
+	{
+        return;
+	}
+
+	// Do not use stalls when a stall is currently open, or 
+	if (User[userId].tradeStatus > 0)
+	{
+		return;
+	}
+
+    //open bank
+    if (map[mapId].Stall[stallId].shopId == 0)
+    {
+		//set trade status to banking
+		User[userId].tradeStatus = BANK;
+		network->sendBankOpen(userId);
+    }
+
+    //open shop
+    if (map[mapId].Stall[stallId].shopId > 0)
+    {
+        //tell the user "shop[shopId] opened up"
+        unsigned char shopId = map[mapId].Stall[stallId].shopId;
+        network->sendShopOpen(userId, shopId);
+
+        //set trade status to shopping
+        User[userId].tradeStatus = SHOP;
+        User[userId].tradePlayer = map[mapId].Stall[stallId].shopId;
+    }
+}
+
+void DepositBankItem(unsigned char userId, unsigned char itemId, unsigned int amount)
+{
+	if (itemId >= NUM_ITEMS || User[userId].inventory[itemId] < amount)
+    {
+        network->sendChat(userId, "Sorry, but you may cannot deposit this item.");
+        return;
+    }
+
+    User[userId].inventory[itemId] -= amount;
+    User[userId].bank[itemId] += amount;
+
+    //send deposit notification to user
+    unsigned int deposit = User[userId].bank[itemId];
+    network->sendBankItem(userId, itemId, deposit);
+
+    //update client player's inventory
+    unsigned int withdrawal = User[userId].inventory[itemId];
+    network->sendPocketItem(userId, itemId, withdrawal);
+}
+
+void WithdrawalBankItem(unsigned char userId, unsigned char itemId, unsigned int amount)
+{
+    if (itemId >= NUM_ITEMS || User[userId].bank[itemId] < amount)
+    {
+        network->sendChat(userId, "Sorry, but you cannot withdrawal this item.");
+        return;
+    }
+    
+    User[userId].bank[itemId] -= amount;
+    User[userId].inventory[itemId] += amount;
+
+    //send deposit notification to user
+    unsigned int deposit = User[userId].bank[itemId];
+    network->sendBankItem(userId, itemId, deposit);
+
+    //update client player's inventory
+    unsigned int withdrawal = User[userId].inventory[itemId];
+    network->sendPocketItem(userId, itemId, withdrawal);
+}
+
+void DeclineClanInvite(unsigned char userId)
+{
+	//quit them out of this clan
+    User[userId].clanStatus = 0;
 }

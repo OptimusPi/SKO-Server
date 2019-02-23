@@ -7,7 +7,7 @@ SKO_Stall::SKO_Stall()
     y = 0;
     w = 0;
     h = 0;
-    shopid = 0;
+    shopId = 0;
 }
 
 //alternate constructor
@@ -17,6 +17,6 @@ SKO_Stall::SKO_Stall(int shopid_in, int x_in, int y_in, int w_in, int h_in)
     y = y_in;
     w = w_in;
     h = h_in;
-    shopid = shopid_in;
+    shopId = shopid_in;
 }
 

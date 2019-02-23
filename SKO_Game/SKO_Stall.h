@@ -14,9 +14,9 @@ class SKO_Stall
       
             
       //is it a shop?
-      int shopid;
+      int shopId;
       
-      SKO_Stall(int shopid, int x_in, int y_in, int w_in, int h_in);
+      SKO_Stall(int shopId, int x_in, int y_in, int w_in, int h_in);
       SKO_Stall();
 };
 

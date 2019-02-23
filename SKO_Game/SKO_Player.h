@@ -93,11 +93,27 @@ class SKO_Player
         unsigned char mapId;
 
         //trading
+        //todo use this enum
+        enum class tradingStatus {
+            NotSet = 0,
+            Banking = 1,
+            Shopping = 2,
+            InvitePlayerTrade = 3,
+            AcceptPlayerTrade = 4,
+            ConfirmPlayerTrade = 5
+        };
+
         int tradeStatus;
         int tradePlayer;
         unsigned int localTrade[256];
 
         //clan
+        enum class clanStatuses {
+            NotSet = 0, 
+            Invite = 1,
+            Assigned = 2
+        };
+
         int clanStatus;
         int clanPlayer;
         //party

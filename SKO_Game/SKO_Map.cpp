@@ -324,7 +324,7 @@ SKO_Map::SKO_Map (std::string FileName)
 		 std::string stallStr = ss1.str();
 
 		 Stall[i] = SKO_Stall();
-		 Stall[i].shopid = configFile.GetInteger(stallStr, "shopId", 0);
+		 Stall[i].shopId = configFile.GetInteger(stallStr, "shopId", 0);
 		 Stall[i].x      = configFile.GetInteger(stallStr, "x", 0);
 		 Stall[i].y      = configFile.GetInteger(stallStr, "y", 0);
 		 Stall[i].w      = configFile.GetInteger(stallStr, "w", 0);

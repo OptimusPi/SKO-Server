@@ -55,5 +55,12 @@ extern void AcceptTrade(unsigned char userId);
 extern void CancelTrade(unsigned char userId);
 extern void OfferTradeItem(unsigned char userId, unsigned char itemId, unsigned int amount);
 extern void ConfirmTrade(unsigned char userId);
+extern void InvitePlayerToParty(unsigned char userId, unsigned char playerB);
+extern void AcceptPartyInvite(unsigned char userId);
+extern void OpenStall(unsigned char userId, unsigned char stallId);
+extern void ShopSell(unsigned char userId, unsigned char itemId, unsigned int amount);
+extern void DepositBankItem(unsigned char userId, unsigned char itemId, unsigned int amount);
+extern void WithdrawalBankItem(unsigned char userId, unsigned char itemId, unsigned int amount);
+extern void DeclineClanInvite(unsigned char userId);
 
 #endif
