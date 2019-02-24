@@ -269,7 +269,7 @@ void SKO_PacketHandler::parseClan(unsigned char userId, SKO_PacketParser *parser
         break;
 
     case CANCEL:
-        DeclineClanInvite(userId); 
+        DeclineClanInvite(userId);
         break;
 
     default:

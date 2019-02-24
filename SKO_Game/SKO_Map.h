@@ -17,11 +17,6 @@
 
 #define MAX_TILES 32768
 
-//shop type
-#define SHOP_BANK 0
-#define SHOP_FOOD 1
-#define SHOP_WEAPONS 2
-
 class SKO_Map
 {
       public:
