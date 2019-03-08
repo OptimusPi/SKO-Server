@@ -492,6 +492,18 @@ void SKO_PacketHandler::parsePacket(unsigned char userId, std::string packet)
         parseClanCreate(userId, parser);
         break;
  
+    case STAT_HP:
+        parseStatHp(userId);
+        break;
+
+    case STAT_DEF:
+        parseStatDef(userId);
+        break;
+
+    case STAT_STR:
+        parseStatStr(userId);
+        break;
+
     default:
         // Disconnect clients sending nonsense packets
         //TODO//User[userId].socket->Close();
