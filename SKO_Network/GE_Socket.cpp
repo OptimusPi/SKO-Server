@@ -109,7 +109,7 @@ int GE_Socket::GetStatus2()
 } 
  
 int GE_Socket::GetStatus() 
-{ 
+{
     if( Connected == false ) { 
        printf("GetStatus() says Connected == false. Returning GE_SOCKET_ERROR\n"); 
        return GE_Socket_Error; 
@@ -245,10 +245,10 @@ int GE_Socket::Send(std::string in_Data)
 		printf("getStatus returns this: [%i]\n", GetStatus()); 
 		Close(); 
 		 
-		return (int)GE_Socket_Error; 
+		return GE_Socket_Error; 
 	}     
  
-	return (int)GE_Socket_OK; 
+	return GE_Socket_OK; 
 } 
  
  
@@ -272,17 +272,17 @@ int GE_Socket::Recv()
         { 
             perror("recv failed,\n[Connection has gracefully been closed]");
             Close(); 
-            return (int)GE_Socket_Error;   
+            return GE_Socket_Error;   
         } 
         else 
         { 
             perror("recv failed for an unexpected reason.");
             printf("recv error ID: %i\n", iResult); 
             Close(); 
-            return (int)GE_Socket_Error; 
+            return GE_Socket_Error; 
         } 
     }         
          
-    return (int)GE_Socket_OK; 
+    return GE_Socket_OK; 
 } 
 

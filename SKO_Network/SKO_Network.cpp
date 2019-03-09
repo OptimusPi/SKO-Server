@@ -27,7 +27,7 @@ SKO_Network::SKO_Network(SKO_Repository *repository, int port, unsigned long int
 
 //Initialize threads and Start listening for connections
 std::string SKO_Network::startup()
-{ 
+{
 	// Bind the given port
 	if (!this->listenSocket->Create(port))
 		return "Failed to bind to port " + std::to_string(port);
@@ -98,14 +98,14 @@ void SKO_Network::saveAllProfiles()
 		printf("Saved %i players.\nsavePaused is %i\n", numSaved, (int)this->pauseSavingStatus);
 	}
 
-	int numPlayers = (playersLinux + playersWindows + playersMac);
+	unsigned int numPlayers = (playersLinux + playersWindows + playersMac);
 
 	printf("number of players: %i, average ping: %i\n", numPlayers, averagePing);
 
 	if (!this->pauseSavingStatus)
 	{
 		if (numPlayers > 0)
-			averagePing = (int)(averagePing / numPlayers);
+			averagePing = averagePing / numPlayers;
 
 		repository->saveServerStatus(playersLinux, playersWindows, playersMac, averagePing);
 	}
@@ -146,102 +146,108 @@ void SKO_Network::sendVersionSuccess(unsigned char userId)
 	send(User[userId].socket, VERSION_SUCCESS);
 }
 
+
+void SKO_Network::verifyVersionLoop()
+{
+	// Wait for users to authenticate
+	for (unsigned char userId = 0; userId < MAX_CLIENTS; userId++)
+	{
+		//check Queue
+		if (!User[userId].Queue)
+			continue;
+
+		printf("User[%i] is waiting in Queue...\n", userId);
+
+		//receive
+		if (User[userId].socket->Recv() & GE_Socket_OK)
+		{
+			std::string packet = User[userId].socket->data;
+			printf("A client is trying to connect...\n");
+			printf("data.length() = [%i]\n", (int)packet.length());
+
+			//if you got anything
+			if (packet.length() >= 6)
+			{
+				SKO_PacketParser *parser = new SKO_PacketParser(packet);
+
+				// [VERSION_CHECK][(unsigned char)version_major][(unsigned char)version_minor][(unsigned char)version_patch][(unsigned char)version_os]
+				if (parser->getPacketType() == VERSION_CHECK)
+				{
+					unsigned char versionMajor = parser->nextByte();
+					unsigned char versionMinor = parser->nextByte();
+					unsigned char versionPatch = parser->nextByte();
+					unsigned char versionOS    = parser->nextByte();
+
+					if (versionMajor == VERSION_MAJOR && versionMinor == VERSION_MINOR && versionPatch == VERSION_PATCH)
+					{
+						printf("Correct version!\n");
+						User[userId].socket->data = "";
+						User[userId].Status = true;
+						User[userId].Queue = false;
+						sendVersionSuccess(userId);
+						printf("Queue Time: \t%llu\n", User[userId].QueueTime);
+						printf("Current Time: \t%llu\n", OPI_Clock::milliseconds());
+
+						//operating system statistics
+						User[userId].OS = versionOS;
+					}
+					else //not correct version
+					{
+						send(User[userId].socket, VERSION_FAIL);
+						printf("error, packet code failed on VERSION_CHECK see look:\n");
+						printf(">>>[read values] VERSION_MAJOR: %i VERSION_MINOR: %i VERSION_PATCH: %i VERSION_OS: %i\n",
+								versionMajor, versionMinor, versionPatch, versionOS);
+						printf(">>>[expected values] VERSION_MAJOR: %i VERSION_MINOR: %i VERSION_PATCH: %i\n",
+								VERSION_MAJOR, VERSION_MINOR, VERSION_PATCH);
+						User[userId].Queue = false;
+						User[userId].socket->Close();
+						User[userId] = SKO_Player();
+					}
+				}
+				else //not correct packet type...
+				{
+					printf(kRed "[FATAL] Client sent wrong packet type during version check!\n" kNormal);
+
+					for (unsigned int i = 0; i < User[userId].socket->data.length(); i++)
+					{
+						printf("[%i]", User[userId].socket->data[i]);
+					}
+					printf("\n");
+
+					send(User[userId].socket, VERSION_FAIL);
+					printf("error, packet code failed on VERSION_CHECK (2)\n");
+					User[userId].Queue = false;
+					User[userId].socket->Close();
+				}
+			}
+		}
+		else // Recv returned error!
+		{
+			User[userId].Queue = false;
+			User[userId].Status = false;
+			User[userId].Ident = false;
+			User[userId].socket->Close();
+			User[userId] = SKO_Player();
+			printf("*\n**\n*\nQUE FAIL! (Recv returned error) IP IS %s*\n**\n*\n\n", User[userId].socket->IP.c_str());
+		}
+
+		//didn't recv anything, don't kill unless it's too long
+		if (OPI_Clock::milliseconds() - User[userId].QueueTime >= this->queueLimitHealthyMs)
+		{
+			User[userId].Queue = false;
+			User[userId].socket->Close();
+			printf("Closing socket %i for timeout.\n", userId);
+			printf("*\n**\n*\nQUE FAIL! IP IS %s*\n**\n*\n\n", User[userId].socket->IP.c_str());
+		}
+	} //end for loop
+}
+
 //TODO refactor into different functions, handle authentication in the socket class.
 void SKO_Network::ConnectionLoop()
 {
 	while (!SERVER_QUIT)
 	{
-		// Wait for users to authenticate
-		for (unsigned char userId = 0; userId < MAX_CLIENTS; userId++)
-		{
-			//check Queue
-			if (!User[userId].Queue)
-				continue;
 
-			printf("User is waiting in Queue...");
-
-			//receive
-			if (User[userId].socket->Recv() & GE_Socket_OK)
-			{
-				std::string packet = User[userId].socket->data;
-				printf("A client is trying to connect...\n");
-				printf("data.length() = [%i]\n", (int)packet.length());
-
-				//if you got anything
-				if (packet.length() >= 6)
-				{
-					SKO_PacketParser *parser = new SKO_PacketParser(packet);
-
-					// [VERSION_CHECK][(unsigned char)version_major][(unsigned char)version_minor][(unsigned char)version_patch][(unsigned char)version_os]
-					if (parser->getPacketType() == VERSION_CHECK)
-					{
-						unsigned char versionMajor = parser->nextByte();
-						unsigned char versionMinor = parser->nextByte();
-						unsigned char versionPatch = parser->nextByte();
-						unsigned char versionOS    = parser->nextByte();
-
-						if (versionMajor == VERSION_MAJOR && versionMinor == VERSION_MINOR && versionPatch == VERSION_PATCH)
-						{
-							printf("Correct version!\n");
-							User[userId].socket->data = "";
-							User[userId].Status = true;
-							User[userId].Queue = false;
-							sendVersionSuccess(userId);
-							printf("Queue Time: \t%llu\n", User[userId].QueueTime);
-							printf("Current Time: \t%llu\n", OPI_Clock::milliseconds());
-
-							//operating system statistics
-							User[userId].OS = versionOS;
-						}
-						else //not correct version
-						{
-							send(User[userId].socket, VERSION_FAIL);
-							printf("error, packet code failed on VERSION_CHECK see look:\n");
-							printf(">>>[read values] VERSION_MAJOR: %i VERSION_MINOR: %i VERSION_PATCH: %i VERSION_OS: %i\n",
-								  versionMajor, versionMinor, versionPatch, versionOS);
-							printf(">>>[expected values] VERSION_MAJOR: %i VERSION_MINOR: %i VERSION_PATCH: %i\n",
-								   VERSION_MAJOR, VERSION_MINOR, VERSION_PATCH);
-							User[userId].Queue = false;
-							User[userId].socket->Close();
-							User[userId] = SKO_Player();
-						}
-					}
-					else //not correct packet type...
-					{
-						printf("Here is the back packet! ");
-
-						for (unsigned int i = 0; i < User[userId].socket->data.length(); i++)
-						{
-							printf("[%i]", User[userId].socket->data[i]);
-						}
-						printf("\n");
-
-						send(User[userId].socket, VERSION_FAIL);
-						printf("error, packet code failed on VERSION_CHECK (2)\n");
-						User[userId].Queue = false;
-						User[userId].socket->Close();
-					}
-				}
-			}
-			else // Recv returned error!
-			{
-				User[userId].Queue = false;
-				User[userId].Status = false;
-				User[userId].Ident = false;
-				User[userId].socket->Close();
-				User[userId] = SKO_Player();
-				printf("*\n**\n*\nQUE FAIL! (Recv returned error) IP IS %s*\n**\n*\n\n", User[userId].socket->IP.c_str());
-			}
-
-			//didn't recv anything, don't kill unless it's too long
-			if (OPI_Clock::milliseconds() - User[userId].QueueTime >= 500)
-			{
-				User[userId].Queue = false;
-				User[userId].socket->Close();
-				printf("Closing socket %i for timeout.\n", userId);
-				printf("*\n**\n*\nQUE FAIL! IP IS %s*\n**\n*\n\n", User[userId].socket->IP.c_str());
-			}
-		} //end for loop
 
 		// Handle all authenticated clients
 		for (unsigned char userId = 0; userId < MAX_CLIENTS; userId++)
@@ -258,21 +264,17 @@ void SKO_Network::ConnectionLoop()
 
 			if (User[userId].pingWaiting)
 			{
-				int ping = OPI_Clock::milliseconds() - User[userId].pingTicker;
-
-				//TODO set limit for ping
-				if (ping > 60000)
+				unsigned long long int ping = OPI_Clock::milliseconds() - User[userId].pingTicker;
+				if (ping > this->pingLimitHealthyMs)
 				{
 					printf("\e[31;0mClosing socket based on ping greater than one minute.\e[m\n");
 					User[userId].socket->Close();
 				}
-			} //end pingWaiting
+			}
 			else
 			{
-				//send ping waiting again if its been more than a second
-				if (OPI_Clock::milliseconds() - User[userId].pingTicker > 1000)
+				if (OPI_Clock::milliseconds() - User[userId].pingTicker > this->pingCheckIntervalMs)
 				{
-					//time to ping them.
 					send(User[userId].socket, PING);
 					User[userId].pingWaiting = true;
 					User[userId].pingTicker = OPI_Clock::milliseconds();
@@ -281,7 +283,7 @@ void SKO_Network::ConnectionLoop()
 		}
 
 		// If there is someone trying to connect
-		if (listenSocket->GetStatus2() & (int)GE_Socket_Read)
+		if (listenSocket->GetStatus2() & GE_Socket_Read)
 		{
 			printf(kGreen "Incoming socket connection...\n" kNormal);
 			// Declare a temp int
@@ -1245,7 +1247,7 @@ void SKO_Network::sendWho(unsigned char userId)
     for (int i = 0; i < MAX_CLIENTS; i++)
     {
         //if socket is taken
-        //TODO remove "Paladin" and use a "SKO_Player::hidden flag
+        //TODO remove "Paladin" and use flag: SKO_Player::hidden
         if (User[i].Ident && User[i].Nick.compare("Paladin") != 0)
         {
             players++;

@@ -13,10 +13,9 @@
 #include <string>
 #include <thread>
 #include "../SKO_Repository/SKO_Repository.h"
-//#include "../SKO_Utilities/SKO_Utilities.h"
 #include "../SKO_Utilities/OPI_Clock.h"
 #include "../SKO_Utilities/OPI_Sleep.h"
-#include "SKO_PacketHandler.h" 
+#include "SKO_PacketHandler.h"
 #include "../SKO_Game/SKO_item_defs.h"
 #include "GE_Socket.h"
 #include <mutex>
@@ -139,6 +138,11 @@ public:
 	// Bind to this port and accept incoming connections.
 	unsigned int port = 0;
 
+	// Kick users when their ping exceeds this many milliseconds
+	unsigned long long int pingLimitHealthyMs = 10000; 
+	unsigned long long int pingCheckIntervalMs = 1000; 
+	unsigned long long int queueLimitHealthyMs = 2000; 
+
 	// Allow only one save call at a time.
 	std::mutex saveMutex;
 
@@ -178,6 +182,7 @@ public:
 	void killEnemy(unsigned char mapId, int enemy);
 	void giveLoot(int enemy, int player);
 	void giveXP(unsigned char userId, int xp);
+	void verifyVersionLoop();
 
     // Socket send (variadic arguments)
 	template<typename First, typename ... Rest>
