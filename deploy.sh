@@ -10,14 +10,14 @@ color2='\033[1;34m'
 done='\033[1;0m'
 sleep 1
 
-# Map Data Files
+# Map data Files
 echo -e -n "${color}Copying map files .."
-cp *.map ..
+cp SKO_Content/*.map ..SKO_Content/
 echo -e "${color}. Done!"
 
 # Map Configuration Files
 echo -e -n "${color}Copying map config files .."
-cp map*.ini ..
+cp SKO_Content/map*.ini ../SKO_Content/
 echo -e "${color}. Done!"
 sleep 1
 
