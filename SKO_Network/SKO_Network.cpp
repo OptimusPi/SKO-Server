@@ -430,6 +430,18 @@ void SKO_Network::send(GE_Socket *socket, First const &first, Rest const &... re
 
 void SKO_Network::disconnectClient(unsigned char userId)
 {
+	// Tell all other players userId left the game
+	if (User[userId].Ident)
+	{
+		for (int i = 0; i < MAX_CLIENTS; i++)
+		{
+			if (User[i].Ident && i != userId)
+			{
+				send(User[i].socket, EXIT, userId);
+			}
+		}		
+	}
+
 	User[userId].Ident = false;
 	User[userId].socket->Close();
 	User[userId].socket->Connected = false;
@@ -443,15 +455,6 @@ void SKO_Network::disconnectClient(unsigned char userId)
 	// save data for all connected players
 	if (User[userId].Save)
 		saveAllProfiles();
-
-	// Tell all other players userId left the game
-	for (int i = 0; i < MAX_CLIENTS; i++)
-	{
-		if (User[i].Ident && i != userId)
-		{
-			send(User[i].socket, EXIT, userId);
-		}
-	}
 
 	printf("resetting trade statuses...\n");
 
@@ -682,16 +685,20 @@ void SKO_Network::attemptLogin(unsigned char userId, std::string username, std::
 	// inform all players
 	for (unsigned char i = 0; i < MAX_CLIENTS; i++)
 	{
-		// Tell the new user about existing players
-		if (i == userId && User[i].Nick.compare("Paladin") != 0)
+		if (!User[i].Ident || User[i].Nick.compare("Paladin") == 0)
+			continue;
+
+		// Do this check so the newly-joined user does not hear about themselves twice..
+		if (i != userId)
 		{
+			// Tell the new user about existing players
+			printf("Telling %s that %s is online.\n", User[i].Nick.c_str(), User[userId].Nick.c_str());
 			sendPlayerJoin(userId, i);
 		}
+
 		// Tell existing players about new user
-		else if (User[i].Ident)
-		{
-			sendPlayerJoin(i, userId);
-		}
+		printf("Telling %s that %s is online.\n", User[i].Nick.c_str(), User[userId].Nick.c_str());
+		sendPlayerJoin(i, userId);
 	}
 
 	// Trigger loading complete on client.
