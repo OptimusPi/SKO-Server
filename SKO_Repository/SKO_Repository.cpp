@@ -179,13 +179,6 @@ int SKO_Repository::loadPlayerData(unsigned char userId)
 			{
 				//grab an item from the row
 				User[userId].inventory[i] = database->getInt(i + 1);
-
-				//you have to up the index and stop at 24 items
-				if (User[userId].inventory[i] > 0)
-					User[userId].inventory_index++;
-
-				if (User[userId].inventory_index > 23)
-					break;
 			}
 		}
 		else
@@ -193,6 +186,8 @@ int SKO_Repository::loadPlayerData(unsigned char userId)
 			//fuck, it didn't load the data. KILL THIS SHIT NOW BEFORE IT DELETES THEIR DATA
 			return 1;
 		}
+
+		printf("After loading, inventory_index is: %i\n", User[userId].inventory_index);
 
 		sql = "SELECT * FROM bank WHERE player_id LIKE '";
 		sql += database->clean(player_id);
