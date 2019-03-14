@@ -477,6 +477,7 @@ void SKO_Network::disconnectClient(unsigned char userId)
 
 	printf("[DISCONNECT] User[%i].Clear() called.\n", userId);
 }
+
 void SKO_Network::attemptRegister(unsigned char userId, std::string username, std::string password)
 {
     //try to create new player account
