@@ -65,8 +65,8 @@ const float GRAVITY = 0.169;
 const float WALK_SPEED = 2.5f;
 
 //holiday events TODO use a config not hard coded magic
-unsigned const char HOLIDAY_NPC_DROP = ITEM_EASTER_EGG, HOLIDAY_BOX_DROP = ITEM_BUNNY_EARS;
-const bool HOLIDAY = false;
+unsigned const char HOLIDAY_NPC_DROP = ITEM_CHERRY_PI, HOLIDAY_BOX_DROP = ITEM_NERD_GLASSES;
+const bool HOLIDAY = true;
 
 bool blocked(unsigned char mapId, float box1_x1, float box1_y1, float box1_x2, float box1_y2, bool npc);
 
