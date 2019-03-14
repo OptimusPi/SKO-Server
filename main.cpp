@@ -1967,8 +1967,10 @@ void PocketItem(unsigned char userId, unsigned char itemId, unsigned int amount)
 	// If it's a new item, increase the count of held items for the player
 	if (User[userId].inventory[itemId] == 0 && amount > 0)
 		User[userId].inventory_index++;
+	
+	printf("PocketItem: User has inventory_index of: %i\n", User[userId].inventory_index);
 
-	// If the item was removed fromt he player's inventory, decrease inventory index
+	// If the item was removed from the player's inventory, decrease inventory index
 	if (User[userId].inventory[itemId] > 0 && amount == 0)
 		User[userId].inventory_index--;
 
@@ -2329,6 +2331,8 @@ void EquipWeapon(unsigned char userId, unsigned char itemId)
 	{
 		User[userId].inventory[otherItem]++;
 		User[userId].inventory_index++;
+		printf("EquipWeapon: User has inventory_index of: %i\n", User[userId].inventory_index);
+
 		unsigned int amount = User[userId].inventory[otherItem];
 		network->sendPocketItem(userId, otherItem, amount);
 	}
@@ -2360,6 +2364,7 @@ void EquipHat(unsigned char userId, unsigned char itemId)
 	{
 		User[userId].inventory[otherItem]++;
 		User[userId].inventory_index++;
+		printf("EquipHat: User has inventory_index of: %i\n", User[userId].inventory_index);
 		unsigned int amount = User[userId].inventory[otherItem];
 		network->sendPocketItem(userId, otherItem, amount);
 	}
@@ -2481,6 +2486,7 @@ void EquipTrophy(unsigned char userId, unsigned char itemId)
 	{
 		User[userId].inventory[otherItem]++;
 		User[userId].inventory_index++;
+		printf("EquipTrophy: User has inventory_index of: %i\n", User[userId].inventory_index);
 		unsigned int amount = User[userId].inventory[otherItem];
 		network->sendPocketItem(userId, otherItem, amount);
 	}

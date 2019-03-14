@@ -1232,8 +1232,10 @@ void SKO_Network::sendWho(unsigned char userId)
     else
         sprintf(strPlayers, "There are %i players online: ", players);
 
-    if (players > 0)
+    if (players > 0) {
         sendChat(userId, strPlayers);
+		sendChat(userId, strNicks);
+	}
 }
 void SKO_Network::sendChat(unsigned char userId, std::string message)
 {
