@@ -614,6 +614,7 @@ void SKO_Network::attemptLogin(unsigned char userId, std::string username, std::
 		if (amount > 0)
 		{
 			User[userId].inventory_index++;
+			printf("Loading Character: User has inventory_index of: %i\n", User[userId].inventory_index);
 			sendPocketItem(userId, i, amount);
 		}
 

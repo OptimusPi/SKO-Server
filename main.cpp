@@ -1100,6 +1100,7 @@ void itemPhysics(unsigned char mapId)
 
 				if (box1_x2 > box2_x1 && box1_x1 < box2_x2 && box1_y2 > box2_y1 && box1_y1 < box2_y2)
 				{
+					printf("User has inventory_index of: %i\n", User[c].inventory_index);
 					//if user doesnt have it, can only pick up if they dont have a full inventory
 					if (User[c].inventory[itemId] != 0 || User[c].inventory_index <= 23)
 					{
@@ -1107,10 +1108,10 @@ void itemPhysics(unsigned char mapId)
 						unsigned int amount = map[mapId].ItemObj[i].amount + User[c].inventory[itemId];
 						PocketItem(c, itemId, amount);
 					} //end else not inventory full (you can pick up)
-					//else
-					//{
-					//	printf("Not picking up item because: inventory:%i and inventory_index:%i \n", User[c].inventory[itemId], User[c].inventory_index);
-					//}
+					else
+					{
+						printf("Not picking up item because: inventory:%i and inventory_index:%i \n", User[c].inventory[itemId], User[c].inventory_index);
+					}
 				}
 			}
 		}
@@ -2387,7 +2388,7 @@ void OpenMysteryBox(unsigned char userId, unsigned char itemId)
 
 	// get rid of the box
 	int numUsed = 0;
-	if (User[userId].inventory[itemId] >= 10)
+	if (User[userId].inventory[itemId] > 10)
 	{
 		numUsed = 10;
 		User[userId].inventory[itemId] -= 10;
