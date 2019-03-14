@@ -160,7 +160,7 @@ int GE_Socket::GetStatus()
  
 bool GE_Socket::Create(unsigned int Port)
 { 
-    Socket = socket( AF_INET, SOCK_STREAM, 0 ); 
+    Socket = socket( AF_INET, SOCK_STREAM, IPPROTO_IP ); 
  
     sin.sin_family = AF_INET; 
     sin.sin_addr.s_addr = INADDR_ANY; 
@@ -168,16 +168,20 @@ bool GE_Socket::Create(unsigned int Port)
 
 	socklen_t len = sizeof sin;
  
-   if (Socket < 0) {
-	perror("listenSock < 0");
-	return false;
-   }	
+    if (Socket < 0) 
+    {
+        perror("listenSock < 0");
+        return false;
+    }	
+
+    int iSetOption = 1;
+    setsockopt(Socket, SOL_SOCKET, SO_REUSEADDR, (char*)&iSetOption, sizeof(iSetOption));
 
     if ( bind( Socket, (struct sockaddr *)&sin, len ) < 0 ) 
     { 
         /* could not start server */ 
         perror("cant bind");
-        return false; 
+        return false;
     } 
  
     return true; 

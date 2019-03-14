@@ -506,9 +506,9 @@ void SKO_PacketHandler::parsePacket(unsigned char userId, std::string packet)
 
     default:
         // Disconnect clients sending nonsense packets
-        //TODO//User[userId].socket->Close();
         printf(kRed "[FATAL] SKO_PacketHandler::parsePacket() called with unknown packet type!\n" kNormal);
         printf(kRed "[       SKO_PacketHandler::parsePacket(%i, %s)] \n" kNormal, userId, parser->toString().c_str());
+        network->forceCloseClient(userId);
         break;
     }
 

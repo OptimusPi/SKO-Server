@@ -25,7 +25,7 @@ SKO_Network::SKO_Network(SKO_Repository *repository, int port, unsigned long int
 	this->packetHandler = new SKO_PacketHandler(this);
 }
 
-//Initialize threads and Start listening for connections
+// Initialize threads and Start listening for connections
 std::string SKO_Network::startup()
 {
 	// Bind the given port
@@ -46,9 +46,22 @@ std::string SKO_Network::startup()
 	return "success";
 }
 
+void SKO_Network::forceCloseClient(unsigned char userId)
+{
+	this->send(User[userId].socket, EXIT);
+	disconnectClient(userId);
+}
+
 void SKO_Network::cleanup()
 {
-	//TODO delete sockets etc
+	//Stop listening for new connection
+	this->listenSocket->Close();
+
+	//Disconnect each user and clean up their socket
+	for (unsigned char userId = 0; userId < MAX_CLIENTS; userId++)
+	{
+		this->forceCloseClient(userId);
+	}
 }
 
 void SKO_Network::saveAllProfiles()
@@ -146,13 +159,20 @@ void SKO_Network::sendVersionSuccess(unsigned char userId)
 	send(User[userId].socket, VERSION_SUCCESS);
 }
 
+void SKO_Network::sendVersionFail(unsigned char userId)
+{
+	send(User[userId].socket, VERSION_FAIL);
+	User[userId].Queue = false;
+	User[userId].socket->Close();
+	User[userId] = SKO_Player();
+}
 
 void SKO_Network::verifyVersionLoop()
 {
 	// Wait for users to authenticate
 	for (unsigned char userId = 0; userId < MAX_CLIENTS; userId++)
 	{
-		//check Queue
+		// check Queue
 		if (!User[userId].Queue)
 			continue;
 
@@ -193,177 +213,178 @@ void SKO_Network::verifyVersionLoop()
 					}
 					else //not correct version
 					{
-						send(User[userId].socket, VERSION_FAIL);
 						printf("error, packet code failed on VERSION_CHECK see look:\n");
 						printf(">>>[read values] VERSION_MAJOR: %i VERSION_MINOR: %i VERSION_PATCH: %i VERSION_OS: %i\n",
 								versionMajor, versionMinor, versionPatch, versionOS);
 						printf(">>>[expected values] VERSION_MAJOR: %i VERSION_MINOR: %i VERSION_PATCH: %i\n",
 								VERSION_MAJOR, VERSION_MINOR, VERSION_PATCH);
-						User[userId].Queue = false;
-						User[userId].socket->Close();
-						User[userId] = SKO_Player();
+						
+						sendVersionFail(userId);
 					}
 				}
 				else //not correct packet type...
 				{
 					printf(kRed "[FATAL] Client sent wrong packet type during version check!\n" kNormal);
-
 					for (unsigned int i = 0; i < User[userId].socket->data.length(); i++)
 					{
 						printf("[%i]", User[userId].socket->data[i]);
 					}
 					printf("\n");
 
-					send(User[userId].socket, VERSION_FAIL);
 					printf("error, packet code failed on VERSION_CHECK (2)\n");
-					User[userId].Queue = false;
-					User[userId].socket->Close();
+					sendVersionFail(userId);
 				}
 			}
 		}
 		else // Recv returned error!
 		{
-			User[userId].Queue = false;
-			User[userId].Status = false;
-			User[userId].Ident = false;
-			User[userId].socket->Close();
-			User[userId] = SKO_Player();
+			forceCloseClient(userId);
 			printf("*\n**\n*\nQUE FAIL! (Recv returned error) IP IS %s*\n**\n*\n\n", User[userId].socket->IP.c_str());
 		}
 
 		//didn't recv anything, don't kill unless it's too long
 		if (OPI_Clock::milliseconds() - User[userId].QueueTime >= this->queueLimitHealthyMs)
 		{
-			User[userId].Queue = false;
-			User[userId].socket->Close();
+			forceCloseClient(userId);
 			printf("Closing socket %i for timeout.\n", userId);
 			printf("*\n**\n*\nQUE FAIL! IP IS %s*\n**\n*\n\n", User[userId].socket->IP.c_str());
 		}
 	} //end for loop
 }
 
+void SKO_Network::handleAuthenticatedUsersLoop()
+{
+	for (unsigned char userId = 0; userId < MAX_CLIENTS; userId++)
+	{
+		// Ignore socket if it is not connected
+		if (!User[userId].Status)
+			continue;
+
+		handleClient(userId);
+
+		// Ping check authenticated users
+		if (!User[userId].Ident)
+			continue;
+
+		if (User[userId].pingWaiting)
+		{
+			unsigned long long int ping = OPI_Clock::milliseconds() - User[userId].pingTicker;
+			if (ping > this->pingLimitHealthyMs)
+			{
+				printf("\e[31;0mClosing socket based on ping greater than one minute.\e[m\n");
+				disconnectClient(userId);
+			}
+		}
+		else
+		{
+			if (OPI_Clock::milliseconds() - User[userId].pingTicker > this->pingCheckIntervalMs)
+			{
+				send(User[userId].socket, PING);
+				User[userId].pingWaiting = true;
+				User[userId].pingTicker = OPI_Clock::milliseconds();
+			}
+		}
+	}
+}
+
+void SKO_Network::handleIncomingConnections()
+{
+	// If there is someone trying to connect
+	if (listenSocket->GetStatus2() & GE_Socket_Read)
+	{
+		printf(kGreen "Incoming socket connection...\n" kNormal);
+		// Declare a temp int
+		int incomingSocket;
+
+		// Increase i until it finds an empty socket
+		for (incomingSocket = 0; incomingSocket <= MAX_CLIENTS; incomingSocket++)
+		{
+			if (incomingSocket == MAX_CLIENTS)
+				break;
+
+			if (User[incomingSocket].Save == true || User[incomingSocket].Status == true || User[incomingSocket].Ident == true)
+			{
+				continue;
+			}
+			else
+			{
+				break;
+			}
+		}
+
+		//break
+		if (incomingSocket == MAX_CLIENTS)
+		{
+			GE_Socket *tempSock = listenSocket->Accept();
+			std::string fullPacket = "0";
+			fullPacket += SERVER_FULL;
+			fullPacket[0] = fullPacket.length();
+			tempSock->Send(fullPacket);
+			tempSock->Close();
+			return;
+		}
+
+		printf("incoming socket is: %i\n", incomingSocket);
+		printf("> User[incomingSocket].socket->Connected == %s\n", User[incomingSocket].socket->Connected ? "True" : "False");
+		printf("> User[incomingSocket].Save == %i\n", (int)User[incomingSocket].Save);
+		printf("> User[incomingSocket].Status == %i\n", (int)User[incomingSocket].Status);
+		printf("> User[incomingSocket].Ident == %i\n", (int)User[incomingSocket].Ident);
+
+		//make them mute and such
+		User[incomingSocket] = SKO_Player();
+		User[incomingSocket].socket = listenSocket->Accept();
+
+		//error reporting
+		if (User[incomingSocket].socket->Socket == 0)
+		{
+			printf("socket[%i] INVALID_SOCKET\n", incomingSocket);
+		}
+		else
+		{
+			// Set the status of that socket to taken 
+			User[incomingSocket].socket->Connected = true;
+
+			//set the data counting clock
+			User[incomingSocket].socket->stream_ticker = OPI_Clock::milliseconds();
+
+			//set the data_stream to null
+			User[incomingSocket].socket->byte_counter = 0;
+
+			//set bandwidth to null
+			User[incomingSocket].socket->bandwidth = 0;
+		}
+		// Output that a client connected
+		printf("[ !!! ] Client %i Connected\n", incomingSocket);
+
+		std::string their_ip = User[incomingSocket].socket->Get_IP();
+
+		if (repository->IsAddressBanned(their_ip))
+		{
+			//cut them off!
+			printf("SOMEONE BANNED TRIED TO CONNECT FROM [%s]\7\n", their_ip.c_str());
+			forceCloseClient(incomingSocket);
+		}
+
+		//put in Queue
+		User[incomingSocket].Queue = true;
+		User[incomingSocket].QueueTime = OPI_Clock::milliseconds();
+
+		printf("put socket %i in Queue\n", incomingSocket);
+	} //if connection incoming
+}
 //TODO refactor into different functions, handle authentication in the socket class.
 void SKO_Network::ConnectionLoop()
 {
 	while (!SERVER_QUIT)
 	{
-
+		// Handle all clients that need to authenticate
+		verifyVersionLoop();
 
 		// Handle all authenticated clients
-		for (unsigned char userId = 0; userId < MAX_CLIENTS; userId++)
-		{
-			// Ignore socket if it is not connected
-			if (!User[userId].Status)
-				continue;
+		handleAuthenticatedUsersLoop();
 
-			handleClient(userId);
-
-			// Ping check authenticated users
-			if (!User[userId].Ident)
-				continue;
-
-			if (User[userId].pingWaiting)
-			{
-				unsigned long long int ping = OPI_Clock::milliseconds() - User[userId].pingTicker;
-				if (ping > this->pingLimitHealthyMs)
-				{
-					printf("\e[31;0mClosing socket based on ping greater than one minute.\e[m\n");
-					User[userId].socket->Close();
-				}
-			}
-			else
-			{
-				if (OPI_Clock::milliseconds() - User[userId].pingTicker > this->pingCheckIntervalMs)
-				{
-					send(User[userId].socket, PING);
-					User[userId].pingWaiting = true;
-					User[userId].pingTicker = OPI_Clock::milliseconds();
-				}
-			}
-		}
-
-		// If there is someone trying to connect
-		if (listenSocket->GetStatus2() & GE_Socket_Read)
-		{
-			printf(kGreen "Incoming socket connection...\n" kNormal);
-			// Declare a temp int
-			int incomingSocket;
-
-			// Increase i until it finds an empty socket
-			for (incomingSocket = 0; incomingSocket <= MAX_CLIENTS; incomingSocket++)
-			{
-				if (incomingSocket == MAX_CLIENTS)
-					break;
-
-				if (User[incomingSocket].Save == true || User[incomingSocket].Status == true || User[incomingSocket].Ident == true)
-				{
-					continue;
-				}
-				else
-				{
-					break;
-				}
-			}
-
-			//break
-			if (incomingSocket == MAX_CLIENTS)
-			{
-				GE_Socket *tempSock = listenSocket->Accept();
-				std::string fullPacket = "0";
-				fullPacket += SERVER_FULL;
-				fullPacket[0] = fullPacket.length();
-				tempSock->Send(fullPacket);
-				tempSock->Close();
-				continue;
-			}
-
-			printf("incoming socket is: %i\n", incomingSocket);
-			printf("> User[incomingSocket].socket->Connected == %s\n", User[incomingSocket].socket->Connected ? "True" : "False");
-			printf("> User[incomingSocket].Save == %i\n", (int)User[incomingSocket].Save);
-			printf("> User[incomingSocket].Status == %i\n", (int)User[incomingSocket].Status);
-			printf("> User[incomingSocket].Ident == %i\n", (int)User[incomingSocket].Ident);
-
-			//make them mute and such
-			User[incomingSocket] = SKO_Player();
-			User[incomingSocket].socket = listenSocket->Accept();
-
-			//error reporting
-			if (User[incomingSocket].socket->Socket == 0)
-			{
-				printf("socket[%i] INVALID_SOCKET\n", incomingSocket);
-			}
-			else
-			{
-				// Set the status of that socket to taken
-				User[incomingSocket].socket->Connected = true;
-
-				//set the data counting clock
-				User[incomingSocket].socket->stream_ticker = OPI_Clock::milliseconds();
-
-				//set the data_stream to null
-				User[incomingSocket].socket->byte_counter = 0;
-
-				//set bandwidth to null
-				User[incomingSocket].socket->bandwidth = 0;
-			}
-			// Output that a client connected
-			printf("[ !!! ] Client %i Connected\n", incomingSocket);
-
-			std::string their_ip = User[incomingSocket].socket->Get_IP();
-
-			if (repository->IsAddressBanned(their_ip))
-			{
-				//cut them off!
-				printf("SOMEONE BANNED TRIED TO CONNECT FROM [%s]\7\n", their_ip.c_str());
-				User[incomingSocket].socket->Close();
-			}
-
-			//put in Queue
-			User[incomingSocket].Queue = true;
-			User[incomingSocket].QueueTime = OPI_Clock::milliseconds();
-
-			printf("put socket %i in Queue\n", incomingSocket);
-		} //if connection incoming
+		// Handle new incoming connections
+		handleIncomingConnections();
 
 		// Sleep in between checking for new connections
 		OPI_Sleep::milliseconds(1);
@@ -473,12 +494,12 @@ void SKO_Network::attemptRegister(unsigned char userId, std::string username, st
     }
     else if (result == 2) // user is ip banned
     {
-        User[userId].socket->Close();
+        forceCloseClient(userId);
     }
     else if (result == 3) // fatal error occurred
     {
         printf(kRed "[FATAL] Unable to create player.\n" kNormal);
-        User[userId].socket->Close();
+        disconnectClient(userId);
     }
 }
 void SKO_Network::attemptLogin(unsigned char userId, std::string username, std::string password)
@@ -543,7 +564,7 @@ void SKO_Network::attemptLogin(unsigned char userId, std::string username, std::
 	{
 		printf("couldn't load data. KILL!\n");
 		User[userId].Save = false;
-		User[userId].socket->Close();
+		disconnectClient(userId);
 		return;
 	}
 
@@ -680,76 +701,15 @@ void SKO_Network::attemptLogin(unsigned char userId, std::string username, std::
 }
 void SKO_Network::createClan(unsigned char userId, std::string clanTag)
 {
-    //check if the player has enough money.
-    if (User[userId].inventory[ITEM_GOLD] < 100000) // 100000 TODO make a const for this
-    {
-        sendChat(userId, "Sorry, you cannot afford to establish a clan. It costs 100K gold.");
-        return;
-    }
-
-    int result = repository->createClan(User[userId].Nick, clanTag);
-    if (result == 0)
-    {
-        //send to all players so everyone knows a new clan was formed!
-        for (int cu1 = 0; cu1 < MAX_CLIENTS; cu1++)
-        {
-            if (User[cu1].Ident)
-                sendChat(cu1, "Clan (" + clanTag + ") has been established by owner " + User[userId].Nick + ".");
-        } //end loop all clients
-
-        //TODO - when below fix is complete, notify player their gold has decreased by 100K
-        User[userId].inventory[ITEM_GOLD] -= 100000;
-
-        //TODO do not rely on client reconnect when forming or joining a clan
-        User[userId].socket->Close();
-        User[userId].socket->Connected = false;
-    }
-    else if (result == 1)
-    {
-        //Clan already exists
-        sendChat(userId, "You cannot establish [" + clanTag + "] because it already exists.");
-    }
+    CreateClan(userId, clanTag); 
 }
 void SKO_Network::acceptClanInvite(unsigned char userId)
 {
-	if (User[userId].clanStatus != INVITE)
-		return;
-    
-	repository->setClanId(User[userId].Nick, User[userId].tempClanId);
-
-	// TODO - make new packet type to update clan instead of booting player
-	// This relies on client to automatically reconnect
-	User[userId].socket->Close();
-	User[userId].socket->Connected = false;
+	AcceptClanInvite(userId);
 }
 void SKO_Network::clanInvite(unsigned char userId, unsigned char playerId)
 {
-    std::string clanId = repository->getOwnerClanId(User[userId].Nick);
-
-    if (User[userId].Clan[0] == '(')
-    {
-        sendChat(userId, "You are not in a clan.");
-        return;
-    }
-
-    if (User[playerId].Clan[0] != '(')
-    {
-        sendChat(userId, "Sorry, " + User[playerId].Nick + " Is already in a clan.");
-        return;
-    }
-
-    if (!clanId.length())
-    {
-        sendChat(userId, "Sorry, only the clan owner can invite new members.");
-        return;
-    }
-
-    //set the clan status of the invited person
-    User[playerId].clanStatus = INVITE;
-    User[playerId].tempClanId = clanId;
-
-    //ask the user to clan
-    sendClanInvite(playerId, userId);
+   clanInvite(userId, playerId);
 }
 void SKO_Network::sendSpawnTarget(unsigned char targetId, unsigned char mapId)
 {
@@ -997,16 +957,15 @@ void SKO_Network::kickPlayer(unsigned char userId, std::string username, std::st
 	//okay, now send
 	for (int i = 0; i < MAX_CLIENTS; i++)
 	{
-		//if socket is taken
+		//if socket is taken, send message that a user was kicked from the game
 		if (User[i].Ident)
-			sendChat(userId, username + " has been kicked. (" + reason + ")");
+			sendChat(i, username + " has been kicked. (" + reason + ")");
 
 		//kick the user
 		if (SKO_Utilities::lowerString(username).compare(SKO_Utilities::lowerString(User[i].Nick)) == 0)
 		{
 			//Send kick packet
-			User[i].socket->Close();
-			User[i].socket->Connected = false;
+			forceCloseClient(i);
 		}
 	}
 }

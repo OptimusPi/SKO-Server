@@ -133,6 +133,7 @@ public:
 	void unbanPlayer(unsigned char userId, std::string username);
 	void warpPlayer(unsigned char userId, std::string usernamne, int x, int y, unsigned char mapId);
 	void showPlayerPing(unsigned char userId, std::string username);
+	void forceCloseClient(unsigned char userId);
  private:
 	
 	// Bind to this port and accept incoming connections.
@@ -183,6 +184,9 @@ public:
 	void giveLoot(int enemy, int player);
 	void giveXP(unsigned char userId, int xp);
 	void verifyVersionLoop();
+	void handleAuthenticatedUsersLoop();
+	void handleIncomingConnections();
+	void sendVersionFail(unsigned char userId);
 
     // Socket send (variadic arguments)
 	template<typename First, typename ... Rest>

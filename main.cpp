@@ -28,14 +28,17 @@
 #include "SKO_Network/SKO_Network.h"
 
 bool SERVER_QUIT = false;
-/* Ctrl+C in terminal */
-void terminal_quit(int signal){
-	printf("Gracefully shutting down after receiving signal=%i.\n", signal);
-	SERVER_QUIT = true;
-}
 
 SKO_Network *network;
 SKO_Repository *repository;
+
+
+/* Ctrl+C in terminal */
+void terminal_quit(int signal){
+	printf(kGreen "\nGracefully shutting down after receiving signal=%i.\n kNormal", signal);
+	SERVER_QUIT = true;
+	network->cleanup();
+}
 
 /* DEFINES */
 
@@ -105,6 +108,9 @@ void ShopSell(unsigned char userId, unsigned char itemId, unsigned int amount);
 void DepositBankItem(unsigned char userId, unsigned char itemId, unsigned int amount);
 void WithdrawalBankItem(unsigned char userId, unsigned char itemId, unsigned int amount);
 void DeclineClanInvite(unsigned char userId);
+void AcceptClanInvite(unsigned char userId, std::string clanTag);
+void AcceptClanInvite(unsigned char userId);
+void ClanInvite(unsigned char userId, unsigned char playerId);
 
 // threads 
 void PhysicsLoop();
@@ -274,11 +280,8 @@ int main()
 
 	network = new SKO_Network(repository, serverPort, 60);
 	printf("Initialized SKO_Network.\n");
-
 	printf("Starting up SKO_Network...\n");
 	std::string networkStatus = network->startup();
-	printf("SKO_Network status is: %s\n", networkStatus.c_str());
-
 	if (networkStatus == "success")
 	{
 		//TODO: make nice logging function that abstracts the console colors
@@ -2978,4 +2981,78 @@ void DeclineClanInvite(unsigned char userId)
 {
 	//quit them out of this clan
     User[userId].clanStatus = 0;
+}
+
+void CreateClan(unsigned char userId, std::string clanTag)
+{
+	//check if the player has enough money.
+    if (User[userId].inventory[ITEM_GOLD] < 100000) // 100000 TODO make a const for this
+    {
+        network->sendChat(userId, "Sorry, you cannot afford to establish a clan. It costs 100K gold.");
+        return;
+    }
+
+    int result = repository->createClan(User[userId].Nick, clanTag);
+    if (result == 0)
+    {
+        //send to all players so everyone knows a new clan was formed!
+        for (int cu1 = 0; cu1 < MAX_CLIENTS; cu1++)
+        {
+            if (User[cu1].Ident)
+                network->sendChat(cu1, "Clan (" + clanTag + ") has been established by owner " + User[userId].Nick + ".");
+        } //end loop all clients
+
+        //TODO - when below fix is complete, notify player their gold has decreased by 100K
+        User[userId].inventory[ITEM_GOLD] -= 100000;
+
+        //TODO do not rely on client reconnect when forming or joining a clan
+        network->forceCloseClient(userId);
+    }
+    else if (result == 1)
+    {
+        //Clan already exists
+        network->sendChat(userId, "You cannot establish [" + clanTag + "] because it already exists.");
+    }
+}
+
+void AcceptClanInvite(unsigned char userId)
+{
+	if (User[userId].clanStatus != INVITE)
+		return;
+    
+	repository->setClanId(User[userId].Nick, User[userId].tempClanId);
+
+	// TODO - make new packet type to update clan instead of booting player
+	// This relies on client to automatically reconnect
+	network->forceCloseClient(userId);
+}
+
+void ClanInvite(unsigned char userId, unsigned char playerId)
+{
+	 std::string clanId = repository->getOwnerClanId(User[userId].Nick);
+
+    if (User[userId].Clan[0] == '(')
+    {
+        network->sendChat(userId, "You are not in a clan.");
+        return;
+    }
+
+    if (User[playerId].Clan[0] != '(')
+    {
+        network->sendChat(userId, "Sorry, " + User[playerId].Nick + " Is already in a clan.");
+        return;
+    }
+
+    if (!clanId.length())
+    {
+        network->sendChat(userId, "Sorry, only the clan owner can invite new members.");
+        return;
+    }
+
+    //set the clan status of the invited person
+    User[playerId].clanStatus = INVITE;
+    User[playerId].tempClanId = clanId;
+
+    //ask the user to clan
+    network->sendClanInvite(playerId, userId);
 }

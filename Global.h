@@ -62,5 +62,8 @@ extern void ShopSell(unsigned char userId, unsigned char itemId, unsigned int am
 extern void DepositBankItem(unsigned char userId, unsigned char itemId, unsigned int amount);
 extern void WithdrawalBankItem(unsigned char userId, unsigned char itemId, unsigned int amount);
 extern void DeclineClanInvite(unsigned char userId);
+extern void CreateClan(unsigned char userId, std::string clanTag);
+extern void AcceptClanInvite(unsigned char userId);
+extern void ClanInvite(unsigned char userId, unsigned char playerId);
 
 #endif
