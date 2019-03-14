@@ -156,7 +156,9 @@ void SKO_Network::SaveLoop()
 
 void SKO_Network::sendVersionSuccess(unsigned char userId)
 {
+	printf(kGreen "Sending VERSION_SUCCESS\n" kNormal);
 	send(User[userId].socket, VERSION_SUCCESS);
+	printf(kGreen "Done sending VERSION_SUCCESS\n" kNormal);
 }
 
 void SKO_Network::sendVersionFail(unsigned char userId)
@@ -442,10 +444,6 @@ void SKO_Network::disconnectClient(unsigned char userId)
 		}		
 	}
 
-	User[userId].Ident = false;
-	User[userId].socket->Close();
-	User[userId].socket->Connected = false;
-
 	// Output socket status
 	printf("[ ERR ] User status: %i\n", User[userId].Status);
 
@@ -472,10 +470,9 @@ void SKO_Network::disconnectClient(unsigned char userId)
 	quitParty(userId);
 
 	printf("Clearing User #%i named %s\n", userId, User[userId].Nick.c_str());
-	if (User[userId].socket)
-	{
-		delete User[userId].socket;
-	}
+	User[userId].Ident = false;
+	User[userId].socket->Close();
+	User[userId].socket->Connected = false;
 	User[userId] = SKO_Player();
 
 	printf("[DISCONNECT] User[%i].Clear() called.\n", userId);
