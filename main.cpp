@@ -1084,11 +1084,13 @@ void itemPhysics(unsigned char mapId)
 			//check for players intersecting
 			for (int c = 0; c < MAX_CLIENTS; c++)
 			{
-				//ninja loot
-				bool isMine = false;
+				// Only check logged-in players
+				if (!User[c].Ident)
+					continue;
 
-				if (map[mapId].ItemObj[i].owner == -1 || map[mapId].ItemObj[i].owner == c)
-					isMine = true;
+				// Only check items that belong to this player, or belong to all players (-1)
+				if (map[mapId].ItemObj[i].owner != -1 && map[mapId].ItemObj[i].owner != c)
+					continue;
 
 				//player
 				float box2_x1 = User[c].x + 25;
@@ -1098,16 +1100,17 @@ void itemPhysics(unsigned char mapId)
 
 				if (box1_x2 > box2_x1 && box1_x1 < box2_x2 && box1_y2 > box2_y1 && box1_y1 < box2_y2)
 				{
-					if (User[c].Ident && isMine)
+					//if user doesnt have it, can only pick up if they dont have a full inventory
+					if (User[c].inventory[itemId] != 0 || User[c].inventory_index <= 23)
 					{
-						//if user doesnt have it, can only pick up if they dont have a full inventory
-						if (User[c].inventory[itemId] != 0 && User[c].inventory_index <= 23)
-						{
-							DespawnItem(i, mapId);
-							unsigned int amount = map[mapId].ItemObj[i].amount + User[c].inventory[itemId];
-							PocketItem(c, itemId, amount);
-						} //end else not inventory full (you can pick up)
-					}
+						DespawnItem(i, mapId);
+						unsigned int amount = map[mapId].ItemObj[i].amount + User[c].inventory[itemId];
+						PocketItem(c, itemId, amount);
+					} //end else not inventory full (you can pick up)
+					//else
+					//{
+					//	printf("Not picking up item because: inventory:%i and inventory_index:%i \n", User[c].inventory[itemId], User[c].inventory_index);
+					//}
 				}
 			}
 		}

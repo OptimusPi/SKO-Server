@@ -503,6 +503,10 @@ void SKO_PacketHandler::parsePacket(unsigned char userId, std::string packet)
     case STAT_STR:
         parseStatStr(userId);
         break;
+    
+    case CAST_SPELL:
+        parseCastSpell(userId);
+        break;
 
     default:
         // Disconnect clients sending nonsense packets
