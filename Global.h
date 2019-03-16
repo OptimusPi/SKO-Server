@@ -34,7 +34,7 @@ extern const char NUM_MAPS;
 
 //TODO move to game logic
 extern bool blocked(unsigned char mapId, float box1_x1, float box1_y1, float box1_x2, float box1_y2, bool npc);
-extern void GiveLoot(int enemy, int player);
+extern void GiveLoot(unsigned char enemy, unsigned char userId);
 extern void Attack(unsigned char userId, float x, float y);
 extern void Jump(unsigned char userId, float x, float y);
 extern void Left(unsigned char userId, float x, float y);

@@ -1577,7 +1577,7 @@ void Jump(unsigned char userId, float numx, float numy)
 	network->sendPlayerAction(isCorrection, MOVE_JUMP, userId, numx, numy);
 }
 
-void DivideLoot(int enemy, int party)
+void DivideLoot(unsigned char enemyId, int party)
 {
 	unsigned char mapId = 0;
 
@@ -1587,60 +1587,70 @@ void DivideLoot(int enemy, int party)
 	int numInParty = 0;
 
 	//find total damage from all party members
-	for (int p = 0; p < MAX_CLIENTS; p++)
+	for (unsigned char p = 0; p < MAX_CLIENTS; p++)
+	{
 		if (User[p].Ident && User[p].partyStatus == PARTY && User[p].party == party)
 		{
 			//set the current map
 			mapId = User[p].mapId;
-			totalDamage += map[mapId].Enemy[enemy]->dibsDamage[p];
+			totalDamage += map[mapId].Enemy[enemyId]->dibsDamage[p];
 			numInParty++;
 		}
+	}
+	printf(kYellow "TotalDamage Is: %.2f\n" kNormal, totalDamage);
 
 	//find a random starting point
 	int randStart = rand() % numInParty;
 
 	//give away items until they are all gone
-	while (totalLootGiven < map[mapId].Enemy[enemy]->lootAmount)
+	while (totalLootGiven < map[mapId].Enemy[enemyId]->lootAmount)
 	{
 		//find total damage from all party members
-		for (int p = randStart; p < MAX_CLIENTS; p++)
+		for (unsigned char p = randStart; p < numInParty; p++)
 			if (User[p].Ident && User[p].partyStatus == PARTY && User[p].party == party)
 			{
+				//If this member did not damage the enemy, they earn nothing
+				float dibsDamagePerPlayer = map[mapId].Enemy[enemyId]->dibsDamage[p];
+				if (dibsDamagePerPlayer < 1)
+					continue;
+
 				//calculate chance of getting the loot
-				float lootEarned = (float)map[mapId].Enemy[enemy]->dibsDamage[p] / totalDamage * map[mapId].Enemy[enemy]->lootAmount;
+				float lootEarned = (dibsDamagePerPlayer / totalDamage) * map[mapId].Enemy[enemyId]->lootAmount;
 				int lootGiven = 0;
 				printf("%s has earned %.2f loot items.\n", User[p].Nick.c_str(), lootEarned);
 
 				//give the player their whole items
 				for (int i = 0; i < lootEarned; i++)
 				{
-					GiveLoot(enemy, p);
+					GiveLoot(enemyId, p);
 					lootGiven++;
 					totalLootGiven++;
 
 					//check if the max items has been given
-					if (totalLootGiven >= map[mapId].Enemy[enemy]->lootAmount)
+					if (totalLootGiven >= map[mapId].Enemy[enemyId]->lootAmount)
 						return;
 				}
 
-				//printf("Loot given so far for %s is %i\n", User[p].Nick.c_str(), lootGiven);
+				printf("Loot given so far for %s is %i\n", User[p].Nick.c_str(), lootGiven);
 
 				//check if the max items has been given
-				if (totalLootGiven >= map[mapId].Enemy[enemy]->lootAmount)
+				printf(kGreen "return- if (%.i >= %i)\n" kNormal, totalLootGiven, map[mapId].Enemy[enemyId]->lootAmount);
+				if (totalLootGiven >= map[mapId].Enemy[enemyId]->lootAmount)
 					return;
 
 				//give a possible bonus item
 				if (Roll(lootEarned - lootGiven))
 				{
-					GiveLoot(enemy, p);
+					printf("Bonus item earned!\n");
+					GiveLoot(enemyId, p);
 					lootGiven++;
 					totalLootGiven++;
 				}
 
-				//printf("All the loot given to %s is %i\n", User[p].Nick.c_str(), lootGiven);
+				printf("All the loot given to %s is %i\n", User[p].Nick.c_str(), lootGiven);
 
 				//check if the max items has been given
-				if (totalLootGiven >= map[mapId].Enemy[enemy]->lootAmount)
+				if (totalLootGiven >= map[mapId].Enemy[enemyId]->lootAmount)
 					return;
 			}
 
@@ -1697,9 +1707,9 @@ void SpawnLoot(unsigned char mapId, SKO_ItemObject lootItem)
 	SpawnItem(mapId, itemObjId, itemId, x, y, x_speed, y_speed);
 }
 
-void GiveLoot(int enemy, int player)
+void GiveLoot(unsigned char enemy, unsigned char userId)
 {
-	unsigned char mapId = User[player].mapId;
+	unsigned char mapId = User[userId].mapId;
 
 	// remember about disabled items
 	SKO_ItemObject lootItem = map[mapId].Enemy[enemy]->getLootItem();
@@ -1728,7 +1738,7 @@ void GiveLoot(int enemy, int player)
 	//printf("Item[lootItem.itemID].w is %i\n", (int)Item[lootItem.itemID].w);
 	//printf("lootItem.itemID is %i\n", (int)lootItem.itemID);
 
-	lootItem.owner = player;
+	lootItem.owner = userId;
 
 	SpawnLoot(mapId, lootItem);
 }
@@ -2627,23 +2637,30 @@ void DropItem(unsigned char userId, unsigned char itemId, unsigned int amount)
 
 void InvitePlayerToParty(unsigned char userId, unsigned char playerB)
 {
+	printf(kGreen "%s wants to invite %s to party.\n" kNormal, User[userId].Nick.c_str(), User[playerB].Nick.c_str());
+	printf(kYellow "%s party status is %i.\n" kNormal, User[userId].Nick.c_str(), User[userId].partyStatus);
+	printf(kYellow "%s party status is %i.\n" kNormal, User[playerB].Nick.c_str(), User[playerB].partyStatus);	
+	printf(kYellow "%s party is %i.\n" kNormal, User[userId].Nick.c_str(), User[userId].party);
+	printf(kYellow "%s party is %i.\n" kNormal, User[playerB].Nick.c_str(), User[playerB].party);	
+
+
     //invite the other user
-    //if the other user is not in your party
+    //if the other user is not in a party
     if (User[playerB].partyStatus != 0)
         return;
         
-    int partyID = User[userId].party;
+    int partyId = User[userId].party;
 
     //set their party
-    if (User[userId].party == -1)
+    if (partyId == -1)
     {
-        for (partyID = 0; partyID <= MAX_CLIENTS; partyID++)
+        for (partyId = 0; partyId <= MAX_CLIENTS; partyId++)
         {
             //look for an open partyID
             bool taken = false;
             for (int i = 0; i < MAX_CLIENTS; i++)
             {
-                if (User[i].Ident && User[i].party == partyID)
+                if (User[i].Ident && User[i].party == partyId)
                 {
                     taken = true;
                     break;
@@ -2655,15 +2672,15 @@ void InvitePlayerToParty(unsigned char userId, unsigned char playerB)
     } //end if party is null
 
     //make the parties equal
-    User[userId].party = partyID;
-    User[playerB].party = partyID;
+    User[userId].party = partyId;
+    User[playerB].party = partyId;
 
     //set the party status of the invited person
     User[playerB].partyStatus = INVITE;
     User[userId].partyStatus = ACCEPT;
 
     //ask the user to party
-    network->sendTradeInvite(playerB, userId);
+    network->sendPartyInvite(playerB, userId);
 }
 
 void InvitePlayerToTrade(unsigned char userId, unsigned char playerId)
@@ -2876,15 +2893,38 @@ void AcceptPartyInvite(unsigned char userId)
     if (User[userId].partyStatus != INVITE)
         return;
 
+	User[userId].partyStatus = PARTY;
+
     //tell the user about all the players in the party
     for (int pl = 0; pl < MAX_CLIENTS; pl++)
     {
-        if (!User[pl].Ident || pl == userId || User[pl].partyStatus != PARTY || User[pl].party != User[userId].party)
-            continue;
+        if (!User[pl].Ident)
+			continue;
+	
+			
+		if (User[pl].party != User[userId].party)
+			continue;
+		
+
+		//
+		// If the party "leader" has sent the first invite, initiate their party first.
+		//
+		if (User[pl].partyStatus == ACCEPT)
+		{
+			printf(kGreen "\n%s is the party leader, now set to PARTY\n\n" kNormal, User[pl].Nick.c_str());
+			User[pl].partyStatus = PARTY;
+			network->sendPartyAccept(pl, pl, User[pl].party);
+		}
+
+		if (User[pl].partyStatus != PARTY)
+			continue;
+
         //
         // Notify all members in the party that player is joining
         //
         network->sendPartyAccept(pl, userId, User[userId].party);
+
+		
         //tell existing party members the new player's stats
         unsigned char hp = (int)((User[userId].hp / (float)User[userId].max_hp) * 80);
         unsigned char xp = (int)((User[userId].xp / (float)User[userId].max_xp) * 80);

@@ -4,7 +4,7 @@
 
 SKO_ChatHandler::SKO_ChatHandler(SKO_Network *network)
 {
-    this->network = network;  
+    this->network = network;
 }
 
 // [CHAT]["/ban"][" "]["<username>"][" "]["<reason>"]

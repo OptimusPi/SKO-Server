@@ -108,6 +108,7 @@ public:
 	void sendTradeCancel(unsigned char userId);
 
 	// Party actions
+	void sendPartyInvite(unsigned char userId, unsigned char playerId);
 	void sendPartyAccept(unsigned char userId, unsigned char playerId, char party);
 	void sendPartyCancel(unsigned char userId, unsigned char quitUserId);
 	void sendPartyLeave(unsigned char userId, unsigned char quitUserId);
@@ -179,7 +180,6 @@ public:
 	void attemptLogin(std::string username, std::string password);
 	void despawnTarget(int target, unsigned char mapId);
 	void respawn(unsigned char mapId, int i);
-	void divideLoot(int enemy, int party); 
 	void killEnemy(unsigned char mapId, int enemy);
 	void giveLoot(int enemy, int player);
 	void giveXP(unsigned char userId, int xp);

@@ -1277,8 +1277,14 @@ void SKO_Network::sendShopOpen(unsigned char userId, unsigned char shopId)
 {
 	send(User[userId].socket, SHOP, shopId);
 }
+void SKO_Network::sendPartyInvite(unsigned char userId, unsigned char playerId)
+{ 
+	send(User[userId].socket, PARTY, INVITE, playerId);
+}
 void SKO_Network::sendPartyAccept(unsigned char userId, unsigned char playerId, char party)
 {
+	printf(kGreen "\nTelling %s that %s joins party %i\n\n" kNormal, 
+		User[userId].Nick.c_str(), User[playerId].Nick.c_str(), party);
 	send(User[userId].socket, PARTY, ACCEPT, playerId, party);
 }
 void SKO_Network::sendPartyCancel(unsigned char userId, unsigned char quitUserId)
