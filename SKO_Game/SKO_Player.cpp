@@ -65,7 +65,7 @@ void SKO_Player::init()
     clanPlayer = 0;
     //party
     party = -1;
-    partyStatus = 0;
+    partyStatus = SKO_PartyStatus::NotSet;
     //current map
     mapId = 0;
 
@@ -92,7 +92,7 @@ SKO_Player::SKO_Player()
 	init();
 }
 
-//Cosmetic only, take what the clinet gives and store it for now. Wow, how nice!
+// Cosmetic only, take what the clinet gives and store it for now. Wow, how nice!
 std::string SKO_Player::getInventoryOrder()
 {
  	std::string iorder = "";
