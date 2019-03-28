@@ -243,19 +243,19 @@ int main()
 	Item[ITEM_ICECREAM] = SKO_Item(9, 16, 5, 0, 0, 0, 0, 4, 0);
 	Item[ITEM_SUNGLASSES] = SKO_Item(21, 13, 3, 0, 0, 0, 0, 8, 0);
 
-	Item[ITEM_SWORD_RUSTED] = SKO_Item(11, 37, 2, 1, 2, 0, 32, 3, 6);
-	Item[ITEM_SWORD_STEEL] = SKO_Item(11, 37, 2, 2, 4, 0, 32, 4, 80);
-	Item[ITEM_SWORD_GOLD] = SKO_Item(11, 42, 2, 3, 11, 0, 40, 5, 6030);
+	Item[ITEM_SWORD_RUSTED] = SKO_Item(11, 37, 2, 1, 2, 0, 32, 3, 25);
+	Item[ITEM_SWORD_STEEL] = SKO_Item(11, 37, 2, 2, 4, 0, 32, 4, 90);
+	Item[ITEM_SWORD_GOLD] = SKO_Item(11, 42, 2, 3, 11, 0, 40, 5, 6000);
 	Item[ITEM_SWORD_CRYSTAL] = SKO_Item(15, 43, 2, 5, 22, 0, 42, 6, 80000);
 
-	Item[ITEM_AXE_RUSTED] = SKO_Item(12, 31, 2, 1, 3, 0, 28, 7, 8);
-	Item[ITEM_AXE_STEEL] = SKO_Item(12, 31, 2, 1, 5, 0, 28, 8, 85);
-	Item[ITEM_AXE_GOLD] = SKO_Item(21, 36, 2, 2, 13, 0, 37, 9, 6100);
+	Item[ITEM_AXE_RUSTED] = SKO_Item(12, 31, 2, 1, 3, 0, 28, 7, 25);
+	Item[ITEM_AXE_STEEL] = SKO_Item(12, 31, 2, 1, 5, 0, 28, 8, 90);
+	Item[ITEM_AXE_GOLD] = SKO_Item(21, 36, 2, 2, 13, 0, 37, 9, 6000);
 	Item[ITEM_AXE_CRYSTAL] = SKO_Item(21, 38, 2, 3, 24, 0, 40, 10, 80000);
 
-	Item[ITEM_HAMMER_RUSTED] = SKO_Item(17, 33, 2, 0, 4, 0, 22, 11, 10);
+	Item[ITEM_HAMMER_RUSTED] = SKO_Item(17, 33, 2, 0, 4, 0, 22, 11, 25);
 	Item[ITEM_HAMMER_STEEL] = SKO_Item(17, 33, 2, 0, 7, 0, 22, 12, 90);
-	Item[ITEM_HAMMER_GOLD] = SKO_Item(17, 33, 2, 2, 16, 0, 22, 13, 6120);
+	Item[ITEM_HAMMER_GOLD] = SKO_Item(17, 33, 2, 2, 16, 0, 22, 13, 6000);
 	Item[ITEM_HAMMER_CRYSTAL] = SKO_Item(27, 33, 2, 3, 25, 0, 32, 14, 80000);
 
 	Item[ITEM_SCYTHE] = SKO_Item(23, 25, 2, 3, 3, 0, 22, 15, 900);
@@ -1331,7 +1331,6 @@ void Attack(unsigned char userId, float numx, float numy)
 	}
 
 	//loop all enemies
-	printf("Checking all enemies: %i\n", map[mapId].num_enemies);
 	for (int i = 0; i < map[mapId].num_enemies; i++)
 	{
 		bool partyBlocked = false;
@@ -1843,6 +1842,10 @@ void Warp(unsigned char userId, SKO_Portal *portal)
 
 	// Tell user about existing map objects
 	LoadMapObjects(userId, portal->mapId);
+
+	// Tell user about existing players
+	// TODO - fix this issue #21
+	// https://github.com/OptimusPi/SKO-Server/issues/21
 }
 
 void GiveXP(unsigned char userId, int xp)
@@ -2032,7 +2035,6 @@ unsigned int GetTotalStrength(unsigned char userId)
 	unsigned char weapon = User[userId].equip[0];
 	unsigned char hat = User[userId].equip[1];
 	unsigned char trophy = User[userId].equip[2];
-
 	//Add strength of all equipment
 	if (weapon)
 		totalStrength += Item[weapon].str;
@@ -2145,13 +2147,14 @@ void KillEnemy(unsigned char enemyId, unsigned char mapId, unsigned char killerU
 void EnemyHit(unsigned char enemyId, unsigned char mapId, unsigned char userId)
 {
 	//Sum of all strength a player has, including equipment
-	int strength = GetTotalStrength(userId);
+	unsigned int strength = GetTotalStrength(userId);
 	unsigned int defense = map[mapId].Enemy[enemyId]->defense;
 
-	unsigned int damage = strength - defense;
-
-	if (damage <= 0)
+	// IF the enemy can block this hit, take no damage and return.
+	if (defense >= strength)
 		return;
+	
+	unsigned int damage = strength - defense;
 
 	//keep track of damage
 	map[mapId].Enemy[enemyId]->dibsDamage[userId] += damage;
