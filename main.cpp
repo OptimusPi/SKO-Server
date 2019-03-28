@@ -243,23 +243,23 @@ int main()
 	Item[ITEM_ICECREAM] = SKO_Item(9, 16, 5, 0, 0, 0, 0, 4, 0);
 	Item[ITEM_SUNGLASSES] = SKO_Item(21, 13, 3, 0, 0, 0, 0, 8, 0);
 
-	Item[ITEM_SWORD_RUSTED] = SKO_Item(11, 37, 2, 1, 2, 0, 32, 3, 6);
-	Item[ITEM_SWORD_STEEL] = SKO_Item(11, 37, 2, 2, 4, 0, 32, 4, 80);
-	Item[ITEM_SWORD_GOLD] = SKO_Item(11, 42, 2, 3, 11, 0, 40, 5, 6030);
-	Item[ITEM_SWORD_CRYSTAL] = SKO_Item(15, 43, 2, 5, 22, 0, 42, 6, 100300);
+	Item[ITEM_SWORD_RUSTED] = SKO_Item(11, 37, 2, 1, 2, 0, 32, 3, 25);
+	Item[ITEM_SWORD_STEEL] = SKO_Item(11, 37, 2, 2, 4, 0, 32, 4, 90);
+	Item[ITEM_SWORD_GOLD] = SKO_Item(11, 42, 2, 3, 11, 0, 40, 5, 6000);
+	Item[ITEM_SWORD_CRYSTAL] = SKO_Item(15, 43, 2, 5, 22, 0, 42, 6, 80000);
 
-	Item[ITEM_AXE_RUSTED] = SKO_Item(12, 31, 2, 1, 3, 0, 28, 7, 8);
-	Item[ITEM_AXE_STEEL] = SKO_Item(12, 31, 2, 1, 5, 0, 28, 8, 85);
-	Item[ITEM_AXE_GOLD] = SKO_Item(21, 36, 2, 2, 13, 0, 37, 9, 6100);
-	Item[ITEM_AXE_CRYSTAL] = SKO_Item(21, 38, 2, 3, 24, 0, 40, 10, 98525);
+	Item[ITEM_AXE_RUSTED] = SKO_Item(12, 31, 2, 1, 3, 0, 28, 7, 25);
+	Item[ITEM_AXE_STEEL] = SKO_Item(12, 31, 2, 1, 5, 0, 28, 8, 90);
+	Item[ITEM_AXE_GOLD] = SKO_Item(21, 36, 2, 2, 13, 0, 37, 9, 6000);
+	Item[ITEM_AXE_CRYSTAL] = SKO_Item(21, 38, 2, 3, 24, 0, 40, 10, 80000);
 
-	Item[ITEM_HAMMER_RUSTED] = SKO_Item(17, 33, 2, 0, 4, 0, 22, 11, 10);
+	Item[ITEM_HAMMER_RUSTED] = SKO_Item(17, 33, 2, 0, 4, 0, 22, 11, 25);
 	Item[ITEM_HAMMER_STEEL] = SKO_Item(17, 33, 2, 0, 7, 0, 22, 12, 90);
-	Item[ITEM_HAMMER_GOLD] = SKO_Item(17, 33, 2, 2, 16, 0, 22, 13, 6120);
-	Item[ITEM_HAMMER_CRYSTAL] = SKO_Item(27, 33, 2, 3, 25, 0, 32, 14, 99085);
+	Item[ITEM_HAMMER_GOLD] = SKO_Item(17, 33, 2, 2, 16, 0, 22, 13, 6000);
+	Item[ITEM_HAMMER_CRYSTAL] = SKO_Item(27, 33, 2, 3, 25, 0, 32, 14, 80000);
 
-	Item[ITEM_SCYTHE] = SKO_Item(23, 25, 2, 3, 3, 0, 22, 15, 7120);
-	Item[ITEM_SCYTHE_REAPER] = SKO_Item(27, 32, 2, 10, 10, 10, 32, 16, 19085);
+	Item[ITEM_SCYTHE] = SKO_Item(23, 25, 2, 3, 3, 0, 22, 15, 900);
+	Item[ITEM_SCYTHE_REAPER] = SKO_Item(27, 32, 2, 10, 10, 10, 32, 16, 18000);
 	Item[ITEM_CANDY_CANE] = SKO_Item(10, 13, 3, 3, 3, 3, 0, 17, 0);
 
 	///halloween event items
@@ -268,8 +268,8 @@ int main()
 	Item[ITEM_JACK_OLANTERN] = SKO_Item(21, 23, 5, 0, 0, 0, 0, 5, 0);
 
 	Item[ITEM_WHITE_PHAT] = SKO_Item(10, 13, 3, 0, 0, 0, 0, 12, 0);
-	Item[ITEM_SKELETON_HELM] = SKO_Item(18, 21, 3, 1, 2, 1, 0, 13, 9000);
-	Item[ITEM_TRAINING_HELM] = SKO_Item(18, 21, 3, 1, 2, 1, 0, 14, 75);
+	Item[ITEM_SKELETON_HELM] = SKO_Item(18, 21, 3, 1, 2, 1, 0, 13, 500);
+	Item[ITEM_TRAINING_HELM] = SKO_Item(18, 21, 3, 1, 2, 1, 0, 14, 10);
 
 	Item[ITEM_PURPLE_PHAT] = SKO_Item(10, 13, 3, 0, 0, 0, 0, 15, 0);
 	Item[ITEM_SNOW_BALL] = SKO_Item(12, 12, 5, 0, 0, 0, 0, 6, 0);
@@ -361,16 +361,20 @@ void MapObjectLoop()
 			// Check for portal collisions
 			for (int portal = 0; portal < map[mapId].num_portals; portal++)
 			{
-				for (int i = 0; i < MAX_CLIENTS; i++)
+				for (int userId = 0; userId < MAX_CLIENTS; userId++)
 				{
-					if (!User[i].Status || User[i].mapId != mapId)
+					if (!User[userId].Status || User[userId].mapId != mapId)
+						continue;
+
+					// Do not bother checking if the player is standing still
+					if (User[userId].x_speed == 0 && User[userId].ground)
 						continue;
 
 					//player box
-					float box1_x1 = User[i].x + 23;
-					float box1_y1 = User[i].y + 13;
-					float box1_x2 = User[i].x + 40;
-					float box1_y2 = User[i].y + 64;
+					float box1_x1 = User[userId].x + 23;
+					float box1_y1 = User[userId].y + 13;
+					float box1_x2 = User[userId].x + 40;
+					float box1_y2 = User[userId].y + 64;
 
 					//portal box
 					float box2_x1 = map[mapId].Portal[portal]->x;
@@ -380,12 +384,12 @@ void MapObjectLoop()
 
 					if (box1_x2 > box2_x1 && box1_x1 < box2_x2 && box1_y2 > box2_y1 && box1_y1 < box2_y2)
 					{
-						if (User[i].level >= map[mapId].Portal[portal]->level_required)
+						if (User[userId].level >= map[mapId].Portal[portal]->level_required)
 						{
-							Warp(i, map[mapId].Portal[portal]);
+							Warp(userId, map[mapId].Portal[portal]);
 							//TODO: how do players stay in a party on different maps?
 							//Maybe disconnect after a minute.
-							quitParty(i);
+							//quitParty(userId);
 						}
 					} //end portal collison
 				}
@@ -839,6 +843,36 @@ void npcPhysics(unsigned char mapId)
 	} //end npc
 }
 
+void checkPlayerRegen(unsigned char userId, unsigned char regen)
+{
+	if (OPI_Clock::milliseconds() - User[userId].regen_ticker < 1200)
+	{
+		return;
+	}
+	
+	//regen hp
+	if (User[userId].hp < User[userId].max_hp)
+	{
+		User[userId].hp += regen;
+
+		//cap the hp to their max
+		if (User[userId].hp > User[userId].max_hp)
+			User[userId].hp = User[userId].max_hp;
+
+		//Send changed HP to client player's party members
+		unsigned char displayHp = (int)((User[userId].hp / (float)User[userId].max_hp) * 80);
+		for (int playerId = 0; playerId < MAX_CLIENTS; playerId++)
+		{
+			if (playerId != userId && User[playerId].Ident && User[playerId].partyStatus == SKO_PartyStatus::Active && User[playerId].party == User[userId].party)
+				network->sendBuddyStatHp(playerId, userId, displayHp);
+		}
+	}
+
+	//Send changed HP stat to client player
+	network->sendStatHp(userId, User[userId].hp);
+	User[userId].regen_ticker = OPI_Clock::milliseconds();
+}
+
 void playerPhysics(unsigned char mapId)
 {	
 	bool block_y;
@@ -922,30 +956,7 @@ void playerPhysics(unsigned char mapId)
 		// TODO - move this code as it does not belong in Physics
 		if (regen > 0)
 		{
-			if (OPI_Clock::milliseconds() - User[i].regen_ticker >= 1200)
-			{
-				//regen hp
-				if (User[i].hp < User[i].max_hp)
-				{
-					User[i].hp += regen;
-
-					//cap the hp to their max
-					if (User[i].hp > User[i].max_hp)
-						User[i].hp = User[i].max_hp;
-
-					//Send changed HP to client player's party members
-					unsigned char displayHp = (int)((User[i].hp / (float)User[i].max_hp) * 80);
-					for (int pl = 0; pl < MAX_CLIENTS; pl++)
-					{
-						if (pl != i && User[pl].Ident && User[pl].partyStatus == PARTY && User[pl].party == User[i].party)
-							network->sendBuddyStatHp(pl, i, displayHp);
-					}
-				}
-
-				//Send changed HP stat to client player
-				network->sendStatHp(i, User[i].hp);
-				User[i].regen_ticker = OPI_Clock::milliseconds();
-			}
+			checkPlayerRegen(i, regen);
 		}
 
 		if (User[i].y_speed < 10)
@@ -1200,76 +1211,78 @@ void Attack(unsigned char userId, float numx, float numy)
 	printf("Looping all players.\n");
 	for (int i = 0; i < MAX_CLIENTS; i++)
 	{
-		if (!User[i].Ident)
+		// Do not hit yourself or people not logged in
+		if (!User[i].Ident || i == userId)
 			continue;
 
-		bool inParty = false;
-		if (User[i].partyStatus == PARTY && User[i].party == User[userId].party)
-			inParty = true;
+		// Do not hit people in your party
+		if (User[i].partyStatus == SKO_PartyStatus::Active && User[i].party == User[userId].party)
+			continue;
 
-		if (i != userId && !inParty && User[i].mapId == User[userId].mapId)
+		// Do not hit people on other maps
+		if (User[i].mapId != User[userId].mapId)
+			continue;
+
+		//check for collision
+		//horizontal
+		float x_dist, y_dist;
+		if (User[userId].facing_right)
+			x_dist = User[i].x - User[userId].x;
+		else
+			x_dist = User[userId].x - User[i].x;
+
+		//vertical
+		y_dist = User[i].y - User[userId].y;
+
+		//how far away you can hit, plus weapon
+		int max_dist = 30;
+		int weapon = User[userId].equip[0];
+		if (weapon != 0)
 		{
-			//check for collision
-			//horizontal
-			float x_dist, y_dist;
-			if (User[userId].facing_right)
-				x_dist = User[i].x - User[userId].x;
-			else
-				x_dist = User[userId].x - User[i].x;
+			max_dist += Item[weapon].reach;
+		}
 
-			//vertical
-			y_dist = User[i].y - User[userId].y;
+		//attack events
+		if (x_dist > 0 && x_dist < max_dist && y_dist > -60 && y_dist < 30)
+		{
+			int dam = User[userId].strength - User[i].defense;
+			int hat = User[userId].equip[1];
 
-			//how far away you can hit, plus weapon
-			int max_dist = 30;
-			int weap = User[userId].equip[0];
-			if (weap != 0)
+			//weapon
+			if (weapon != 0)
+				dam += Item[weapon].str;
+
+			if (hat > 0)
+				dam += Item[hat].str;
+
+			//other user
+			weapon = User[i].equip[0];
+			hat = User[i].equip[1];
+
+			if (weapon != 0)
+				dam -= Item[weapon].def;
+
+			if (hat > 0)
+				dam -= Item[hat].def;
+
+			//don't give free hp
+			if (dam < 0)
 			{
-				max_dist += Item[weap].reach;
+				dam = 0;
 			}
 
-			//attack events
-			if (x_dist > 0 && x_dist < max_dist && y_dist > -60 && y_dist < 30)
+			if (User[i].hp <= dam)
 			{
-				int dam = User[userId].strength - User[i].defense;
-				int hat = User[userId].equip[1];
+				printf("Respawn, x:%.2f y:%.2f\n", User[i].x, User[i].y);
+				Respawn(User[i].mapId, i);
+				printf("Respawned, x:%.2f y:%.2f\n", User[i].x, User[i].y);
 
-				//weapon
-				if (weap != 0)
-					dam += Item[weap].str;
-
-				if (hat > 0)
-					dam += Item[hat].str;
-
-				//other user
-				weap = User[i].equip[0];
-				hat = User[i].equip[1];
-
-				if (weap != 0)
-					dam -= Item[weap].def;
-
-				if (hat > 0)
-					dam -= Item[hat].def;
-
-				//don't give free hp
-				if (dam < 0)
-				{
-					dam = 0;
-				}
-
-				if (User[i].hp <= dam)
-				{
-					printf("Respawn, x:%.2f y:%.2f\n", User[i].x, User[i].y);
-					Respawn(User[i].mapId, i);
-					printf("Respawned, x:%.2f y:%.2f\n", User[i].x, User[i].y);
-
-				} //end died
-				else
-				{
-					PlayerDamaged(i, dam);
-				} //end lose hp
-			}	 //end hit
-		}
+			} //end died
+			else
+			{
+				PlayerDamaged(i, dam);
+			} //end lose hp
+		}	 //end hit
 	} //end loop everyone
 
 	//loop all targets
@@ -1318,7 +1331,6 @@ void Attack(unsigned char userId, float numx, float numy)
 	}
 
 	//loop all enemies
-	printf("Checking all enemies: %i\n", map[mapId].num_enemies);
 	for (int i = 0; i < map[mapId].num_enemies; i++)
 	{
 		bool partyBlocked = false;
@@ -1334,9 +1346,9 @@ void Attack(unsigned char userId, float numx, float numy)
 				partyBlocked = false;
 
 			//but if you are part of the party it isn't blocked
-			if (User[userId].partyStatus == PARTY)
+			if (User[userId].partyStatus == SKO_PartyStatus::Active)
 			{
-				if (User[map[mapId].Enemy[i]->dibsPlayer].partyStatus == PARTY &&
+				if (User[map[mapId].Enemy[i]->dibsPlayer].partyStatus == SKO_PartyStatus::Active &&
 					User[map[mapId].Enemy[i]->dibsPlayer].party == User[userId].party)
 					partyBlocked = false;
 			}
@@ -1577,7 +1589,7 @@ void Jump(unsigned char userId, float numx, float numy)
 	network->sendPlayerAction(isCorrection, MOVE_JUMP, userId, numx, numy);
 }
 
-void DivideLoot(int enemy, int party)
+void DivideLoot(unsigned char enemyId, int party)
 {
 	unsigned char mapId = 0;
 
@@ -1587,60 +1599,70 @@ void DivideLoot(int enemy, int party)
 	int numInParty = 0;
 
 	//find total damage from all party members
-	for (int p = 0; p < MAX_CLIENTS; p++)
-		if (User[p].Ident && User[p].partyStatus == PARTY && User[p].party == party)
+	for (unsigned char p = 0; p < MAX_CLIENTS; p++)
+	{
+		if (User[p].Ident && User[p].partyStatus == SKO_PartyStatus::Active && User[p].party == party)
 		{
 			//set the current map
 			mapId = User[p].mapId;
-			totalDamage += map[mapId].Enemy[enemy]->dibsDamage[p];
+			totalDamage += map[mapId].Enemy[enemyId]->dibsDamage[p];
 			numInParty++;
 		}
+	}
+	printf(kYellow "TotalDamage Is: %.2f\n" kNormal, totalDamage);
 
 	//find a random starting point
 	int randStart = rand() % numInParty;
 
 	//give away items until they are all gone
-	while (totalLootGiven < map[mapId].Enemy[enemy]->lootAmount)
+	while (totalLootGiven < map[mapId].Enemy[enemyId]->lootAmount)
 	{
 		//find total damage from all party members
-		for (int p = randStart; p < MAX_CLIENTS; p++)
-			if (User[p].Ident && User[p].partyStatus == PARTY && User[p].party == party)
+		for (unsigned char p = randStart; p < numInParty; p++)
+			if (User[p].Ident && User[p].partyStatus == SKO_PartyStatus::Active && User[p].party == party)
 			{
+				//If this member did not damage the enemy, they earn nothing
+				float dibsDamagePerPlayer = map[mapId].Enemy[enemyId]->dibsDamage[p];
+				if (dibsDamagePerPlayer < 1)
+					continue;
+
 				//calculate chance of getting the loot
-				float lootEarned = (float)map[mapId].Enemy[enemy]->dibsDamage[p] / totalDamage * map[mapId].Enemy[enemy]->lootAmount;
+				float lootEarned = (dibsDamagePerPlayer / totalDamage) * map[mapId].Enemy[enemyId]->lootAmount;
 				int lootGiven = 0;
 				printf("%s has earned %.2f loot items.\n", User[p].Nick.c_str(), lootEarned);
 
 				//give the player their whole items
 				for (int i = 0; i < lootEarned; i++)
 				{
-					GiveLoot(enemy, p);
+					GiveLoot(enemyId, p);
 					lootGiven++;
 					totalLootGiven++;
 
 					//check if the max items has been given
-					if (totalLootGiven >= map[mapId].Enemy[enemy]->lootAmount)
+					if (totalLootGiven >= map[mapId].Enemy[enemyId]->lootAmount)
 						return;
 				}
 
-				//printf("Loot given so far for %s is %i\n", User[p].Nick.c_str(), lootGiven);
+				printf("Loot given so far for %s is %i\n", User[p].Nick.c_str(), lootGiven);
 
 				//check if the max items has been given
-				if (totalLootGiven >= map[mapId].Enemy[enemy]->lootAmount)
+				printf(kGreen "return- if (%.i >= %i)\n" kNormal, totalLootGiven, map[mapId].Enemy[enemyId]->lootAmount);
+				if (totalLootGiven >= map[mapId].Enemy[enemyId]->lootAmount)
 					return;
 
 				//give a possible bonus item
 				if (Roll(lootEarned - lootGiven))
 				{
-					GiveLoot(enemy, p);
+					printf("Bonus item earned!\n");
+					GiveLoot(enemyId, p);
 					lootGiven++;
 					totalLootGiven++;
 				}
 
-				//printf("All the loot given to %s is %i\n", User[p].Nick.c_str(), lootGiven);
+				printf("All the loot given to %s is %i\n", User[p].Nick.c_str(), lootGiven);
 
 				//check if the max items has been given
-				if (totalLootGiven >= map[mapId].Enemy[enemy]->lootAmount)
+				if (totalLootGiven >= map[mapId].Enemy[enemyId]->lootAmount)
 					return;
 			}
 
@@ -1697,9 +1719,9 @@ void SpawnLoot(unsigned char mapId, SKO_ItemObject lootItem)
 	SpawnItem(mapId, itemObjId, itemId, x, y, x_speed, y_speed);
 }
 
-void GiveLoot(int enemy, int player)
+void GiveLoot(unsigned char enemy, unsigned char userId)
 {
-	unsigned char mapId = User[player].mapId;
+	unsigned char mapId = User[userId].mapId;
 
 	// remember about disabled items
 	SKO_ItemObject lootItem = map[mapId].Enemy[enemy]->getLootItem();
@@ -1728,7 +1750,7 @@ void GiveLoot(int enemy, int player)
 	//printf("Item[lootItem.itemID].w is %i\n", (int)Item[lootItem.itemID].w);
 	//printf("lootItem.itemID is %i\n", (int)lootItem.itemID);
 
-	lootItem.owner = player;
+	lootItem.owner = userId;
 
 	SpawnLoot(mapId, lootItem);
 }
@@ -1820,6 +1842,10 @@ void Warp(unsigned char userId, SKO_Portal *portal)
 
 	// Tell user about existing map objects
 	LoadMapObjects(userId, portal->mapId);
+
+	// Tell user about existing players
+	// TODO - fix this issue #21
+	// https://github.com/OptimusPi/SKO-Server/issues/21
 }
 
 void GiveXP(unsigned char userId, int xp)
@@ -1856,16 +1882,18 @@ void GiveXP(unsigned char userId, int xp)
 		unsigned char displayXp = (int)((User[userId].xp / (float)User[userId].max_xp) * 80);
 		unsigned char displayHp = (int)((User[userId].hp / (float)User[userId].max_hp) * 80);
 
-		for (int pl = 0; pl < MAX_CLIENTS; pl++)
+		for (int playerId = 0; playerId < MAX_CLIENTS; playerId++)
 		{
-			if (pl != userId && User[pl].Ident && User[pl].partyStatus == PARTY && User[pl].party == User[userId].party)
+			if (playerId == userId || User[playerId].Ident)
+				continue;
+
+			if (User[playerId].partyStatus == SKO_PartyStatus::Active && User[playerId].party == User[userId].party)
 			{
-				network->sendBuddyStatHp(pl, userId, displayHp);
-				network->sendBuddyStatXp(pl, userId, displayXp);
-				network->sendBuddyStatLevel(pl, userId, User[userId].level);
+				network->sendBuddyStatHp(playerId, userId, displayHp);
+				network->sendBuddyStatXp(playerId, userId, displayXp);
+				network->sendBuddyStatLevel(playerId, userId, User[userId].level);
 			}
 		}
-		return;
 	} //end gain xp
 
 	//xp
@@ -1875,7 +1903,7 @@ void GiveXP(unsigned char userId, int xp)
 	unsigned char displayXp = (int)((User[userId].xp / (float)User[userId].max_xp) * 80);
 	for (int c = 0; c < MAX_CLIENTS; c++)
 	{
-		if (c != userId && User[c].Ident && User[c].partyStatus == PARTY && User[c].party == User[userId].party)
+		if (c != userId && User[c].Ident && User[c].partyStatus == SKO_PartyStatus::Active && User[c].party == User[userId].party)
 			network->sendBuddyStatXp(c, userId, displayXp);
 	}
 }
@@ -1899,7 +1927,7 @@ void Respawn(unsigned char mapId, unsigned char userId)
 void quitParty(unsigned char userId)
 {
 	printf("quitParty(%s)\n", User[userId].Nick.c_str());
-	if (User[userId].partyStatus == 0 || User[userId].party < 0)
+	if (User[userId].partyStatus == SKO_PartyStatus::NotSet || User[userId].party < 0)
 	{
 		printf("User %s is in no party.\n", User[userId].Nick.c_str());
 	}
@@ -1907,13 +1935,13 @@ void quitParty(unsigned char userId)
 	{
 		printf("User %s has party status %i and in party %i\n",
 			   User[userId].Nick.c_str(),
-			   User[userId].partyStatus,
+			   (int)User[userId].partyStatus,
 			   User[userId].party);
 	}
 	int partyToLeave = User[userId].party;
 
 	User[userId].party = -1;
-	User[userId].partyStatus = 0;
+	User[userId].partyStatus = SKO_PartyStatus::NotSet;
 
 	printf("telling everyone that %s left his party.\n", User[userId].Nick.c_str());
 	//tell everyone
@@ -1935,7 +1963,7 @@ void quitParty(unsigned char userId)
 	if (count == 1)
 	{
 		User[partyHostUserId].party = -1;
-		User[partyHostUserId].partyStatus = 0;
+		User[partyHostUserId].partyStatus = SKO_PartyStatus::NotSet;
 		network->sendPartyLeave(partyHostUserId, partyHostUserId);
 	}
 }
@@ -1995,7 +2023,7 @@ void PlayerDamaged(unsigned char userId, unsigned char damage)
 		if (User[c].Ident && User[c].mapId == User[userId].mapId)
 		{
 			network->sendPlayerHit(c, userId);
-			if (userId != c && User[c].partyStatus == PARTY && User[c].party == User[userId].party)
+			if (userId != c && User[c].partyStatus == SKO_PartyStatus::Active && User[c].party == User[userId].party)
 				network->sendBuddyStatHp(c, userId, displayHp);
 		}
 	}
@@ -2007,7 +2035,6 @@ unsigned int GetTotalStrength(unsigned char userId)
 	unsigned char weapon = User[userId].equip[0];
 	unsigned char hat = User[userId].equip[1];
 	unsigned char trophy = User[userId].equip[2];
-
 	//Add strength of all equipment
 	if (weapon)
 		totalStrength += Item[weapon].str;
@@ -2040,7 +2067,7 @@ unsigned int GetTotaldefense(unsigned char userId)
 void KillEnemy(unsigned char enemyId, unsigned char mapId, unsigned char killerUserId)
 {
 	//Divide Loot between a party
-	if (User[killerUserId].partyStatus == PARTY)
+	if (User[killerUserId].partyStatus == SKO_PartyStatus::Active)
 	{
 		DivideLoot(enemyId, User[killerUserId].party);
 	}
@@ -2062,7 +2089,7 @@ void KillEnemy(unsigned char enemyId, unsigned char mapId, unsigned char killerU
 		bonus_clan_xp = map[mapId].Enemy[enemyId]->xp * 0.10; //10% bonus
 	}
 	printf("User is in a clan so bonus xp for them! %i\n", (int)bonus_clan_xp);
-	if (User[killerUserId].partyStatus == PARTY)
+	if (User[killerUserId].partyStatus == SKO_PartyStatus::Active)
 	{
 		//give bonus XP for party
 		float bonusXP = splitXP * 0.10;
@@ -2070,12 +2097,12 @@ void KillEnemy(unsigned char enemyId, unsigned char mapId, unsigned char killerU
 
 		//find total damage from all party members
 		for (int p = 0; p < MAX_CLIENTS; p++)
-			if (User[p].Ident && User[p].partyStatus == PARTY && User[p].party == User[killerUserId].party)
+			if (User[p].Ident && User[p].partyStatus == SKO_PartyStatus::Active && User[p].party == User[killerUserId].party)
 				totalDamage += map[mapId].Enemy[enemyId]->dibsDamage[p];
 
 		//find total damage from all party members
 		for (int p = 0; p < MAX_CLIENTS; p++)
-			if (User[p].Ident && User[p].partyStatus == PARTY && User[p].party == User[killerUserId].party)
+			if (User[p].Ident && User[p].partyStatus == SKO_PartyStatus::Active && User[p].party == User[killerUserId].party)
 			{
 				//base XP they deserve
 				float gimmieXP = 0;
@@ -2120,13 +2147,14 @@ void KillEnemy(unsigned char enemyId, unsigned char mapId, unsigned char killerU
 void EnemyHit(unsigned char enemyId, unsigned char mapId, unsigned char userId)
 {
 	//Sum of all strength a player has, including equipment
-	int strength = GetTotalStrength(userId);
+	unsigned int strength = GetTotalStrength(userId);
 	unsigned int defense = map[mapId].Enemy[enemyId]->defense;
 
-	unsigned int damage = strength - defense;
-
-	if (damage <= 0)
+	// IF the enemy can block this hit, take no damage and return.
+	if (defense >= strength)
 		return;
+	
+	unsigned int damage = strength - defense;
 
 	//keep track of damage
 	map[mapId].Enemy[enemyId]->dibsDamage[userId] += damage;
@@ -2306,10 +2334,10 @@ void EatFood(unsigned char userId, unsigned char itemId)
 	// TODO - change magic number 80 to use a config value
 	unsigned char displayHp = (int)((User[userId].hp / (float)User[userId].max_hp) * 80);
 
-	for (int pl = 0; pl < MAX_CLIENTS; pl++)
+	for (int playerId = 0; playerId < MAX_CLIENTS; playerId++)
 	{
-		if (pl != userId && User[pl].Ident && User[pl].partyStatus == PARTY && User[pl].party == User[userId].party)
-			network->sendBuddyStatHp(pl, userId, displayHp);
+		if (playerId != userId && User[playerId].Ident && User[playerId].partyStatus == SKO_PartyStatus::Active && User[playerId].party == User[userId].party)
+			network->sendBuddyStatHp(playerId, userId, displayHp);
 	}
 
 	// Update item amount in player inventory
@@ -2627,23 +2655,29 @@ void DropItem(unsigned char userId, unsigned char itemId, unsigned int amount)
 
 void InvitePlayerToParty(unsigned char userId, unsigned char playerB)
 {
+	printf(kGreen "%s wants to invite %s to party.\n" kNormal, User[userId].Nick.c_str(), User[playerB].Nick.c_str());
+	printf(kYellow "%s party status is %i.\n" kNormal, User[userId].Nick.c_str(), (int)User[userId].partyStatus);
+	printf(kYellow "%s party status is %i.\n" kNormal, User[playerB].Nick.c_str(), (int)User[playerB].partyStatus);	
+	printf(kYellow "%s party is %i.\n" kNormal, User[userId].Nick.c_str(), User[userId].party);
+	printf(kYellow "%s party is %i.\n" kNormal, User[playerB].Nick.c_str(), User[playerB].party);	
+
     //invite the other user
-    //if the other user is not in your party
-    if (User[playerB].partyStatus != 0)
+    //if the other user is not in a party
+    if (User[playerB].partyStatus > SKO_PartyStatus::NotSet)
         return;
         
-    int partyID = User[userId].party;
+    int partyId = User[userId].party;
 
     //set their party
-    if (User[userId].party == -1)
+    if (partyId == -1)
     {
-        for (partyID = 0; partyID <= MAX_CLIENTS; partyID++)
+        for (partyId = 0; partyId <= MAX_CLIENTS; partyId++)
         {
             //look for an open partyID
             bool taken = false;
             for (int i = 0; i < MAX_CLIENTS; i++)
             {
-                if (User[i].Ident && User[i].party == partyID)
+                if (User[i].Ident && User[i].party == partyId)
                 {
                     taken = true;
                     break;
@@ -2655,15 +2689,15 @@ void InvitePlayerToParty(unsigned char userId, unsigned char playerB)
     } //end if party is null
 
     //make the parties equal
-    User[userId].party = partyID;
-    User[playerB].party = partyID;
+    User[userId].party = partyId;
+    User[playerB].party = partyId;
 
     //set the party status of the invited person
-    User[playerB].partyStatus = INVITE;
-    User[userId].partyStatus = ACCEPT;
+    User[playerB].partyStatus = SKO_PartyStatus::InviteReceived;
+    User[userId].partyStatus = SKO_PartyStatus::InviteSent;
 
     //ask the user to party
-    network->sendTradeInvite(playerB, userId);
+    network->sendPartyInvite(playerB, userId);
 }
 
 void InvitePlayerToTrade(unsigned char userId, unsigned char playerId)
@@ -2873,40 +2907,69 @@ void ConfirmTrade(unsigned char userId)
 void AcceptPartyInvite(unsigned char userId)
 {
 	//only if I was invited :)
-    if (User[userId].partyStatus != INVITE)
-        return;
+    if (User[userId].partyStatus == SKO_PartyStatus::InviteReceived)
+	{
+        User[userId].partyStatus = SKO_PartyStatus::Active;
+	}
+	else 
+	{
+		return;
+	}
+
+	
 
     //tell the user about all the players in the party
-    for (int pl = 0; pl < MAX_CLIENTS; pl++)
+    for (int playerId = 0; playerId < MAX_CLIENTS; playerId++)
     {
-        if (!User[pl].Ident || pl == userId || User[pl].partyStatus != PARTY || User[pl].party != User[userId].party)
-            continue;
+        if (!User[playerId].Ident)
+			continue;
+	
+			
+		if (User[playerId].party != User[userId].party)
+			continue;
+		
+
+		//
+		// If the party "leader" has sent the first invite, initiate their party first.
+		//
+		if (User[playerId].partyStatus == SKO_PartyStatus::InviteSent)
+		{
+			printf(kGreen "\n%s is the party leader, now set to PARTY\n\n" kNormal, User[playerId].Nick.c_str());
+			User[playerId].partyStatus = SKO_PartyStatus::Active;
+			network->sendPartyAccept(playerId, playerId, User[playerId].party);
+		}
+
+		if (User[playerId].partyStatus != SKO_PartyStatus::Active)
+			continue;
+
         //
         // Notify all members in the party that player is joining
         //
-        network->sendPartyAccept(pl, userId, User[userId].party);
+        network->sendPartyAccept(playerId, userId, User[userId].party);
+
+		
         //tell existing party members the new player's stats
         unsigned char hp = (int)((User[userId].hp / (float)User[userId].max_hp) * 80);
         unsigned char xp = (int)((User[userId].xp / (float)User[userId].max_xp) * 80);
         unsigned char level = User[userId].level;
 
-        network->sendBuddyStatHp(pl, userId, hp);
-        network->sendBuddyStatXp(pl, userId, xp);
-        network->sendBuddyStatLevel(pl, userId, level);
+        network->sendBuddyStatHp(playerId, userId, hp);
+        network->sendBuddyStatXp(playerId, userId, xp);
+        network->sendBuddyStatLevel(playerId, userId, level);
 
         //
         // Notify player of each existing party member
         //
-        network->sendPartyAccept(userId, pl, User[pl].party);
+        network->sendPartyAccept(userId, playerId, User[playerId].party);
         // Send player the current party member stats
-        hp = (int)((User[pl].hp / (float)User[pl].max_hp) * 80);
-        xp = (int)((User[pl].xp / (float)User[pl].max_xp) * 80);
-        level = User[pl].level;
+        hp = (int)((User[playerId].hp / (float)User[playerId].max_hp) * 80);
+        xp = (int)((User[playerId].xp / (float)User[playerId].max_xp) * 80);
+        level = User[playerId].level;
 
         // Update party stats for client party player list
-        network->sendBuddyStatHp(userId, pl, hp);
-        network->sendBuddyStatXp(userId, pl, xp);
-        network->sendBuddyStatLevel(userId, pl, level);
+        network->sendBuddyStatHp(userId, playerId, hp);
+        network->sendBuddyStatXp(userId, playerId, xp);
+        network->sendBuddyStatLevel(userId, playerId, level);
     }
 }
 

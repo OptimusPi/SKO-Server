@@ -508,6 +508,9 @@ void SKO_PacketHandler::parsePacket(unsigned char userId, std::string packet)
         parseCastSpell(userId);
         break;
 
+    case EQUIP:
+        parseUnequip(userId, parser);
+        break;
     default:
         // Disconnect clients sending nonsense packets
         printf(kRed "[FATAL] SKO_PacketHandler::parsePacket() called with unknown packet type!\n" kNormal);

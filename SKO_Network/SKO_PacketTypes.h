@@ -12,7 +12,7 @@ const unsigned char
 
 	VERSION_MAJOR = 1,
 	VERSION_MINOR = 3,
-	VERSION_PATCH = 0,
+	VERSION_PATCH = 1,
 
 	CHAT = 1,
 

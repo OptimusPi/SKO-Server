@@ -1,5 +1,6 @@
 /* INCLUDES */
 #include "../SKO_Network/GE_Socket.h"
+#include "../SKO_Enums/SKO_PartyStatus.h"
 
 #ifndef __SKO_PLAYER_H_
 #define __SKO_PLAYER_H_
@@ -118,7 +119,7 @@ class SKO_Player
         int clanPlayer;
         //party
         int party;
-        int partyStatus;
+        SKO_PartyStatus partyStatus;
 
         //fun server stuff
         unsigned long long int loginTime;

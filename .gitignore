@@ -1,3 +1,5 @@
 *.o
 skoserver
 skoserver-dev
+*.ipch
+*.bin
