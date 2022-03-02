@@ -43,7 +43,7 @@ void terminal_quit(int signal){
 /* DEFINES */
 
 //HIT_LOOPS is how many for loop iterations to follow during collisions
-#define HIT_LOOPS 100
+#define HIT_LOOPS 50
 
 //players
 SKO_Player User[MAX_CLIENTS];
@@ -59,10 +59,10 @@ SKO_Item Item[256];
 unsigned char hpBar = 25;
 
 //gravity
-const float GRAVITY = 0.169;
+const float GRAVITY = 0.18;
 
 //player walk speed
-const float WALK_SPEED = 2.5f;
+const float WALK_SPEED = 2.0f;
 
 //holiday events TODO use a config not hard coded magic
 unsigned const char HOLIDAY_NPC_DROP = ITEM_CHERRY_PI, HOLIDAY_BOX_DROP = ITEM_NERD_GLASSES;
