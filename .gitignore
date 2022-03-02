@@ -3,3 +3,4 @@ skoserver
 skoserver-dev
 *.ipch
 *.bin
+.env
