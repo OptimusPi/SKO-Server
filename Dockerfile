@@ -5,10 +5,10 @@ FROM ubuntu:latest
 RUN apt -y update && apt-get install -y
 
 # Install the Clang compiler
-RUN apt -y install clang install build-essential install make
+RUN apt-get -y install clang build-essential make
 
 # Install C++ dependencies for SKO-Server
-RUN apt -y install libmysql++-dev libargon2-dev
+RUN apt-get -y install libmysql++-dev libargon2-dev
 
 # Copy the current folder which contains C++ source code to the Docker image under /usr/src
 COPY . .
