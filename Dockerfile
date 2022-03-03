@@ -2,7 +2,7 @@
 FROM ubuntu:latest
 
 # Update apps on the base image
-RUN apt -y update && apt-get install -y
+RUN apt-get -y update && apt-get install -y
 
 # Install the Clang compiler
 RUN apt-get -y install clang build-essential make
