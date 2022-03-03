@@ -43,8 +43,8 @@ OPI_MYSQL::~OPI_MYSQL()
 {
 	printf("destructing OPI_MYSQL...\n");
 	delete[] server;
-	delete[] user;
 	delete[] database;
+	delete[] user;
 	delete[] password;
 }
 
@@ -57,7 +57,7 @@ void OPI_MYSQL::log(std::string output)
 	logCount++;
 }
 
-bool OPI_MYSQL::connect(std::string server_in, std::string database_in, std::string user_in, std::string password_in)
+bool OPI_MYSQL::connect(std::string server_in, std::string database_in, int port_in, std::string user_in, std::string password_in)
 {
 	//return value
 	bool success = false;
@@ -67,8 +67,9 @@ bool OPI_MYSQL::connect(std::string server_in, std::string database_in, std::str
 	std::strcpy(database, database_in.c_str());
 	std::strcpy(user, user_in.c_str());
 	std::strcpy(password, password_in.c_str());
+	port = port_in;
        
-	printf("Set OPI_MYSQL server details [%s][%s][%s][%s]\n", server, database, user, password);
+	printf("Set OPI_MYSQL server details [%s][%s][%i][%s][********]\n", server, database, port, user);
 
 	conn = mysql_init(NULL); 
 
@@ -84,7 +85,7 @@ bool OPI_MYSQL::connect(std::string server_in, std::string database_in, std::str
 		user, 
 		password, 
 		database, 
-		3306, 
+		port, 
 		NULL, 
 		(unsigned long)0
 	))
@@ -106,7 +107,7 @@ bool OPI_MYSQL::reconnect()
 {
 	conn = mysql_init(NULL);    
 	//printf("mysql_real_connect((MYSQL *)conn, %s, %s, %s, %s, 0, NULL, (unsigned long)0);", server, user, password, database);
-	if (!mysql_real_connect((MYSQL *)conn, server, user, password, database, 3306, NULL, (unsigned long)0)) 
+	if (!mysql_real_connect((MYSQL *)conn, server, user, password, database, port, NULL, (unsigned long)0)) 
 	{
 		//if it is NULL there is some error
 		log("[FATAL ERROR IN MYSQL] Error was:\n> " + std::string(mysql_error(conn)) + "*");

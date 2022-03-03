@@ -7,7 +7,7 @@ class SKO_Repository
 {
 	public:
 	SKO_Repository();
-	std::string Connect(std::string hostname, std::string schema, std::string username, std::string password);
+	std::string Connect(std::string hostname, std::string schema, int port, std::string username, std::string password);
 
 	int loginPlayer(std::string username, std::string password);
 	int loadPlayerData(unsigned char userId);

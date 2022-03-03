@@ -31,7 +31,7 @@ class OPI_MYSQL
 		bool reconnect();
 
 		//connection factory
-		bool connect(std::string server, std::string database, std::string user, std::string password);
+		bool connect(std::string server, std::string database, int port, std::string user, std::string password);
 
 		//query
 		int query(std::string statement);
@@ -68,6 +68,7 @@ class OPI_MYSQL
 		char * database = new char[100];
 		char * user = new char[100];
 		char * password = new char [100]; 
+		int port = 3306;
 
 		//results
 		MYSQL_RES *result;

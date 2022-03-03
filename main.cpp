@@ -4,7 +4,7 @@
 #include <errno.h>
 #include <stdint.h>
 #include <signal.h>
-#include <unistd.h>
+//#include <unistd.h>
 #include <thread>
 
 //TODO remove this when possible
@@ -43,7 +43,7 @@ void terminal_quit(int signal){
 /* DEFINES */
 
 //HIT_LOOPS is how many for loop iterations to follow during collisions
-#define HIT_LOOPS 100
+#define HIT_LOOPS 50
 
 //players
 SKO_Player User[MAX_CLIENTS];
@@ -59,10 +59,10 @@ SKO_Item Item[256];
 unsigned char hpBar = 25;
 
 //gravity
-const float GRAVITY = 0.169;
+const float GRAVITY = 0.18;
 
 //player walk speed
-const float WALK_SPEED = 2.5f;
+const float WALK_SPEED = 2.0f;
 
 //holiday events TODO use a config not hard coded magic
 unsigned const char HOLIDAY_NPC_DROP = ITEM_CHERRY_PI, HOLIDAY_BOX_DROP = ITEM_NERD_GLASSES;
@@ -119,6 +119,35 @@ void NpcLoop();
 
 int snap_distance = 64;
 
+
+// Use environment variables for config values.
+// Or set values in .env file (see: .env.example)
+std::string getvar(const char* key)
+{
+	printf("Reading environment variable {%s} ...\r\n", key);
+	char* value = getenv(key);
+	printf("Read %s=%s\r\n from getenv()\r\n", key, value);
+		
+	// Validate environment variable loaded
+	if (value) {
+		printf("Read %s=%s\r\n from getenv()\r\n", key, value);
+		return std::string(value);
+	}
+
+	// Fall back to .env file
+	 INIReader configFile(".env");
+	 if (configFile.ParseError() < 0) {
+		printf("error: Can't load value for '%s'\n", key);
+		return "";
+	 }
+
+	 auto iniValue = configFile.Get("", key, "");
+
+	 printf("Read %s=%s\r\n from .env", key, iniValue.c_str());
+
+	 return iniValue;
+}
+
 /* CODE */
 int main()
 {
@@ -147,66 +176,19 @@ int main()
 		User[i] = SKO_Player();
 	}
 
-	std::ifstream ConfigFile("SKO_Content/config.ini");
-	unsigned int serverPort = 0;
-	std::string databaseHostname = "";
-	std::string databaseUsername = "";
-	std::string databasePassword = "";
-	std::string databaseSchema = "";
 
-	if (ConfigFile.is_open())
-	{
-		//store each line
-		std::string line;
-
-		//Snap Distance
-		std::getline(ConfigFile, line);
-		snap_distance = atoi(line.c_str());
-		printf("snap_distance: %d\n\r", snap_distance);
-
-		//server port
-		std::getline(ConfigFile, line);
-		serverPort = atoi(line.c_str());
-		printf("server port: %d\n\r", serverPort);
-
-		//SQL Server Hostname
-		std::getline(ConfigFile, line);
-		databaseHostname = line.c_str();
-		printf("hostname: %s\n\r", databaseHostname.c_str());
-
-		//SQL Server Schema
-		std::getline(ConfigFile, line);
-		databaseSchema = line.c_str();
-		printf("schema: %s\n\r", databaseSchema.c_str());
-
-		//SQL Server Username
-		std::getline(ConfigFile, line);
-		databaseUsername = line.c_str();
-		printf("user: %s\n\r", databaseUsername.c_str());
-
-		//SQL Server Password
-		std::getline(ConfigFile, line);
-		databasePassword = line.c_str();
-		printf("password: %s\n", databasePassword.c_str());
-
-		ConfigFile.close();
-	}
-	else
-	{
-		printf("COULD NOT OPEN CONFIG\n");
-		return 1;
-	}
-
-	databaseHostname = SKO_Utilities::lowerString(databaseHostname);
-	databaseUsername = SKO_Utilities::lowerString(databaseUsername);
-	databasePassword = SKO_Utilities::lowerString(databasePassword);
-	databaseSchema = SKO_Utilities::lowerString(databaseSchema);
+	unsigned int serverPort = atoi(getvar("SKO_PORT").c_str());
+	unsigned int databasePort = atoi(getvar("SKO_DB_PORT").c_str());
+	std::string databaseHostname = getvar("SKO_DB_HOST");
+	std::string databaseUsername = getvar("SKO_DB_USER");
+	std::string databasePassword = getvar("SKO_DB_PASSWORD");
+	std::string databaseSchema = getvar("SKO_DB_SCHEMA");
 
 	printf("About to connect to database.\n");
 
 	repository = new SKO_Repository();
 
-	if (repository->Connect(databaseHostname, databaseSchema, databaseUsername, databasePassword) == "error")
+	if (repository->Connect(databaseHostname, databaseSchema, databasePort, databaseUsername, databasePassword) == "error")
 		return 1;
 
 	//items                    width,  height, type, def,  str,  hp,  reach, equipID

@@ -9,9 +9,9 @@ SKO_Repository::SKO_Repository()
 	this->database = new OPI_MYSQL();
 }
 
-std::string SKO_Repository::Connect(std::string hostname, std::string schema, std::string username, std::string password)
+std::string SKO_Repository::Connect(std::string hostname, std::string schema, int port, std::string username, std::string password)
 {
-	if (!this->database->connect(hostname, schema, username, password))
+	if (!this->database->connect(hostname, schema, port, username, password))
 	{
 		printf("Could not connect to MYSQL database.\n");
 		return "error";
