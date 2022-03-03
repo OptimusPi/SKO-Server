@@ -11,15 +11,11 @@ RUN apt -y install clang install build-essential install make
 RUN apt -y install libmysql++-dev libargon2-dev
 
 # Copy the current folder which contains C++ source code to the Docker image under /usr/src
-COPY . /usr/src/dockertest1
+COPY . .
 
 # Specify the working directory
-WORKDIR /usr/src/dockertest1
+WORKDIR /
 
-# Use Clang to compile the Test.cpp source file
 RUN make
-
-# This command runs your application, comment out this line to compile only
-CMD ["./launch"]
 
 LABEL Name=skoserver Version=1.4.0
