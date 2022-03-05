@@ -15,7 +15,7 @@ jobs:
     steps:
     - uses: actions/checkout@v2
     - name: Build the Docker image
-      run: docker build . --file Dockerfile --tag sko-server:development$(date +%s)
+      run: docker build . --file Dockerfile --tag sko-server$(date +%s)
     - name: Install doctl 
       uses: digitalocean/action-doctl@v2
       with:
@@ -24,7 +24,7 @@ jobs:
       run: doctl registry login --expiry-seconds 600
     - name: Tag image 
       run:
-        docker tag sko-server:development \
-        registry.digitalocean.com/sko-server/sko-server:development${{github.event.inputs.version }}
+        docker tag sko-server \
+        registry.digitalocean.com/sko-server/sko-server${{github.event.inputs.version }}
     - name: Push image to DO Container Registry 
-      run: docker push registry.digitalocean.com/sko-server/sko-server:development${{ github.event.inputs.version }}
+      run: docker push registry.digitalocean.com/sko-server/sko-server${{ github.event.inputs.version }}
