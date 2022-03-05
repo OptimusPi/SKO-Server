@@ -19,3 +19,6 @@ WORKDIR /
 RUN make
 
 LABEL Name=skoserver Version=1.4.0
+
+# run sko server
+CMD ["./skoserver-dev"]
