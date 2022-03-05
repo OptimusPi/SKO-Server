@@ -9,22 +9,22 @@ on:
 jobs:
 
   build:
-
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v2
-    - name: Build the Docker image
-      run: docker build -t sko-server/sko-server .
-    - name: Install doctl 
-      uses: digitalocean/action-doctl@v2
+    - name: Github Checkout
+      uses: actions/checkout@v2
+      
+    - name: Login to Digital Ocean Registry
+      uses: docker/login-action@v1
       with:
-        token: ${{ secrets.DIGITALOCEAN_PRIVATE_ACCESS_KEY }}
-    - name: Log in to DO Container Registry 
-      run: doctl registry login --expiry-seconds 600
-    - name: Tag image 
-      run:
-        docker tag sko-server/sko-server \
-        registry.digitalocean.com/sko-server/sko-server:latest
-    - name: Push image to DO Container Registry
+        registry: registry.digitalocean.com
+        username: ${{ secrets.DIGITALOCEAN_PRIVATE_ACCESS_KEY }}
+        password: ${{ secrets.DIGITALOCEAN_PRIVATE_ACCESS_KEY }}
+    
+    - name: Build Docker Container
+      run: docker build -t registry.digitalocean.com/sko-server/sko-server:latest .
+    
+    - name: Push to Digital Ocean Registry
       run: docker push registry.digitalocean.com/sko-server/sko-server:latest
+   
