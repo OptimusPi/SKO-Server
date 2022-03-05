@@ -32,9 +32,9 @@ std::string SKO_Repository::GetClanTag(std::string username, std::string default
 	if (database->count())
 	{
 		database->nextRow();
-		clanTag = "[";
+		clanTag = "{";
 		clanTag += database->getString(0);
-		clanTag += "]";
+		clanTag += "}";
 	}
 
 	return clanTag;
