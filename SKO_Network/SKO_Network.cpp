@@ -682,7 +682,7 @@ void SKO_Network::attemptLogin(unsigned char userId, std::string username, std::
 	// inform all players
 	for (unsigned char i = 0; i < MAX_CLIENTS; i++)
 	{
-		if (!User[i].Ident || User[i].Nick.compare("Paladin") == 0)
+		if (!User[i].Ident)
 			continue;
 
 		// Do this check so the newly-joined user does not hear about themselves twice..
