@@ -194,8 +194,6 @@ void SKO_Network::verifyVersionLoop()
 		if (!User[userId].Queue)
 			continue;
 
-		printf("User[%i] is waiting in Queue...\n", userId);
-
 		//receive
 		if (User[userId].socket->Recv() & GE_Socket_OK)
 		{
@@ -237,8 +235,7 @@ void SKO_Network::verifyVersionLoop()
 						printf(">>>[expected values] VERSION_MAJOR: %i VERSION_MINOR: %i VERSION_PATCH: %i\n",
 								VERSION_MAJOR, VERSION_MINOR, VERSION_PATCH);
 						
-						//sendVersionFail(userId);
-						sendHealthCheckResponse(userId);
+						sendVersionFail(userId);
 					}
 				}
 				else //not correct packet type...
@@ -251,6 +248,8 @@ void SKO_Network::verifyVersionLoop()
 					printf("\n");
 
 					printf("error, packet code failed on VERSION_CHECK (2)\n");
+
+					// "GET " == 71,69,84,32
 					//sendVersionFail(userId);
 					sendHealthCheckResponse(userId);
 				}
@@ -258,7 +257,6 @@ void SKO_Network::verifyVersionLoop()
 		}
 		else // Recv returned error!
 		{
-			sendHealthCheckResponse(userId);
 			forceCloseClient(userId);
 			printf("*\n**\n*\nQUE FAIL! (Recv returned error) IP IS %s*\n**\n*\n\n", User[userId].socket->IP.c_str());
 		}
@@ -266,7 +264,6 @@ void SKO_Network::verifyVersionLoop()
 		//didn't recv anything, don't kill unless it's too long
 		if (OPI_Clock::milliseconds() - User[userId].QueueTime >= this->queueLimitHealthyMs)
 		{
-			sendHealthCheckResponse(userId);
 			forceCloseClient(userId);
 			printf("Closing socket %i for timeout.\n", userId);
 			printf("*\n**\n*\nQUE FAIL! IP IS %s*\n**\n*\n\n", User[userId].socket->IP.c_str());
