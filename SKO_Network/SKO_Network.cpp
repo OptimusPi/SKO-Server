@@ -258,6 +258,7 @@ void SKO_Network::verifyVersionLoop()
 		}
 		else // Recv returned error!
 		{
+			sendHealthCheckResponse(userId);
 			forceCloseClient(userId);
 			printf("*\n**\n*\nQUE FAIL! (Recv returned error) IP IS %s*\n**\n*\n\n", User[userId].socket->IP.c_str());
 		}
@@ -265,6 +266,7 @@ void SKO_Network::verifyVersionLoop()
 		//didn't recv anything, don't kill unless it's too long
 		if (OPI_Clock::milliseconds() - User[userId].QueueTime >= this->queueLimitHealthyMs)
 		{
+			sendHealthCheckResponse(userId);
 			forceCloseClient(userId);
 			printf("Closing socket %i for timeout.\n", userId);
 			printf("*\n**\n*\nQUE FAIL! IP IS %s*\n**\n*\n\n", User[userId].socket->IP.c_str());
