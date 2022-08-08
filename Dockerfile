@@ -20,5 +20,7 @@ RUN make
 
 LABEL Name=skoserver Version=1.4.0
 
+EXPOSE 1337
+
 # run sko server
 CMD ["./skoserver-dev"]

@@ -177,7 +177,7 @@ int main()
 	}
 
 
-	unsigned int serverPort = atoi(getvar("SKO_PORT").c_str());
+	unsigned int serverPort = 1337; // atoi(getvar("SKO_PORT").c_str());
 	unsigned int databasePort = atoi(getvar("SKO_DB_PORT").c_str());
 	std::string databaseHostname = getvar("SKO_DB_HOST");
 	std::string databaseUsername = getvar("SKO_DB_USER");
