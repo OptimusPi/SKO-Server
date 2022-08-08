@@ -170,7 +170,7 @@ void SKO_Network::sendVersionFail(unsigned char userId)
 }
 
 
-vois SKO_Network::sendHealthCheckResponse(unsigned char userId)
+void SKO_Network::sendHealthCheckResponse(unsigned char userId)
 {
 	std::string response = "HTTP/1.0 200 OK\r\n";
 
@@ -251,7 +251,7 @@ void SKO_Network::verifyVersionLoop()
 
 					printf("error, packet code failed on VERSION_CHECK (2)\n");
 					//sendVersionFail(userId);
-					sendHealthCheckResponse();
+					sendHealthCheckResponse(userId);
 				}
 			}
 		}
