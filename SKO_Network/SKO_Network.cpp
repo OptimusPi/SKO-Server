@@ -172,7 +172,7 @@ void SKO_Network::sendVersionFail(unsigned char userId)
 
 void SKO_Network::sendHealthCheckResponse(unsigned char userId)
 {
-	std::string response = "HTTP/1.0 200 OK\r\n\r\n";
+	std::string response = "HTTP/1.0 200 OK\r\nConnection: close\r\n";
 
 	if (User[userId].socket->Send(response) == GE_Socket_Error)
 	{
