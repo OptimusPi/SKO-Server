@@ -163,7 +163,8 @@ bool GE_Socket::Create(unsigned int Port)
     Socket = socket( AF_INET, SOCK_STREAM, IPPROTO_IP ); 
  
     sin.sin_family = AF_INET; 
-    sin.sin_addr.s_addr = INADDR_ANY; 
+    //sin.sin_addr.s_addr = INADDR_ANY; 
+    sin.sin_addr.s_addr = inet_addr("0.0.0.0");
     sin.sin_port = htons((int) Port );
 
 	socklen_t len = sizeof sin;
