@@ -17,9 +17,8 @@ RUN make
 
 FROM ubuntu:latest
 WORKDIR /root/
-COPY --from=builder /app/bin/skoserver-dev /usr/local/bin/
-
-EXPOSE 1337
+COPY --from=builder /app/skoserver-dev .
+COPY --from=builder /app/SKO_Content/* .
 
 # run sko server
 CMD ["./skoserver-dev"]
