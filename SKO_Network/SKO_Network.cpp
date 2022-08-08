@@ -207,9 +207,13 @@ void SKO_Network::verifyVersionLoop()
 		if (User[userId].socket->Recv() & GE_Socket_OK)
 		{
 			std::string packet = User[userId].socket->data;
-			printf("A client is trying to connect...\n");
-			printf("data.length() = [%i]\n", (int)packet.length());
-
+			
+			if (packet.length() > 0)
+			{
+				printf("A client is trying to connect...\n");
+				printf("data.length() = [%i]\n", (int)packet.length());
+			}
+			
 			//if you got anything
 			if (packet.length() >= 6)
 			{
