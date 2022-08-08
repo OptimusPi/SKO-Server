@@ -1,5 +1,6 @@
 # Get the base Ubuntu image from Docker Hub
-FROM ubuntu:latest
+FROM ubuntu:latest as builder
+WORKDIR /app
 
 # Update apps on the base image
 RUN apt-get -y update && apt-get install -y
@@ -12,13 +13,11 @@ RUN apt-get -y install libmysql++-dev libargon2-dev
 
 # Copy the current folder which contains C++ source code to the Docker image under /usr/src
 COPY . .
-
-# Specify the working directory
-WORKDIR /
-
 RUN make
 
-LABEL Name=skoserver Version=1.4.0
+FROM ubuntu:latest
+WORKDIR /root/
+COPY --from=builder /app/bin/sko-server-dev /usr/local/bin/
 
 EXPOSE 1337
 
