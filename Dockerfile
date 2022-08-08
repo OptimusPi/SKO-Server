@@ -17,8 +17,12 @@ RUN make
 
 FROM ubuntu:latest
 WORKDIR /root/
+
+RUN apt-get -y update && apt-get install -y
+RUN apt-get -y install libmysql++-dev libargon2-dev
+
 COPY --from=builder /app/skoserver-dev .
-COPY --from=builder /app/SKO_Content/* .
+COPY --from=builder /app/SKO_Content/* ./SKO_Content
 
 # run sko server
 CMD ["./skoserver-dev"]
