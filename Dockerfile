@@ -17,7 +17,7 @@ RUN make
 
 FROM ubuntu:latest
 WORKDIR /root/
-COPY --from=builder /app/bin/sko-server-dev /usr/local/bin/
+COPY --from=builder /app/bin/skoserver-dev /usr/local/bin/
 
 EXPOSE 1337
 
