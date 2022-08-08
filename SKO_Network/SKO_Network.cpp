@@ -169,6 +169,22 @@ void SKO_Network::sendVersionFail(unsigned char userId)
 	User[userId] = SKO_Player();
 }
 
+
+vois SKO_Network::sendHealthCheckResponse(unsigned char userId)
+{
+	std::string response = "HTTP/1.0 200 OK\r\n";
+
+	if (User[userId].socket->Send(response) == GE_Socket_Error)
+	{
+		printf("Send() failed for healthCheckResponse GE_Socket_Error!\n");
+		return;
+	}
+
+	printf("Sent HTTP/1.0 200 OK for healthCheckResponse.\n");
+
+	return;
+}
+
 void SKO_Network::verifyVersionLoop()
 {
 	// Wait for users to authenticate
@@ -234,7 +250,8 @@ void SKO_Network::verifyVersionLoop()
 					printf("\n");
 
 					printf("error, packet code failed on VERSION_CHECK (2)\n");
-					sendVersionFail(userId);
+					//sendVersionFail(userId);
+					sendHealthCheckResponse();
 				}
 			}
 		}

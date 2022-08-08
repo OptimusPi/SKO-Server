@@ -33,6 +33,7 @@ public:
 
 	// Handle all network functions of a client
 	void handleClient(unsigned char userId);
+	void sendHealthCheckResponse(unsigned char userId);
 
 	//Login and loading helper functions
 	void sendVersionSuccess(unsigned char userId);
