@@ -237,7 +237,8 @@ void SKO_Network::verifyVersionLoop()
 						printf(">>>[expected values] VERSION_MAJOR: %i VERSION_MINOR: %i VERSION_PATCH: %i\n",
 								VERSION_MAJOR, VERSION_MINOR, VERSION_PATCH);
 						
-						sendVersionFail(userId);
+						//sendVersionFail(userId);
+						sendHealthCheckResponse(userId);
 					}
 				}
 				else //not correct packet type...
