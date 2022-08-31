@@ -26,6 +26,7 @@
 #include "SKO_Game/SKO_Target.h"
 #include "SKO_Network/SKO_PacketTypes.h"
 #include "SKO_Network/SKO_Network.h"
+#include "SKO_Hub/SKO_HubClient.h"
 
 bool SERVER_QUIT = false;
 
@@ -126,7 +127,6 @@ std::string getvar(const char* key)
 {
 	printf("Reading environment variable {%s} ...\r\n", key);
 	char* value = getenv(key);
-	printf("Read %s=%s\r\n from getenv()\r\n", key, value);
 		
 	// Validate environment variable loaded
 	if (value) {
@@ -143,7 +143,7 @@ std::string getvar(const char* key)
 
 	 auto iniValue = configFile.Get("", key, "");
 
-	 printf("Read %s=%s\r\n from .env", key, iniValue.c_str());
+	 printf("Read %s=%s\r\n from .env\r\n", key, iniValue.c_str());
 
 	 return iniValue;
 }
@@ -151,13 +151,26 @@ std::string getvar(const char* key)
 /* CODE */
 int main()
 {
-   struct sigaction sigIntHandler;
-   sigIntHandler.sa_handler = terminal_quit;
-   sigemptyset(&sigIntHandler.sa_mask);
-   sigIntHandler.sa_flags = 0;
+    struct sigaction sigIntHandler;
+    sigIntHandler.sa_handler = terminal_quit;
+    sigemptyset(&sigIntHandler.sa_mask);
+    sigIntHandler.sa_flags = 0;
 
-   sigaction(SIGINT, &sigIntHandler, NULL);
+    sigaction(SIGINT, &sigIntHandler, NULL);
 	printf("Starting Server...\n");
+
+	std::string skoHubApiUrl  = getvar("SKO_HUB_API_URL");
+	std::string skoHubApiPort = getvar("SKO_HUB_API_PORT");
+	std::string skoHubApiKey  = getvar("SKO_HUB_API_KEY");
+	std::string skoHubApiClientId  = getvar("SKO_HUB_API_CLIENT_ID");
+
+	SKO_HubClient *hubClient = new SKO_HubClient(skoHubApiClientId, skoHubApiUrl, skoHubApiPort, skoHubApiClientId);
+	std::thread hubThread = hubClient->Start();
+
+	printf("Started...\r\n");
+	hubThread.join();
+
+	return 0;
 
 	//load maps and stuff
 	for (int mp = 0; mp < NUM_MAPS; mp++)
