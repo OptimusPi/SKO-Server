@@ -57,7 +57,7 @@ std::thread SKO_HubClient::Start()
 	}
 	memset(this->recvbuf, 0x15, sizeof(recvbuf));
 	
-    if (this->Send("connect"))
+    if (this->Send("+register"))
     {
         perror("Send(connect)");
         exit(EXIT_FAILURE);
@@ -76,13 +76,24 @@ void SKO_HubClient::Process()
     while (!this->stop)
     {
         printf("running...%i\r\n", i);
-        OPI_Sleep::seconds(1);
+        OPI_Sleep::milliseconds(1);
 
         if (this->Receive())
         {
             perror("Receive()");
             this->stop = true;
         }
+
+        // SKO Hub is sending a query 
+        if (this->data[0] == "?")
+        {
+            if (this->data.substring(0, 8) == "+?apiKey")
+            {
+
+            }
+        }
+
+        
 
         if (++i > 15)
         {
@@ -113,6 +124,7 @@ bool SKO_HubClient::Receive()
 	}
 
     //Save data that we received
+    // TODO - packet splitting, command splitting
     this->data.append(this->recvbuf, recvbytes);
 
     if (recvbytes >= MAX_BUFFER) {
