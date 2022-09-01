@@ -24,5 +24,6 @@ RUN DEBIAN_FRONTEND=noninteractive && apt-get -yq install libmysql++-dev libargo
 COPY --from=builder /app/skoserver-dev .
 COPY --from=builder /app/SKO_Content/* SKO_Content/
 
+EXPOSE 1337/TCP
 # run sko server
 CMD ["./skoserver-dev"]
