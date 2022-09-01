@@ -85,15 +85,13 @@ void SKO_HubClient::Process()
         }
 
         // SKO Hub is sending a query 
-        if (this->data[0] == "?")
+        if (this->data[0] == '?')
         {
-            if (this->data.substring(0, 8) == "+?apiKey")
+            if (this->data.substr(0, 8) == "+?apiKey")
             {
 
             }
         }
-
-        
 
         if (++i > 15)
         {
