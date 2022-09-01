@@ -49,6 +49,7 @@ public:
     std::thread Start();
     bool Send(std::string in_Data);
     void Process();
+    void Chop(int size);
 
 private:
     // SKO Hub connection details

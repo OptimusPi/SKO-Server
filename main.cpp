@@ -38,6 +38,8 @@ SKO_Repository *repository;
 void terminal_quit(int signal){
 	printf(kGreen "\nGracefully shutting down after receiving signal=%i.\n kNormal", signal);
 	SERVER_QUIT = true;
+
+	// TODO also stop SKO Hub or else it will Segfault on exit.
 	network->cleanup();
 }
 
@@ -164,12 +166,12 @@ int main()
 	std::string skoHubApiKey  = getvar("SKO_HUB_API_KEY");
 	std::string skoHubApiClientId  = getvar("SKO_HUB_API_CLIENT_ID");
 
-	SKO_HubClient *hubClient = new SKO_HubClient(skoHubApiClientId, skoHubApiUrl, skoHubApiPort, skoHubApiClientId);
+	SKO_HubClient *hubClient = new SKO_HubClient(skoHubApiClientId, skoHubApiUrl, skoHubApiPort, skoHubApiKey);
 	std::thread hubThread = hubClient->Start();
 
 	printf("Started...\r\n");
 	hubThread.join();
-
+	printf("!!! SKO HUB HAS ENDED !!!\r\n");
 	return 0;
 
 	//load maps and stuff
