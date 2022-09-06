@@ -127,12 +127,12 @@ int snap_distance = 64;
 // Or set values in .env file (see: .env.example)
 std::string getvar(const char* key)
 {
-	printf("Reading environment variable {%s} ...\r\n", key);
+	//printf("Reading environment variable {%s} ...\r\n", key);
 	char* value = getenv(key);
 		
 	// Validate environment variable loaded
 	if (value) {
-		printf("Read %s=%s\r\n from getenv()\r\n", key, value);
+		//printf("Read %s=%s\r\n from getenv()\r\n", key, value);
 		return std::string(value);
 	}
 
@@ -145,9 +145,59 @@ std::string getvar(const char* key)
 
 	 auto iniValue = configFile.Get("", key, "");
 
-	 printf("Read %s=%s\r\n from .env\r\n", key, iniValue.c_str());
+	 //printf("Read %s=%s\r\n from .env\r\n", key, iniValue.c_str());
 
 	 return iniValue;
+}
+
+
+
+#include <cryptopp/aes.h>
+using CryptoPP::AES;
+
+#include <cryptopp/osrng.h>
+using CryptoPP::AutoSeededRandomPool;
+
+#include <cryptopp/ccm.h>
+using CryptoPP::CBC_Mode;
+
+#include <cryptopp/base64.h>
+using CryptoPP::Base64Encoder;
+using CryptoPP::Base64Decoder;
+
+#include <cryptopp/filters.h>
+using CryptoPP::StringSink;
+using CryptoPP::StringSource;
+using CryptoPP::StreamTransformationFilter;
+using CryptoPP::AuthenticatedEncryptionFilter;
+using CryptoPP::BlockPaddingSchemeDef;
+
+#include <cryptopp/hex.h>
+using CryptoPP::HexEncoder;
+
+#include <cryptopp/hmac.h>
+using CryptoPP::HMAC;
+using CryptoPP::SHA256;
+using CryptoPP::HashFilter;
+
+std::vector<std::string> split(const std::string& s, char seperator)
+{
+   std::vector<std::string> output;
+
+    std::string::size_type prev_pos = 0, pos = 0;
+
+    while((pos = s.find(seperator, pos)) != std::string::npos)
+    {
+        std::string substring( s.substr(prev_pos, pos-prev_pos) );
+
+        output.push_back(substring);
+
+        prev_pos = ++pos;
+    }
+
+    output.push_back(s.substr(prev_pos, pos-prev_pos)); // Last word
+
+    return output;
 }
 
 /* CODE */
@@ -159,6 +209,274 @@ int main()
     sigIntHandler.sa_flags = 0;
 
     sigaction(SIGINT, &sigIntHandler, NULL);
+
+
+{
+//////////
+	// Configurable AES Secret Key (Hex format) 
+	std::string aesKeyStr = getvar("AES_SECRET_HEX_KEY");
+
+	// Simulating a cipher string that comes from api as `${iv}:${cipherText}:${hmac}`
+	// iv is in Hexadecimal format
+	// cipherText is in Base64 format
+	// hmac is in Hexadecimal format
+	std::string cipher = "eeca19c2f61bd91f790e8665acb2f209:fZ4uLDhfOqIL56NBvXUZQ6QxeczT9mMnV8PZeimLN8cCkzwfv+7BtzxLKi1w4J1dwqB1P3/Ubki0/fx0vZHXXw==:01d2f98d91373b4785140d1fa18c312c167e2b984fe9db1cfec40815d4a186df";
+	auto cipherSplit = split(cipher, ':');
+
+	if (cipherSplit.size() < 3)
+	{
+		perror("cipherText is not legit.");
+		return 1;
+	}
+
+	std::string ivStr = cipherSplit[0];
+	std::string cipherText = cipherSplit[1];
+	std::string hmacStr = cipherSplit[2];
+	std::string aesKeyHex;
+	std::string ivHex;
+
+
+	//first check hmac
+	std::string mac;
+	std::stringstream ssMessage;
+	ssMessage << ivStr << ":" << cipherText; 
+	std::string messageStr = ssMessage.str();
+
+	// Parse AES Key as HEX and get raw bytes
+	CryptoPP::StringSource aesKeySS(aesKeyStr,
+		true, new CryptoPP::HexDecoder(new StringSink(aesKeyHex)));
+	CryptoPP::SecByteBlock key((const byte*)aesKeyHex.data(), 256/8);
+
+	HMAC<SHA256> hmac(key, key.size());
+
+	StringSource ssMac(messageStr, true, 
+		new HashFilter(hmac,
+			new HexEncoder(
+				new StringSink(mac), false
+			)
+		) // HashFilter      
+	); // StringSource
+
+	if (hmacStr != mac)
+	{
+		perror("BAD CIPHER!");
+		return 1;
+	} 
+	else if (hmacStr.length() < 1) {
+		perror("BAD CIPHER!");
+		return 1;
+	}
+	else {
+		printf("HMAC VALIDATED!\r\n");
+	}
+
+	// Parse IV as HEX and get raw bytes
+	CryptoPP::StringSource ivSS(ivStr,
+		true, new CryptoPP::HexDecoder(new StringSink(ivHex)));
+	CryptoPP::SecByteBlock iv((const byte*)ivHex.data(), 128/8);
+
+	/*********************************\
+	\*********************************/
+
+	try
+	{
+		std::string plain = "JoiRunner is a homeboy so is ezpzpk I bet they'll be proud..,";
+		std::string cipher, encoded, recovered;
+		std::cout << "TEST plain text: " << plain << std::endl;
+		std::cout << "TEST iv size: " << AES::BLOCKSIZE << std::endl;
+		
+		CryptoPP::CBC_Mode<AES>::Encryption enc;
+
+		// Unique initilization vector for each message
+		// Sometimes called a NONCE.
+		byte iv[AES::BLOCKSIZE];
+		AutoSeededRandomPool prng;
+		prng.GenerateBlock(iv, sizeof(iv));
+
+		enc.SetKeyWithIV( key, 256/8, iv);
+
+		StringSource ss1( plain, true,
+			new StreamTransformationFilter( enc,
+				new Base64Encoder(
+					new StringSink(cipher), false
+				) // Base64Encoder
+			) // StreamTransformationFilter
+		); // StringSource
+
+		std::string ivString;
+		StringSource ss2( iv, sizeof(iv), true,
+			new HexEncoder(
+				new StringSink(ivString), false
+			) // Base64Encoder
+		); // StringSource
+
+		//first check hmac
+		std::string mac;
+		std::stringstream ssMessage;
+		ssMessage << ivString << ":" << cipher; 
+		std::string messageStr = ssMessage.str();
+
+		HMAC<SHA256> hmac(key, key.size());
+
+		StringSource ssMac(messageStr, true, 
+			new HashFilter(hmac,
+				new HexEncoder(
+					new StringSink(mac), false
+				)
+			) // HashFilter      
+		); // StringSource
+
+
+		std::stringstream strstr;
+		strstr << "test encrypt [" << ivString << ":" << cipher << ":" << mac << "]";
+		std::cout << strstr.str() << std::endl;	
+	}
+	catch( CryptoPP::Exception& e )
+	{
+		std::cerr << e.what() << std::endl;
+		exit(1);
+	}
+
+	// /*********************************\
+	// \*********************************/
+
+	// // Pretty print cipher text
+	// StringSource ss2( cipher, true,
+	// 	new Base64Encoder(
+	// 		new StringSink( encoded )
+	// 	) // Base64Encoder
+	// ); // StringSource
+	// std::cout << "cipher text: " << encoded << std::endl;
+
+	/*********************************\
+	\*********************************/
+
+
+
+	try
+	{
+		std::string plaintext;
+		CryptoPP::CBC_Mode<AES>::Decryption dec;
+		dec.SetKeyWithIV( key, 32, iv );
+
+		// The StreamTransformationFilter removes
+		//  padding as required.
+		StringSource ss3(cipherText, true, 
+			new Base64Decoder(
+				new StreamTransformationFilter( dec,
+					new StringSink( plaintext ),
+					StreamTransformationFilter::NO_PADDING,
+					true
+				) // StreamTransformationFilter
+			)
+		); // StringSource
+
+		std::cout << "from JS recovered text: " << plaintext << std::endl;
+	}
+	catch( CryptoPP::Exception& e )
+	{
+		std::cerr << e.what() << std::endl;
+		exit(1);
+	}
+
+//////////
+}
+	
+
+
+	// /// @brief 
+	// /// @return 
+	// std::string aesKey = getvar("AES_SECRET_KEY");
+
+	// if (aesKey.length() != 32) {
+	// 	std::cout << "ERROR! aesKEy must be 32 bytes for IV with 16 bytes.";
+	// 	return 1;
+	// }
+
+	// for (int i = 0; i < 1; i++)
+	// {
+	// 	std::cout << "Run #" << i << std::endl << std::endl;
+
+	// 	byte key[aesKey.length()];
+	// 	std::memcpy(key, aesKey.data(), aesKey.length());
+
+	// 	byte iv[16];
+	// 	AutoSeededRandomPool prng;
+	// 	prng.GenerateBlock(iv, sizeof(iv));
+
+	// 	std::string cipher, encoded, recovered;
+		
+	// 	if (i == 0)
+	// 	{
+	// 		// Pretty print key
+	// 		encoded.clear();
+	// 		StringSource(key, sizeof(key), true,
+	// 				new StringSink(encoded)
+	// 		); // StringSource
+	// 		std::cout << "  key: " << encoded << std::endl;
+
+	// 		// Pretty print iv
+	// 		encoded.clear();
+	// 		StringSource(iv, sizeof(iv), true,
+	// 			new Base64Encoder(
+	// 				new StringSink(encoded)
+	// 			) // HexEncoder
+	// 		); // StringSource
+	// 		std::cout << "  iv: " << encoded << std::endl;
+	// 	}
+
+	// 	// encrypt with AES
+	// 	std::string clearText = "{ id: 0, name: 'pifreak'}";
+	// 	printf(" encrypting clearText: %s\r\n", clearText.c_str());
+
+	// 	CCM<AES>::Encryption e;
+	// 	e.SetKeyWithIV(key, sizeof(key), iv);
+	// 	e.SpecifyDataLengths( 0, clearText.length(), 0 );
+
+	// 	AuthenticatedEncryptionFilter aef( e,
+	// 		new StringSink( cipher )
+	// 	); // AuthenticatedEncryptionFilter
+
+
+	// 	aef.Put( (byte*)clearText.data(), clearText.length() );
+	// 	aef.MessageEnd();
+
+	// 	// The StreamTransformationFilter removes
+	// 	//  padding as required.
+	// 	// StringSource ss1(clearText.c_str(), true,
+    //     // new AuthenticatedEncryptionFilter( e,
+    //     //     new StringSink( cipher )
+    //     // ) // AuthenticatedEncryptionFilter
+   	// 	// ); // StringSource
+
+	// 	// Pretty print
+	// 	encoded.clear();
+	// 	StringSource(cipher, true,
+	// 		new Base64Encoder(
+	// 			new StringSink(encoded)
+	// 		) // HexEncoder
+	// 	); // StringSource
+	// 	std::cout << "  cipher text: " << encoded << std::endl;
+
+	// 	std::cout << "\r\n--- Run #" << i << " completed. ---\r\n\r\n";
+	// }
+
+	// //CryptoPP::CBC_Mode<AES>::CryptoPP::Encryption e;
+	// //e.SetKeyWithIV(key, sizeof(key), iv);
+
+	return 0;
+	/// 
+	//////
+
+
+
+
+
+
+
+
+
+
 	printf("Starting Server...\n");
 
 	std::string skoHubApiUrl  = getvar("SKO_HUB_API_URL");
@@ -168,6 +486,9 @@ int main()
 
 	SKO_HubClient *hubClient = new SKO_HubClient(skoHubApiClientId, skoHubApiUrl, skoHubApiPort, skoHubApiKey);
 	std::thread hubThread = hubClient->Start();
+
+	
+
 
 	printf("Started...\r\n");
 	hubThread.join();
