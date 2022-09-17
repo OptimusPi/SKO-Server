@@ -13,8 +13,8 @@
 #include <string>
 #include <thread>
 #include "../SKO_Repository/SKO_Repository.h"
-#include "../SKO_Utilities/OPI_Clock.h"
-#include "../SKO_Utilities/OPI_Sleep.h"
+#include "../OPI_Utilities/OPI_Clock.h"
+#include "../OPI_Utilities/OPI_Sleep.h"
 #include "SKO_PacketHandler.h"
 #include "../SKO_Game/SKO_item_defs.h"
 #include "GE_Socket.h"

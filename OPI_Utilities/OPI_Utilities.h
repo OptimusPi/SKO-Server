@@ -1,9 +1,10 @@
 #include <string>
+#include <vector>
 
-#ifndef __SKO_Utilities_H_ 
-#define __SKO_Utilities_H_
+#ifndef __OPI_Utilities_H_ 
+#define __OPI_Utilities_H_
 
-class SKO_Utilities
+class OPI_Utilities
 {
     public:
     // Returns the next parameter from a slash command
@@ -11,18 +12,19 @@ class SKO_Utilities
     // Example:
     //    slash command: "/warp pifreak 2500 100 2"
     //    parameters: "pifreak 2500 100 2"
-    //   SKO_Utilities::nextParameter(): "pifreak"
+    //   OPI_Utilities::nextParameter(): "pifreak"
     //    parameters: "2500 100 2"
-    //   SKO_Utilities::nextParameter(): "2500"
+    //   OPI_Utilities::nextParameter(): "2500"
     //    parameters: "100 2"
-    //   SKO_Utilities::nextParameter(): "100"
+    //   OPI_Utilities::nextParameter(): "100"
     //    parameters: "2"
-    //   SKO_Utilities::nextParameter(): "2"
+    //   OPI_Utilities::nextParameter(): "2"
     //    parameters: ""
-    //   SKO_Utilities::nextParameter: ""
+    //   OPI_Utilities::nextParameter: ""
     static std::string nextParameter(std::string &parameters);
     static std::string trimString(std::string str);
     static std::string lowerString(std::string myString);
+    static std::vector<std::string> split(const std::string& s, char seperator);
 };
  
 #endif

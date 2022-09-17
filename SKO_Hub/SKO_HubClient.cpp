@@ -1,4 +1,5 @@
 #include "SKO_HubClient.h"
+#include "../OPI_Utilities/OPI_Crypto.h"
 #include <sstream>
 
 SKO_HubClient::SKO_HubClient(std::string clientId, std::string apiUrl, std::string apiPort, std::string apiKey)

@@ -1,5 +1,5 @@
 #include "SKO_Repository.h"
-#include "../SKO_Utilities/OPI_Hasher.h"
+#include "../OPI_Utilities/OPI_Hasher.h"
 
 //TODO remove this when possible
 #include "../Global.h"

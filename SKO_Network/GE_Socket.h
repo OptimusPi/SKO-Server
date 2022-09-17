@@ -15,7 +15,7 @@
 #include <arpa/inet.h>
 #include <unistd.h>
 
-#include "../SKO_Utilities/OPI_Clock.h"
+#include "../OPI_Utilities/OPI_Clock.h"
 
 int close(int fd);
 
