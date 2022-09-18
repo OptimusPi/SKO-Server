@@ -45,7 +45,7 @@ class OPI_Crypto
         std::string Decrypt(std::string cipher);
 
     private:
-        void GetKey_Hex(std::string aesKeyHexStr);
+        void SetKey_WithHex(std::string aesKeyHexStr);
         std::string ValidateHMAC(std::string cipher);
         std::string GenerateHMAC(std::string cipher);
         CryptoPP::SecByteBlock key;

@@ -1,14 +1,16 @@
 #include "SKO_HubClient.h"
-#include "../OPI_Utilities/OPI_Crypto.h"
 #include <sstream>
+#include "../OPI_Utilities/OPI_Crypto.h"
 
-SKO_HubClient::SKO_HubClient(std::string clientId, std::string apiUrl, std::string apiPort, std::string apiKey)
+SKO_HubClient::SKO_HubClient(std::string clientId, std::string apiUrl, std::string apiPort, std::string apiKey, std::string aesKeyHex)
 {
     // Connection details
     this->clientId = clientId;
     this->apiUrl = apiUrl;
     this->apiPort = apiPort;
     this->apiKey = apiKey;
+    this->crypto = new OPI_Crypto(aesKeyHex);
+    aesKeyHex.clear();
     
     // Initialize receive data
     this->data = "";

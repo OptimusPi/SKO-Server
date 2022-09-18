@@ -4,18 +4,16 @@
 #include <iostream>
 #include <sstream>
 
-OPI_Crypto::OPI_Crypto(std::string aesKey)
+OPI_Crypto::OPI_Crypto(std::string aesKeyHex)
 {
-	if (aesKey.length() < 64)
+	if (aesKeyHex.length() < 64)
 	{
-		std::cout << "FATAL ERRORL AES KEY LENGTH IS: " 
-			<< aesKey.length() 
+		std::cerr << "!!FATAL ERROR!! AES KEY LENGTH IS: " 
+			<< aesKeyHex.length() 
 			<< std::endl;
 		exit(1);
 	}
-	this->GetKey_Hex(aesKey);
-
-	printf("got key fine: [%s]\r\n", this->key.data());
+	this->SetKey_WithHex(aesKeyHex);
 }
 
 OPI_Crypto::~OPI_Crypto()
@@ -23,7 +21,7 @@ OPI_Crypto::~OPI_Crypto()
 	//this->key.deallocate();
 }
 
-void OPI_Crypto::GetKey_Hex(std::string aesKeyHexStr)
+void OPI_Crypto::SetKey_WithHex(std::string aesKeyHexStr)
 {
 	if (aesKeyHexStr.length() != 64) {
 		printf("the aes hex key is the wrong size.\r\n");

@@ -20,7 +20,6 @@
 #include <netinet/in.h>
 #include <cstring>
 
-
 #include <sys/socket.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -37,13 +36,16 @@
 #include <arpa/inet.h> 
 
 
+
+#include "../OPI_Utilities/OPI_Crypto.h"
+
 #define MAX_BUFFER 10000
 
 class SKO_HubClient 
 {
  
 public:
-    SKO_HubClient(std::string clientId, std::string apiUrl, std::string apiPort, std::string apiKey);
+    SKO_HubClient(std::string clientId, std::string apiUrl, std::string apiPort, std::string apiKey, std::string aesKeyHex);
     ~SKO_HubClient();
 
     std::thread Start();
@@ -66,6 +68,9 @@ private:
     bool Receive();
     char recvbuf[MAX_BUFFER];
     int Socket;
+
+    // Encryption provider for AES CBC mode with 256-bit HMAC
+    OPI_Crypto* crypto;
 };
 
 #endif

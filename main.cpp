@@ -168,30 +168,9 @@ int main()
 	std::string skoHubApiPort = getvar("SKO_HUB_API_PORT");
 	std::string skoHubApiKey  = getvar("SKO_HUB_API_KEY");
 	std::string skoHubApiClientId  = getvar("SKO_HUB_API_CLIENT_ID");
-	std::string aesKeyStr = getvar("AES_SECRET_SKO_HUB");
+	std::string aesKeyHex = getvar("AES_SECRET_SKO_HUB");
 
-
-	std::string cipherTest = "37bc51d85a9d9e920926e917bd2aab35:wILyxHu7e7VUjfy9nU0r+HXmjMP1o5pxQpl+tvAwbJW0ElOpDwNUOGfQbv+MDcCev1mpfVXJWQha+9CwleW52g==:7f66f0ce41f00683fadc64f3dc0ce8994cea0004b55c65e5705bec9b941af013";
-	std::string plainTest = "JoiRunner is a homeboy so is ezpzpk I bet they'll be proud..,";
-
-	printf("OPI_Crypto(): starting\r\n");
-	auto cryptoProvider = OPI_Crypto(aesKeyStr);
-	printf("OPI_Crypto(): done\r\n");
-
-	auto plainTextResult = cryptoProvider.Decrypt(cipherTest);
-	printf("plain resuult is: %s\r\n", plainTextResult.c_str());
-	
-	auto cipherResult = cryptoProvider.Encrypt(plainTest);
-	printf("cipher result is: %s\r\n", cipherResult.c_str());
-
-	auto plainTextResult2 = cryptoProvider.Decrypt(cipherResult);
-	printf("plain resuult 2is: %s\r\n", plainTextResult2.c_str());
-
-
-	exit(0);
-
-
-	SKO_HubClient *hubClient = new SKO_HubClient(skoHubApiClientId, skoHubApiUrl, skoHubApiPort, skoHubApiKey);
+	SKO_HubClient *hubClient = new SKO_HubClient(skoHubApiClientId, skoHubApiUrl, skoHubApiPort, skoHubApiKey, aesKeyHex);
 	std::thread hubThread = hubClient->Start();
 
 	printf("Started...\r\n");
