@@ -258,8 +258,7 @@ int GE_Socket::Send(std::string in_Data)
  
 int GE_Socket::Recv()
 { 
-    fd_set sset; 
-     
+    fd_set sset;  
     FD_ZERO(&sset);  
     FD_SET((unsigned int)Socket,&sset);  
  

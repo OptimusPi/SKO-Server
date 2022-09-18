@@ -1,7 +1,7 @@
 #include <string>
-#include "SKO_Utilities.h"
+#include "OPI_Utilities.h"
 
-std::string SKO_Utilities::nextParameter(std::string &parameters)
+std::string OPI_Utilities::nextParameter(std::string &parameters)
 {
     //grab first parameter from list
     std::string next = parameters.substr(0, parameters.find_first_of(" "));
@@ -13,7 +13,7 @@ std::string SKO_Utilities::nextParameter(std::string &parameters)
     return next;
 }
 
-std::string SKO_Utilities::trimString(std::string str) 
+std::string OPI_Utilities::trimString(std::string str) 
 {
 	std::size_t first = str.find_first_not_of(' ');
 
@@ -29,10 +29,34 @@ std::string SKO_Utilities::trimString(std::string str)
 	return returnVal;
 }
 
-std::string SKO_Utilities::lowerString(std::string myString)
+std::string OPI_Utilities::lowerString(std::string myString)
 {
 	for (unsigned long int i = 0; i < myString.length(); ++i)
 		myString[i] = std::tolower(myString[i]);
 
 	return myString;
+}
+
+
+std::vector<std::string> OPI_Utilities::split(const std::string& s, char seperator)
+{
+    if (s.empty()) {
+        return std::vector<std::string>();
+    }
+
+    std::vector<std::string> output;
+    std::string::size_type prev_pos = 0, pos = 0;
+
+    while((pos = s.find(seperator, pos)) != std::string::npos)
+    {
+        std::string substring( s.substr(prev_pos, pos-prev_pos) );
+
+        output.push_back(substring);
+
+        prev_pos = ++pos;
+    }
+
+    output.push_back(s.substr(prev_pos, pos-prev_pos));
+
+    return output;
 }

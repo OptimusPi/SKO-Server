@@ -10,7 +10,7 @@
 #include "SKO_Target.h"
 #include "SKO_NPC.h"
 
-#include "../SKO_Utilities/INIReader.h"
+#include "../OPI_Utilities/INIReader.h"
 
 #ifndef __SKO_MAP_H_
 #define __SKO_MAP_H_

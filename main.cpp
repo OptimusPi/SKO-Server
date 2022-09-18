@@ -10,9 +10,9 @@
 //TODO remove this when possible
 #include "Global.h"
 
-#include "SKO_Utilities/OPI_Clock.h"
-#include "SKO_Utilities/OPI_Timestep.h"
-#include "SKO_Utilities/SKO_Utilities.h"
+#include "OPI_Utilities/OPI_Clock.h"
+#include "OPI_Utilities/OPI_Timestep.h"
+#include "OPI_Utilities/OPI_Utilities.h"
 
 #include "SKO_Game/SKO_Player.h"
 #include "SKO_Game/SKO_Item.h"
@@ -26,6 +26,7 @@
 #include "SKO_Game/SKO_Target.h"
 #include "SKO_Network/SKO_PacketTypes.h"
 #include "SKO_Network/SKO_Network.h"
+#include "SKO_Hub/SKO_HubClient.h"
 
 bool SERVER_QUIT = false;
 
@@ -37,6 +38,8 @@ SKO_Repository *repository;
 void terminal_quit(int signal){
 	printf(kGreen "\nGracefully shutting down after receiving signal=%i.\n kNormal", signal);
 	SERVER_QUIT = true;
+
+	// TODO also stop SKO Hub or else it will Segfault on exit.
 	network->cleanup();
 }
 
@@ -124,13 +127,12 @@ int snap_distance = 64;
 // Or set values in .env file (see: .env.example)
 std::string getvar(const char* key)
 {
-	printf("Reading environment variable {%s} ...\r\n", key);
+	//printf("Reading environment variable {%s} ...\r\n", key);
 	char* value = getenv(key);
-	printf("Read %s=%s\r\n from getenv()\r\n", key, value);
 		
 	// Validate environment variable loaded
 	if (value) {
-		printf("Read %s=%s\r\n from getenv()\r\n", key, value);
+		//printf("Read %s=%s\r\n from getenv()\r\n", key, value);
 		return std::string(value);
 	}
 
@@ -143,21 +145,38 @@ std::string getvar(const char* key)
 
 	 auto iniValue = configFile.Get("", key, "");
 
-	 printf("Read %s=%s\r\n from .env", key, iniValue.c_str());
+	 //printf("Read %s=%s\r\n from .env\r\n", key, iniValue.c_str());
 
 	 return iniValue;
 }
 
+#include "OPI_Utilities/OPI_Crypto.h"
+
 /* CODE */
 int main()
 {
-   struct sigaction sigIntHandler;
-   sigIntHandler.sa_handler = terminal_quit;
-   sigemptyset(&sigIntHandler.sa_mask);
-   sigIntHandler.sa_flags = 0;
+    struct sigaction sigIntHandler;
+    sigIntHandler.sa_handler = terminal_quit;
+    sigemptyset(&sigIntHandler.sa_mask);
+    sigIntHandler.sa_flags = 0;
 
-   sigaction(SIGINT, &sigIntHandler, NULL);
+    sigaction(SIGINT, &sigIntHandler, NULL);
+
 	printf("Starting Server...\n");
+
+	std::string skoHubApiUrl  = getvar("SKO_HUB_API_URL");
+	std::string skoHubApiPort = getvar("SKO_HUB_API_PORT");
+	std::string skoHubApiKey  = getvar("SKO_HUB_API_KEY");
+	std::string skoHubApiClientId  = getvar("SKO_HUB_API_CLIENT_ID");
+	std::string aesKeyHex = getvar("AES_SECRET_SKO_HUB");
+
+	SKO_HubClient *hubClient = new SKO_HubClient(skoHubApiClientId, skoHubApiUrl, skoHubApiPort, skoHubApiKey, aesKeyHex);
+	std::thread hubThread = hubClient->Start();
+
+	printf("Started...\r\n");
+	hubThread.join();
+	printf("!!! SKO HUB HAS ENDED !!!\r\n");
+	return 0;
 
 	//load maps and stuff
 	for (int mp = 0; mp < NUM_MAPS; mp++)

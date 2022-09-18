@@ -13,8 +13,8 @@
 #include <string.h>
 #include <stdio.h> 
 #include <mutex>
-#include "../SKO_Utilities/OPI_Clock.h"
-#include "../SKO_Utilities/OPI_Sleep.h"
+#include "../OPI_Utilities/OPI_Clock.h"
+#include "../OPI_Utilities/OPI_Sleep.h"
 
 class OPI_MYSQL
 {
