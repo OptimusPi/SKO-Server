@@ -20,28 +20,35 @@ using CryptoPP::StringSource;
 using CryptoPP::StreamTransformationFilter;
 using CryptoPP::AuthenticatedEncryptionFilter;
 using CryptoPP::BlockPaddingSchemeDef;
+using CryptoPP::ArraySink;
 
 #include <cryptopp/hex.h>
 using CryptoPP::HexEncoder;
+using CryptoPP::HexDecoder;
 
 #include <cryptopp/hmac.h>
 using CryptoPP::HMAC;
 using CryptoPP::SHA256;
 using CryptoPP::HashFilter;
+using CryptoPP::HashVerificationFilter;
+
+
 
 class OPI_Crypto
 {
     public:
-        /// @brief 
-        /// @param aesKey 
-        /// @param cleartext 
-        /// @return 
-        std::string Encrypt(std::string aesKey, std::string cleartext);
-        std::string Decrypt(std::string aesKey, std::string cipher);
-        static CryptoPP::SecByteBlock GetKey(std::string aesKeyStr);
+
+        OPI_Crypto(std::string aesKey);
+        ~OPI_Crypto();
+
+        std::string Encrypt(std::string cleartext);
+        std::string Decrypt(std::string cipher);
 
     private:
-
+        void GetKey_Hex(std::string aesKeyHexStr);
+        std::string ValidateHMAC(std::string cipher);
+        std::string GenerateHMAC(std::string cipher);
+        CryptoPP::SecByteBlock key;
 };
 
 #endif

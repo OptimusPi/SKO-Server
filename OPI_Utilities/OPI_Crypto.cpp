@@ -4,21 +4,47 @@
 #include <iostream>
 #include <sstream>
 
-CryptoPP::SecByteBlock OPI_Crypto::GetKey(std::string aesKeyStr)
+OPI_Crypto::OPI_Crypto(std::string aesKey)
 {
-    std::string aesKeyBytes;
-    CryptoPP::StringSource aesKeySS(aesKeyStr, true, new CryptoPP::HexDecoder(new StringSink(aesKeyBytes)));
-	CryptoPP::SecByteBlock key((const byte*)aesKeyBytes.data(), 256/8);
+	if (aesKey.length() < 64)
+	{
+		std::cout << "FATAL ERRORL AES KEY LENGTH IS: " 
+			<< aesKey.length() 
+			<< std::endl;
+		exit(1);
+	}
+	this->GetKey_Hex(aesKey);
 
-	return key;
+	printf("got key fine: [%s]\r\n", this->key.data());
 }
 
-std::string OPI_Crypto::Encrypt(std::string aesKeyStr, std::string clearText)
+OPI_Crypto::~OPI_Crypto()
+{
+	//this->key.deallocate();
+}
+
+void OPI_Crypto::GetKey_Hex(std::string aesKeyHexStr)
+{
+	if (aesKeyHexStr.length() != 64) {
+		printf("the aes hex key is the wrong size.\r\n");
+		return;
+	}
+
+	std::string keyBytes;
+    CryptoPP::StringSource aesKeySS(aesKeyHexStr, true, 
+		new CryptoPP::HexDecoder(
+			new StringSink(keyBytes)
+		)
+	);
+	CryptoPP::SecByteBlock keySecByteBlock(reinterpret_cast<const byte*>(&keyBytes[0]), keyBytes.size());
+	keyBytes.clear();
+	this->key = keySecByteBlock;
+}
+
+std::string OPI_Crypto::Encrypt(std::string clearText)
 {
 	CryptoPP::CBC_Mode<AES>::Encryption enc;
     std::string cipherText;
-	auto key = OPI_Crypto::GetKey(aesKeyStr);
-
 
     // Unique initilization vector for each message
     // Sometimes called a NONCE.
@@ -26,7 +52,7 @@ std::string OPI_Crypto::Encrypt(std::string aesKeyStr, std::string clearText)
     AutoSeededRandomPool prng;
     prng.GenerateBlock(iv, sizeof(iv));
 
-    enc.SetKeyWithIV( key, 256/8, iv);
+    enc.SetKeyWithIV( this->key, 256/8, iv);
 
     CryptoPP::StringSource ss1( clearText, true,
         new StreamTransformationFilter( enc,
@@ -44,30 +70,28 @@ std::string OPI_Crypto::Encrypt(std::string aesKeyStr, std::string clearText)
     ); // StringSource
 
     // calculate and attach HMAC
-    std::string hmacStr;
+    std::string hmacHexStr;
     std::stringstream cipher;
     cipher << ivString << ":" << cipherText; 
-
-    HMAC<SHA256> hmac(key, key.size());
+	
+    HMAC<SHA256> hmac(this->key, this->key.size());
 
     CryptoPP::StringSource ssMac(cipher.str(), true, 
         new HashFilter(hmac,
             new HexEncoder(
-                new StringSink(hmacStr), false
+                new StringSink(hmacHexStr), false
             )
         ) // HashFilter
     ); // StringSource
 
-	cipher << ":" << hmacStr;
+	cipher << ":" << hmacHexStr;
 
     return cipher.str();
 }
 
-std::string OPI_Crypto::Decrypt(std::string aesKeyStr, std::string cipher)
-{
-	// get secure key from key string
-	auto key = OPI_Crypto::GetKey(aesKeyStr);
 
+std::string OPI_Crypto::Decrypt(std::string cipher)
+{
     // Split cipher text into IV, cipherText, aand 
     auto cipherSplit = OPI_Utilities::split(cipher, ':');
     if (cipherSplit.size() < 3)
@@ -76,47 +100,58 @@ std::string OPI_Crypto::Decrypt(std::string aesKeyStr, std::string cipher)
 		return "";
 	}
 
+	// Parse cypher into iv, cypherText, and hmac
     std::string ivStr = cipherSplit[0];
 	std::string cipherText = cipherSplit[1];
-	std::string hmacStr = cipherSplit[2];
-	std::string aesKeyHex;
-	std::string ivHex;
+	std::string hmacHexStr = cipherSplit[2];
+	
 
     //first check hmac
-	std::string calculatedHmac;
-	std::stringstream ssMessage;
-	ssMessage << ivStr << ":" << cipherText;
-	std::string messageStr = ssMessage.str();
-
-	HMAC<SHA256> hmac(key, key.size());
-
-	StringSource ssMac(messageStr, true, 
-		new HashFilter(hmac,
-			new HexEncoder(
-				new StringSink(calculatedHmac), false
-			)
-		) // HashFilter      
-	); // StringSource
-
-    // need time constant...?
-	if (hmacStr != calculatedHmac)
+	try
 	{
-		perror("BAD CIPHER!");
-		return "";
-	} 
-	else if (hmacStr.length() < 1) {
-		perror("BAD CIPHER!");
+		// Initialize SHA-256 HMAC 
+		HMAC<SHA256> hmac(this->key, this->key.size());
+		
+		// Decode Hex hmac into raw bytes
+		std::string hmacBytes;
+		CryptoPP::StringSource ssMac(hmacHexStr, true, 
+				new CryptoPP::HexDecoder(
+					new StringSink(hmacBytes)
+				)
+    	);
+
+		// The message that generated the HMAC was "{iv}:{cypherText}"
+		std::stringstream ssMessage;
+		ssMessage << ivStr << ":" << cipherText;
+		
+		// Securely validate HMAC with constant-time
+		// input bytes + hmac
+		StringSource ss(ssMessage.str() + hmacBytes, 
+			true, /* Pump All */
+			new HashVerificationFilter(hmac, 
+				NULL, 
+				HashVerificationFilter::THROW_EXCEPTION | HashVerificationFilter::HASH_AT_END
+			)
+		); // StringSource
+
+		std::cout << "Verified message" << std::endl;
+	}
+	catch(const CryptoPP::Exception& e)
+	{
+		std::cerr << e.what() << std::endl;
 		return "";
 	}
 
 	// Parse IV as HEX and get raw bytes
+	std::string ivHex;
 	CryptoPP::StringSource ivSS(ivStr,
 		true, new CryptoPP::HexDecoder(new StringSink(ivHex)));
 	CryptoPP::SecByteBlock iv((const byte*)ivHex.data(), 128/8);
+	ivHex.clear();
 
     std::string clearText;
     CryptoPP::CBC_Mode<AES>::Decryption dec;
-    dec.SetKeyWithIV( key, 32, iv ); // 256 bit / 8 bits per byte = 32
+    dec.SetKeyWithIV( this->key, 32, iv ); // 256 bit / 8 bits per byte = 32
 
     // The StreamTransformationFilter removes
     //  padding as required.
