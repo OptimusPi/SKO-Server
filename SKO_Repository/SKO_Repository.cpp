@@ -768,7 +768,7 @@ bool SKO_Repository::savePlayerData(unsigned char userId)
 	total_minutes_played += (unsigned long long int)(this_session_milli/1000.0/60.0);
 
 	sql << ", minutes_played=";
-	sql << (int)total_minutes_played;
+	sql << total_minutes_played;
 
 		
 	//what map are they on?
