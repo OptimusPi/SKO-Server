@@ -10,7 +10,7 @@
 //TODO remove this when possible
 #include "../Global.h"
 
-SKO_Network::SKO_Network(SKO_Repository *repository, int port, unsigned long int saveRateSeconds)
+SKO_Network::SKO_Network(SKO_Repository *repository, int port, unsigned long long int saveRateSeconds)
 {
 	// Bind this port to accept connections
 	this->port = port;

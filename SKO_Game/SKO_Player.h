@@ -122,8 +122,8 @@ class SKO_Player
         SKO_PartyStatus partyStatus;
 
         //fun server stuff
-        unsigned long long int loginTime;
-        unsigned long long int minutesPlayed;
+        unsigned long int loginTime;
+        unsigned long int minutesPlayed;
         unsigned short int OS;
         unsigned long int mobKills;
         unsigned long int pvpKills;
