@@ -171,6 +171,8 @@ int main()
 	std::string aesKeyHex = getvar("AES_SECRET_SKO_HUB");
 
 	SKO_HubClient *hubClient = new SKO_HubClient(skoHubApiClientId, skoHubApiUrl, skoHubApiPort, skoHubApiKey, aesKeyHex);
+	
+	printf("Starting hubThread...\n");
 	std::thread hubThread = hubClient->Start();
 
 	printf("Started...\r\n");

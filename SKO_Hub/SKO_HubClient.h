@@ -39,7 +39,7 @@
 
 #include "../OPI_Utilities/OPI_Crypto.h"
 
-#define MAX_BUFFER 10000
+#define MAX_BUFFER 1000000
 
 class SKO_HubClient 
 {
@@ -50,8 +50,12 @@ public:
 
     std::thread Start();
     bool Send(std::string in_Data);
+    bool Send_Secure(std::string tag, std::string data);
+    bool Send_Secure(std::string tag, std::string data, std::string auth);
     void Process();
     void Chop(int size);
+    bool IsValidPacket(std::string packet);
+    bool IsValidInnerMessage(std::string packet);
 
 private:
     // SKO Hub connection details

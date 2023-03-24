@@ -1,6 +1,7 @@
 #include "SKO_HubClient.h"
 #include <sstream>
 #include "../OPI_Utilities/OPI_Crypto.h"
+#include "../OPI_Utilities/base64.h"
 
 SKO_HubClient::SKO_HubClient(std::string clientId, std::string apiUrl, std::string apiPort, std::string apiKey, std::string aesKeyHex)
 {
@@ -72,11 +73,75 @@ std::thread SKO_HubClient::Start()
     return processThread;
 }
 
+// "{nonce64:data64}"
+bool SKO_HubClient::IsValidInnerMessage(std::string packet)
+{
+    // don't bother seaarching if packet is too short.
+    if (packet.length() < 3)
+        return false;
+
+    int bracket1 = packet.find("{");
+    if (bracket1 < 0)
+        return false;
+
+    int colon = packet.find(":");
+    if (colon < bracket1)
+        return false;
+
+    int bracket2 = packet.find("}");
+    if (bracket2 < colon)
+        return false;
+
+    return true;
+}
+
+// "+actions:{nonce64:data64}"
+// "?queries:{nonce64:data64}"
+bool SKO_HubClient::IsValidPacket(std::string packet)
+{
+    // don't bother searching if packet is too short.
+    if (packet.length() < 8)
+    {
+        return false;
+    }
+
+    // every packet needs to start with '?' or '+'
+    if (packet[0] != '?' && packet[0] != '+')
+    {
+        perror("not a command or query!");
+        return false;
+    }
+
+    // every packet needs this separator after the key
+    int colon = packet.find(":");
+    if (!colon)
+    {
+        perror("no separator found!");
+        return false;
+    }
+
+    int bracket1 = packet.find("{");
+    if (bracket1 < colon)
+    {
+        perror("no left bracket found!");
+        return false;
+    }
+
+    int bracket2 = packet.find("}");
+    if (bracket2 < bracket1)
+    {
+        perror("no right bracket found!");
+        return false;
+    }
+
+    return true;
+}
+
 void SKO_HubClient::Process()
 {   
     unsigned long long pingTime = OPI_Clock::milliseconds();
-    unsigned long long  ping = 0;
-    unsigned long long  nextPingTime = 0;
+    unsigned long long ping = 0;
+    unsigned long long nextPingTime = 0;
     bool registered = false;
 
     while (!this->stop)
@@ -87,46 +152,66 @@ void SKO_HubClient::Process()
             this->stop = true;
         }
 
-        // SKO Hub is sending a query 
-        if (this->data[0] == '?')
+        if (!this->IsValidPacket(this->data))
         {
-            if (this->data.substr(0, 9) == "?clientId")
+            if (!this->data.empty())
             {
-                std::stringstream ss;
-                ss << "+clientId ";
-                ss << this->clientId;
-                this->Send(ss.str());
-                this->Chop(9);
-            } 
-            else if (this->data.substr(0, 7) == "?apiKey")
-            {
-                std::stringstream ss;
-                ss << "+apiKey ";
-                ss << this->apiKey;
-                this->Send(ss.str());
-                this->Chop(7);
+                std::string error = "WARNING: continuing due to incomplete packet: ["
+                + this->data + "]";
+                perror(error.c_str());
             }
-            else if (this->data.substr(0, 5) == "?ping")
+            continue;
+        }
+ 
+        std::string packet = this->data.substr(0, this->data.find("}") + 1);
+        this->Chop(packet.length());
+
+        std::string tag = packet.substr(0, packet.find(":"));
+        auto start_index = packet.find("{") + 1;
+        auto length = packet.find("}") - start_index;
+
+        std::string encrypted_blob = packet.substr(start_index, length);
+        std::string message = this->crypto->Decrypt(encrypted_blob);
+
+        auto nonce_index = message.find(":");
+        std::string nonce64 = message.substr(0, nonce_index);
+        std::string content64 = message.substr(nonce_index + 1);
+        std::string content = base64_decode(content64);
+        
+
+        // SKO Hub is sending a query 
+        if (tag[0] == '?')
+        {
+            if (tag == "?clientId")
+            {
+                this->Send_Secure("+clientId", this->clientId, nonce64);
+            }
+            else if (tag == "?apiKey")
+            {
+                this->Send_Secure("+apiKey", this->apiKey, nonce64);
+            }
+            else if (tag == "?ping")
             {
                 this->Send("+pong");
-                this->Chop(5);
+            }
+            else 
+            {
+                printf("Unknown message! = [%s]", packet.c_str());
             }
         }
 
         // SKO Hub is sending a response 
-        if (this->data[0] == '+')
+        if (packet[0] == '+')
         {
-            if (this->data.substr(0, 11) == "+registered")
+            if (packet.substr(0, 11) == "+registered")
             {
                 registered = true;
                 printf("+++++ registered!\r\n");
-                this->Chop(11);
             }
-            else if (this->data.substr(0, 5) == "+pong")
+            else if (packet.substr(0, 5) == "+pong")
             {
                 ping = OPI_Clock::milliseconds() - pingTime;
                 printf("ping: %lld\r\n", ping);
-                this->Chop(5);
             }
         }
 
@@ -145,14 +230,31 @@ void SKO_HubClient::Process()
     printf("!!! STOPPING !!!\r\n");
 }
 
+
+bool SKO_HubClient::Send_Secure(std::string tag, std::string data, std::string auth)
+{
+    std::string message_pair = "{" + auth + ":" + data + "}";
+	return this->Send_Secure(tag, message_pair); 
+}
+
+bool SKO_HubClient::Send_Secure(std::string tag, std::string data)
+{
+    std::string encrypted_data = this->crypto->Encrypt(data);
+    std::string full_packet = tag + ":{" + encrypted_data + "}";
+
+	return this->Send(full_packet); 
+}
+
 bool SKO_HubClient::Send(std::string in_Data)
 {
 	if (send(this->Socket, in_Data.c_str(), in_Data.length(), 0) == 0 ) 
 	{ 
 		perror("SKO_HubClient::Send\n"); 
 		return true; 
-	}     
- 
+	}  
+
+    printf("SKO_HubClient::Send(%s)\r\n", in_Data.c_str());   
+
 	return false; 
 }
 
@@ -163,8 +265,6 @@ void SKO_HubClient::Chop(int size)
 
 bool SKO_HubClient::Receive()
 {
-    // TODO cut packets when multiple if necessary,
-    // TODO right now it's set to only do one packet at a time.
     int recvbytes = 0;
 	struct timeval timeout;
 	timeout.tv_sec = 0; 
@@ -178,7 +278,7 @@ bool SKO_HubClient::Receive()
  
     // Do not block on recv(), only read it if it's ready to go.
     if (FD_ISSET(Socket,&sset)) 
-    { 
+    {
         if ((recvbytes = recv(this->Socket, this->recvbuf, MAX_BUFFER, 0)) == -1)
         {
             perror("recv");

@@ -14,6 +14,7 @@ OPI_Crypto::OPI_Crypto(std::string aesKeyHex)
 		exit(1);
 	}
 	this->SetKey_WithHex(aesKeyHex);
+	aesKeyHex.clear();
 }
 
 OPI_Crypto::~OPI_Crypto()
@@ -90,7 +91,7 @@ std::string OPI_Crypto::Encrypt(std::string clearText)
 
 std::string OPI_Crypto::Decrypt(std::string cipher)
 {
-    // Split cipher text into IV, cipherText, aand 
+    // Split cipher text into IV, cipherText, and 
     auto cipherSplit = OPI_Utilities::split(cipher, ':');
     if (cipherSplit.size() < 3)
 	{
@@ -103,7 +104,6 @@ std::string OPI_Crypto::Decrypt(std::string cipher)
 	std::string cipherText = cipherSplit[1];
 	std::string hmacHexStr = cipherSplit[2];
 	
-
     //first check hmac
 	try
 	{
