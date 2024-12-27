@@ -197,17 +197,7 @@ int main()
 		User[i] = SKO_Player();
 	}
 
-
-	unsigned int serverPort = atoi(getvar("SKO_PORT").c_str());
-	unsigned int databasePort = atoi(getvar("SKO_DB_PORT").c_str());
-	std::string databaseHostname = getvar("SKO_DB_HOST");
-	std::string databaseUsername = getvar("SKO_DB_USER");
-	std::string databasePassword = getvar("SKO_DB_PASSWORD");
-	std::string databaseSchema = getvar("SKO_DB_SCHEMA");
-
-	printf("About to connect to database.\n");
-
-	repository = new SKO_Repository();
+	repository = new SKO_Repository(hubClient);
 
 	if (repository->Connect(databaseHostname, databaseSchema, databasePort, databaseUsername, databasePassword) == "error")
 		return 1;

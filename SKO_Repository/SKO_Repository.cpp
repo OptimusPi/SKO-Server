@@ -4,38 +4,14 @@
 //TODO remove this when possible
 #include "../Global.h"
 
-SKO_Repository::SKO_Repository() 
+SKO_Repository::SKO_Repository(SKO_HubClient hubClient) 
 {
-	this->database = new OPI_MYSQL();
+	this->hubClient = hubClient;
 }
 
-std::string SKO_Repository::Connect(std::string hostname, std::string schema, int port, std::string username, std::string password)
+std::string SKO_Repository::GetClanTag(unsigned char userId, std::string defaultValue)
 {
-	if (!this->database->connect(hostname, schema, port, username, password))
-	{
-		printf("Could not connect to MYSQL database.\n");
-		return "error";
-	}
-
-	return "success";
-}
-
-std::string SKO_Repository::GetClanTag(std::string username, std::string defaultValue)
-{
-	std::string str_SQL = "SELECT clan.name FROM player INNER JOIN clan ON clan.id = player.clan_id WHERE player.username LIKE '";
-	str_SQL += database->clean(username);
-	str_SQL += "'";
-
-	database->query(str_SQL);
-
-	std::string clanTag = defaultValue;
-	if (database->count())
-	{
-		database->nextRow();
-		clanTag = "{";
-		clanTag += database->getString(0);
-		clanTag += "}";
-	}
+	auto clanTag = hubClient->QuerySecure("?get_clan_tag", userId);
 
 	return clanTag;
 }
@@ -238,10 +214,13 @@ int SKO_Repository::loadPlayerData(unsigned char userId)
 
 void SKO_Repository::LogPlayerAddress(unsigned char userId)
 { 
-		//log ip
+	//log ip
 	printf("i.p. logging...\n");
 	std::string player_ip = User[userId].socket->Get_IP();
 	std::string player_id = User[userId].ID;
+
+
+
 	std::string sql = "INSERT INTO ip_log (player_id, ip) VALUES('";
 	sql += database->clean(player_id);
 	sql += "', '";
@@ -693,8 +672,6 @@ bool SKO_Repository::savePlayerData(unsigned char userId)
 	sql << "'";
 
 	database->query(sql.str());
-		
-		
 		
 	//save inventory
 	sql.str("");

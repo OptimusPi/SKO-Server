@@ -52,6 +52,7 @@ public:
     bool Send(std::string in_Data);
     bool Send_Secure(std::string tag, std::string data);
     bool Send_Secure(std::string tag, std::string data, std::string auth);
+    bool Query_Secure(std::string tag, std::string data, std::string auth);
     void Process();
     void Chop(int size);
     bool IsValidPacket(std::string packet);
@@ -59,19 +60,20 @@ public:
 
 private:
     // SKO Hub connection details
-    std::string clientId;
-    std::string apiUrl;
-    std::string apiPort;
-    std::string apiKey;
+    std::string clientId = "";
+    std::string apiUrl = "";
+    std::string apiPort = "";
+    std::string apiKey = "";
 
     // Thread for processing SKO Hub
     bool stop = false;
 
     // socket stuff
-    std::string data;
+    std::string data = "";
     bool Receive();
     char recvbuf[MAX_BUFFER];
-    int Socket;
+    int Socket = 0;
+    unsigned long long ping = 999;
 
     // Encryption provider for AES CBC mode with 256-bit HMAC
     OPI_Crypto* crypto;

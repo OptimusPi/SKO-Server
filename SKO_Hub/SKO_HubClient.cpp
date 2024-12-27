@@ -140,7 +140,6 @@ bool SKO_HubClient::IsValidPacket(std::string packet)
 void SKO_HubClient::Process()
 {   
     unsigned long long pingTime = OPI_Clock::milliseconds();
-    unsigned long long ping = 0;
     unsigned long long nextPingTime = 0;
     bool registered = false;
 
@@ -200,7 +199,7 @@ void SKO_HubClient::Process()
             }
         }
 
-        // SKO Hub is sending a response 
+        // SKO Hub is sending a response
         if (packet[0] == '+')
         {
             if (packet.substr(0, 11) == "+registered")
@@ -210,12 +209,12 @@ void SKO_HubClient::Process()
             }
             else if (packet.substr(0, 5) == "+pong")
             {
-                ping = OPI_Clock::milliseconds() - pingTime;
+                this->ping = OPI_Clock::milliseconds() - pingTime;
                 printf("ping: %lld\r\n", ping);
             }
         }
 
-        // Send ping every 10 seconds
+        // Send ping every 5 seconds
         if (registered && OPI_Clock::milliseconds() >= nextPingTime)
         {
             printf("sending ?ping\r\n");
@@ -232,6 +231,12 @@ void SKO_HubClient::Process()
 
 
 bool SKO_HubClient::Send_Secure(std::string tag, std::string data, std::string auth)
+{
+    std::string message_pair = "{" + auth + ":" + data + "}";
+	return this->Send_Secure(tag, message_pair); 
+}
+
+bool SKO_HubClient::Query_Secure(std::string tag, std::string data, std::string auth)
 {
     std::string message_pair = "{" + auth + ":" + data + "}";
 	return this->Send_Secure(tag, message_pair); 

@@ -555,7 +555,7 @@ void SKO_Network::attemptLogin(unsigned char userId, std::string username, std::
 	//set display name
 	User[userId].Nick = username;
 
-	std::string clanTag = repository->GetClanTag(username, "(noob)");
+	std::string clanTag = repository->GetClanTag(userId, "(noob)");
 
 	printf("Clan: %s\n", clanTag.c_str());
 	User[userId].Clan = clanTag;
